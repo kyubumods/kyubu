@@ -297,7 +297,8 @@ void refresh_mods(bool rescan = true, bool keep_changes = false) {
     std::vector<list::Mod> mods;
     std::vector<KyubuModInfo> info(1);
     g_world = plan::World();
-    g_world.api = "1.2.0";
+    // The running loader's API (KyubuApi.version), so a catalog entry's `kyubu` range is checked against what is installed.
+    g_world.api = std::to_string(api->version >> 16) + "." + std::to_string(api->version & 0xFFFF) + ".0";
     g_pkgs.clear();
     if (!keep_changes) { download::cancel(-1); g_coll.clear(); g_notice.clear(); g_papply.on = false; }
     for (uint32_t i = 0; i < count; ++i) {

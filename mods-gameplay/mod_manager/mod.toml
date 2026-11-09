@@ -1,6 +1,6 @@
 id = "mod_manager"
 name = "ModManager"
-version = "0.1.3"
+version = "0.1.4"
 authors = ["Penchev"]
 kyubu = "^1.2"
 manage_mods = true

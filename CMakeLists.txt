@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(kyubu VERSION 1.0.1 LANGUAGES C CXX)
+project(kyubu VERSION 1.0.2 LANGUAGES C CXX)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
   message(FATAL_ERROR "Kyubu must be built for 32-bit x86 (the game is 32-bit). Use -A Win32 with MSVC or cmake/mingw-i686.cmake.")

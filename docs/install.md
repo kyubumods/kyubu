@@ -13,11 +13,15 @@ Kyubu is a mod loader for **Cube World Alpha v0.1.1** (the 2013-07-20 build: `Cu
 
 ## Install
 
-1. Extract the release zip anywhere, for example into your Cube World folder as `Cube World\kyubu-1.0.0\`.
+1. Extract the release zip anywhere, for example into your Cube World folder as `Cube World\kyubu-1.0.2\`.
 2. Run **`install\install.cmd`**. It asks for the Cube World folder when it cannot find `Cube.exe` two levels up. You can also pass the folder: `install.cmd "C:\Games\Cube World"`.
    - Without the `.cmd` wrapper: `powershell -ExecutionPolicy Bypass -File install\kyubu_install.ps1 -Action install -GameDir "C:\Games\Cube World"`
    - With Python 3: `python install\kyubu_install.py install "C:\Games\Cube World"`
 3. Start `Cube.exe` as usual. On the start menu a notice shows how many mods were loaded.
+
+The installer needs an internet connection for one step: it downloads **ModManager** from the mod catalog. Offline,
+Kyubu is installed anyway and the installer says ModManager was left out; run it again when you are online to add it.
+`--no-mod-manager` / `-NoModManager` skips the download.
 
 The installer:
 
@@ -27,10 +31,12 @@ The installer:
 | Renames `zlib1.dll` → `zlib1_vanilla.dll` | A copy of the original is also kept in `kyubu\backup\zlib1.dll`. |
 | Copies the proxy as `zlib1.dll` | |
 | Adds `kyubu\` | Symbol maps (`kyubu\symbols\`), `config.default.toml`, and `config.toml` if you do not have one yet. |
-| Adds `mods\` | With ModManager in it (an upgrade replaces it and keeps its `config.toml`). |
+| Adds `mods\` | |
+| Downloads ModManager | From the catalog at <https://kyubumods.github.io/catalog/>: the newest version that fits this loader. The catalog's `index.json` must carry the catalog key's signature and the zip must match the catalog's SHA-256, or nothing is installed. It goes to `mods\mod_manager\`; an upgrade replaces the folder (your ModManager settings are in `kyubu\config\mod_manager.toml` and stay). |
 | Verifies and records | Re-checks all hashes and writes `kyubu\install.json`. |
 
-Running the installer again upgrades the proxy and symbol maps in place; your `config.toml`, logs and mod data are kept.
+Running the installer again upgrades the proxy, the symbol maps and ModManager in place; your `config.toml`, logs and mod
+data are kept.
 
 Start the game with **`Cube.exe`**, not `CubeLauncher.exe` (the old auto-updater).
 
@@ -57,8 +63,8 @@ Cube World\
 
 ## Adding and removing mods
 
-- ModManager comes with Kyubu: choose **Mods** on the title menu to install mods from the catalog, update,
-  configure and switch them.
+- ModManager, which the installer adds: choose **Mods** on the title menu to install mods from the catalog, update,
+  configure and switch them. It updates itself from the catalog too.
 - Copy a mod folder (or its `.zip`) into `mods\`. A mod folder contains a `mod.toml`.
 - To disable a mod without deleting it, add to `kyubu\config.toml`:
 

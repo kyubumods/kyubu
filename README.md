@@ -21,10 +21,11 @@ A faulting mod is disabled while the game keeps running; a crash names the respo
 
 ## Status
 
-Version 1.0.1 (API 1.4), for the 2013-07-20 build of Cube World Alpha. Built with MinGW-w64 (i686) and checked on Windows 10 against the original `Cube.exe` and `Server.exe`; not yet built with Visual Studio.
+Version 1.0.2 (API 1.4), for the 2013-07-20 build of Cube World Alpha. Built with MinGW-w64 (i686) and checked on Windows 10 against the original `Cube.exe` and `Server.exe`; not yet built with Visual Studio.
 
-- **Mods:** ModManager comes with Kyubu (the installer puts it in `mods/`) and adds a Mods row to the title menu. It lists, configures and switches mods, and installs verified mods from the signed catalog at <https://kyubumods.github.io/catalog/>. The gameplay mods (SkillsUnleashed, EMTweaks,
-  level_rework, title_plus) have their own repositories and reach players through that catalog.
+- **Mods:** ModManager (its own repository, `mod_manager`), which the installer downloads from the mod catalog,
+  adds a Mods row to the title menu. It lists, configures and switches mods, and installs verified mods from the signed catalog at <https://kyubumods.github.io/catalog/>. ModManager and the gameplay mods (SkillsUnleashed,
+  EMTweaks, level_rework, title_plus) have their own repositories and reach players through that catalog.
 - **Multiplayer:** `Server.exe` runs mods' server side, and gate mods (`gate = true`, [docs/mods.md](docs/mods.md)) make a server refuse clients whose mods differ. Mods' own data still travels only through the vanilla protocol; the modded-server protocol is designed ([docs/networking-future.md](docs/networking-future.md)) but not built.
 - **How the game was mapped:** every game function and field Kyubu uses is in `mapping/`, each with the probe that checked it (`mapping/probes/`, summarised in [docs/game/](docs/game/README.md)).
 

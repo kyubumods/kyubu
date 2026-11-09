@@ -83,8 +83,8 @@ def script_expectations(script):
 
 # Mods that live in their own repositories. Probe records name them by their folder in the development tree; a
 # checkout without the folder (the public Kyubu repository) accepts them. Replaying such a probe needs the mod.
-EXTERNAL_MODS = ('mods-gameplay/emtweaks', 'mods-gameplay/level_rework', 'mods-gameplay/skills_unleashed',
-                 'mods-gameplay/title_plus')
+EXTERNAL_MODS = ('mods-gameplay/emtweaks', 'mods-gameplay/level_rework', 'mods-gameplay/mod_manager',
+                 'mods-gameplay/skills_unleashed', 'mods-gameplay/title_plus')
 
 
 def mods_problems(pid, mods, repo=None):

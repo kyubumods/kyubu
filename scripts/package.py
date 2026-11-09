@@ -17,14 +17,13 @@ import sys
 import zipfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BUNDLED = ['mod_manager']           # mods-gameplay/: the mods the release carries; the installer puts them in mods/
 EXAMPLES = ['gold_sword', 'hello_lua', 'hello_native', 'hook_sample', 'spells_lib', 'frost_spells', 'entity_spawner']
 THIRD_PARTY_LICENSES = {
     'minhook': 'minhook/LICENSE.txt', 'luajit': 'luajit/COPYRIGHT', 'imgui': 'imgui/LICENSE.txt',
     'tomlplusplus': 'toml/LICENSE', 'nlohmann-json': 'json/LICENSE.MIT', 'miniz': 'miniz/LICENSE',
     'monocypher': 'monocypher/LICENCE.md',
 }
-KEYS_H = os.path.join(ROOT, 'mods-gameplay', 'mod_manager', 'src', 'keys.h')   # holds the test public key's bytes
+KEYS_H = os.path.join(ROOT, 'mods-gameplay', 'mod_manager', 'src', 'keys.h')   # the test public key's bytes, where ModManager's source is
 GHIDRA_FILES = ('apply.py', 'mappings.json')       # mapping/ghidra/, shipped together in the SDK's ghidra/
 
 
@@ -69,7 +68,10 @@ def sha256(p):
 
 
 def test_key_problems(folder, keys_h=KEYS_H):
-    """DLLs under folder that contain ModManager's test public key (add-mod-manager D16 release guard)."""
+    """DLLs under folder that contain ModManager's test public key. Without ModManager's source (keys.h) there is no key
+    to look for."""
+    if not os.path.isfile(keys_h):
+        return []
     text = open(keys_h, encoding='utf-8').read()
     keys = []
     for block in re.findall(r'#ifdef\s+KYUBU_MM_TEST_KEY(.*?)#endif', text, flags=re.S):
@@ -113,11 +115,6 @@ def player_release(build, out, ver, strip):
         if not os.path.isdir(src):
             sys.exit(f'{src} not found: build the example mods first')
         copy_tree(src, os.path.join(rel, 'example-mods', m))
-    for m in BUNDLED:
-        src = os.path.join(build, 'gameplay-mods', m)
-        if not os.path.isdir(src):
-            sys.exit(f'{src} not found: build {m} first')
-        copy_tree(src, os.path.join(rel, 'mods', m))
     copy_tree(os.path.join(ROOT, 'docs'), os.path.join(rel, 'docs'))
     copy(os.path.join(ROOT, 'LICENSE'), os.path.join(rel, 'LICENSE.txt'))
     for name, p in THIRD_PARTY_LICENSES.items():
@@ -128,8 +125,9 @@ def player_release(build, out, ver, strip):
 Install:    run install\\install.cmd (asks for your Cube World folder)
             or: python install\\kyubu_install.py install "<Cube World folder>"
 Uninstall:  run install\\uninstall.cmd
-Mods:       ModManager is installed with Kyubu: choose Mods on the title menu to browse the catalog
-            and install mods. Mods from elsewhere go in <Cube World>\\mods\\ ; examples are in example-mods\\
+Mods:       the installer downloads ModManager from the mod catalog (it needs a connection; run it
+            again later if it was offline): choose Mods on the title menu to browse the catalog and
+            install mods. Mods from elsewhere go in <Cube World>\\mods\\ ; examples are in example-mods\\
 Safe mode:  hold Shift while the game starts
 Docs:       docs\\install.md (players), docs\\README.md (mod authors)
 Licence:    MIT, in LICENSE.txt; third-party licences are in licenses\\

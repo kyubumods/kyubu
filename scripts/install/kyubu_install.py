@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Kyubu installer for Cube World Alpha (v0.1.1).
 
-    python kyubu_install.py install   <game_dir> [--force]
+    python kyubu_install.py install   <game_dir> [--force] [--no-mod-manager]
     python kyubu_install.py uninstall <game_dir> [--purge] [--force]
     python kyubu_install.py status    <game_dir>
 
-install   renames zlib1.dll to zlib1_vanilla.dll, copies the Kyubu proxy in as zlib1.dll, and adds
-          kyubu/ (symbol maps, default config) and mods/ with the mods the release carries (ModManager).
-          Running it again upgrades the proxy, the symbol maps and those mods in place. It refuses if Cube.exe/Server.exe or zlib1.dll are not
-          the known v0.1.1 files (--force skips the executable check; the loader then runs in
-          passthrough mode on an unknown build).
+install   renames zlib1.dll to zlib1_vanilla.dll, copies the Kyubu proxy in as zlib1.dll, adds kyubu/
+          (symbol maps, default config) and mods/, then downloads ModManager from the mod catalog into
+          mods/mod_manager/: the newest version that fits this loader, its catalog signed with the catalog
+          key and its zip checked against the catalog's SHA-256. Without a connection Kyubu is still
+          installed and ModManager is skipped with a warning (run the installer again later).
+          Running it again upgrades the proxy, the symbol maps and ModManager in place, keeping a player's
+          config files. It refuses if Cube.exe/Server.exe or zlib1.dll are not the known v0.1.1 files
+          (--force skips the executable check; the loader then runs in passthrough mode on an unknown build).
 uninstall deletes the proxy and renames zlib1_vanilla.dll back to zlib1.dll. kyubu/ and mods/ are
           left in place (they do nothing without the proxy); --purge also deletes kyubu/.
 
@@ -18,10 +21,14 @@ No other game file is written, renamed or deleted. The script needs only the Pyt
 import argparse
 import datetime
 import hashlib
+import io
 import json
 import os
+import re
 import shutil
 import sys
+import urllib.request
+import zipfile
 
 KNOWN_HOSTS = {
     'Cube.exe': '84a7a132a84d4282338e7ea45a1940d32066d64e39cbafed8f2418d5a6dc30bf',     # the 2013-07-20 build
@@ -31,6 +38,14 @@ VANILLA_ZLIB = 'e96b397b499d9eaa3f52eaf496ca8941e80c0ad1544879ccadf02bf2c6a1ecfc
 PROXY_MARKER = b'Kyubu crash report'   # string present in every Kyubu proxy build
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+
+# ModManager comes from the mod catalog, not from the release. The catalog's index.json is signed with this key (the
+# release key of mods-gameplay/mod_manager/src/keys.h); LOADER_API is KYUBU_API_VERSION of the proxy this release ships.
+# KYUBU_INSTALL_CATALOG (a URL or a folder) and KYUBU_INSTALL_CATALOG_KEY (hex) replace the two for tests.
+CATALOG_URL = 'https://kyubumods.github.io/catalog/'
+CATALOG_KEY = 'e58fd9207ab9e11b754c87850bdb5f239138a485c7b9805444a7fb821572047e'
+LOADER_API = (1, 4)
+MOD_MANAGER = 'mod_manager'
 
 
 class InstallError(Exception):
@@ -99,7 +114,157 @@ def copy_tree(src, dst, overwrite):
     return copied
 
 
-def install(game, force=False, log=print):
+# ---- Ed25519 signature check (RFC 8032), only what verifying the catalog's index.json needs ----------------------------
+_P = 2 ** 255 - 19
+_Q = 2 ** 252 + 27742317777372353535851937790883648493
+_D = -121665 * pow(121666, _P - 2, _P) % _P
+_I = pow(2, (_P - 1) // 4, _P)
+
+
+def _x_of(y, sign):
+    xx = (y * y - 1) * pow(_D * y * y + 1, _P - 2, _P) % _P
+    x = pow(xx, (_P + 3) // 8, _P)
+    if (x * x - xx) % _P:
+        x = x * _I % _P
+    if (x * x - xx) % _P:
+        return None
+    if (x & 1) != sign:
+        x = _P - x
+    return x
+
+
+def _add(a, b):
+    x1, y1, z1, t1 = a
+    x2, y2, z2, t2 = b
+    pa, pb = (y1 - x1) * (y2 - x2) % _P, (y1 + x1) * (y2 + x2) % _P
+    pc, pd = t1 * 2 * _D * t2 % _P, z1 * 2 * z2 % _P
+    e, f, g, h = pb - pa, pd - pc, pd + pc, pb + pa
+    return (e * f % _P, g * h % _P, f * g % _P, e * h % _P)
+
+
+def _mul(s, pt):
+    out = (0, 1, 1, 0)
+    while s:
+        if s & 1:
+            out = _add(out, pt)
+        pt = _add(pt, pt)
+        s >>= 1
+    return out
+
+
+def _decode(b):
+    y = int.from_bytes(b, 'little')
+    sign, y = y >> 255, y & ((1 << 255) - 1)
+    if y >= _P:
+        return None
+    x = _x_of(y, sign)
+    if x is None or (x == 0 and sign):
+        return None
+    return (x, y, 1, x * y % _P)
+
+
+_BY = 4 * pow(5, _P - 2, _P) % _P
+_B = (_x_of(_BY, 0), _BY, 1, _x_of(_BY, 0) * _BY % _P)
+
+
+def ed25519_verify(public, message, signature):
+    """True when `signature` (64 bytes) is `public`'s (32 bytes) signature of `message`."""
+    if len(public) != 32 or len(signature) != 64:
+        return False
+    a, r = _decode(public), _decode(signature[:32])
+    s = int.from_bytes(signature[32:], 'little')
+    if a is None or r is None or s >= _Q:
+        return False
+    h = int.from_bytes(hashlib.sha512(signature[:32] + public + message).digest(), 'little') % _Q
+    left, right = _mul(s, _B), _add(r, _mul(h, a))
+    return (left[0] * right[2] - right[0] * left[2]) % _P == 0 and (left[1] * right[2] - right[1] * left[2]) % _P == 0
+
+
+# ---- ModManager from the catalog -----------------------------------------------------------------------------------------
+def _version(text):
+    """(major, minor, patch) of a release version, None for a pre-release or anything else."""
+    m = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)', text or '')
+    return tuple(int(g) for g in m.groups()) if m else None
+
+
+def fits_loader(req, api=LOADER_API):
+    """Whether a catalog `kyubu` requirement ("^1.2", "^1.2.3" or "*") admits the loader API `api` (major, minor)."""
+    if req in ('*', ''):
+        return True
+    m = re.fullmatch(r'\^(\d+)(?:\.(\d+))?(?:\.(\d+))?', req or '')
+    if not m:
+        return False
+    major, minor = int(m.group(1)), int(m.group(2) or 0)
+    return api[0] == major and api[1] >= minor
+
+
+def _fetch(base, rel):
+    if re.match(r'https?://', base):
+        req = urllib.request.Request(base.rstrip('/') + '/' + rel, headers={'User-Agent': 'kyubu-installer'})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            return r.read()
+    with open(os.path.join(base, *rel.split('/')), 'rb') as f:
+        return f.read()
+
+
+def installed_version(folder):
+    """The version in folder/mod.toml, or None."""
+    try:
+        text = open(os.path.join(folder, 'mod.toml'), encoding='utf-8').read()
+    except OSError:
+        return None
+    m = re.search(r'(?m)^version\s*=\s*"([^"]*)"', text)
+    return m.group(1) if m else None
+
+
+def install_mod_manager(game, log=print, catalog=None, key=None):
+    """Puts the newest catalog ModManager that fits LOADER_API into game/mods/mod_manager. Raises InstallError."""
+    catalog = catalog or os.environ.get('KYUBU_INSTALL_CATALOG') or CATALOG_URL
+    key = bytes.fromhex(key or os.environ.get('KYUBU_INSTALL_CATALOG_KEY') or CATALOG_KEY)
+    try:
+        index, sig = _fetch(catalog, 'index.json'), _fetch(catalog, 'index.json.sig')
+    except Exception as e:   # no connection, a proxy, a missing file: say why and go on without it
+        raise InstallError(f'cannot read the mod catalog at {catalog} ({e})')
+    if not ed25519_verify(key, index, sig):
+        raise InstallError('the mod catalog is not signed with the Kyubu catalog key')
+    mods = [m for m in json.loads(index.decode('utf-8')).get('mods', []) if m.get('id') == MOD_MANAGER]
+    fit = [v for m in mods for v in m.get('versions', []) if _version(v.get('version')) and fits_loader(v.get('kyubu'))]
+    if not fit:
+        raise InstallError(f'the mod catalog has no ModManager for loader API {LOADER_API[0]}.{LOADER_API[1]}')
+    best = max(fit, key=lambda v: _version(v['version']))
+    dst = os.path.join(game, 'mods', MOD_MANAGER)
+    have = installed_version(dst)
+    if have == best['version'] and os.path.isdir(os.path.join(dst, 'bin')):
+        log(f'ModManager {have} is up to date')
+        return have
+    try:
+        data = _fetch(catalog, best['url'])
+    except Exception as e:
+        raise InstallError(f'cannot download ModManager {best["version"]} ({e})')
+    if hashlib.sha256(data).hexdigest() != best.get('sha256'):
+        raise InstallError(f'the ModManager {best["version"]} download does not match the catalog (sha256)')
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        names = [n for n in z.namelist() if not n.endswith('/')]
+        for n in names:
+            parts = n.replace('\\', '/').split('/')
+            if n.startswith('/') or '..' in parts or ':' in n:
+                raise InstallError(f'the ModManager zip holds an unsafe path: {n}')
+        tmp = dst + '.new'
+        if os.path.isdir(tmp):
+            shutil.rmtree(tmp)
+        for n in names:
+            out = os.path.join(tmp, *n.split('/'))
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with open(out, 'wb') as f:
+                f.write(z.read(n))
+    if os.path.isdir(dst):
+        shutil.rmtree(dst)
+    os.replace(tmp, dst)
+    log(f'installed ModManager {best["version"]} into mods/{MOD_MANAGER}/' + (f' (was {have})' if have else ''))
+    return best['version']
+
+
+def install(game, force=False, log=print, mod_manager=True):
     src = payload_dir()
     s = state(game)
     if not s['hosts']:
@@ -135,12 +300,12 @@ def install(game, force=False, log=print):
         shutil.copy2(os.path.join(game, 'kyubu', 'config.default.toml'), cfg)
     os.makedirs(os.path.join(game, 'mods'), exist_ok=True)
     log(f'copied {n} file(s) into kyubu/, created mods/')
-    # The mods the release carries (ModManager): replaced on an upgrade, apart from a player's config.toml.
-    bundled = os.path.join(src, 'mods')
-    if os.path.isdir(bundled):
-        m = copy_tree(bundled, os.path.join(game, 'mods'),
-                      overwrite=lambda rel: rel.split(os.sep)[1:] != ['config.toml'])
-        log(f'installed {", ".join(sorted(os.listdir(bundled)))} into mods/ ({m} file(s))')
+    missing = None
+    if mod_manager:
+        try:
+            install_mod_manager(game, log)
+        except InstallError as e:
+            missing = str(e)
 
     after = state(game)
     if after['state'] != 'installed':
@@ -150,6 +315,9 @@ def install(game, force=False, log=print):
                    'proxy_sha256': after['zlib1'], 'zlib1_vanilla_sha256': after['zlib1_vanilla'],
                    'hosts': after['hosts']}, f, indent=2)
     log('Kyubu installed. Start Cube.exe as usual; hold Shift while it starts for safe mode.')
+    if missing:
+        log(f'warning: ModManager was not installed: {missing}. Kyubu works without it; run the installer again '
+            'when online to add it.')
 
 
 def uninstall(game, purge=False, force=False, log=print):
@@ -185,13 +353,15 @@ def main(argv=None):
         sp.add_argument('game_dir')
         if name != 'status':
             sp.add_argument('--force', action='store_true')
+        if name == 'install':
+            sp.add_argument('--no-mod-manager', action='store_true', help='do not download ModManager from the catalog')
         if name == 'uninstall':
             sp.add_argument('--purge', action='store_true', help='also delete kyubu/ (logs, config, mod data)')
     a = p.parse_args(argv)
     game = os.path.abspath(a.game_dir)
     try:
         if a.cmd == 'install':
-            install(game, a.force)
+            install(game, a.force, mod_manager=not a.no_mod_manager)
         elif a.cmd == 'uninstall':
             uninstall(game, a.purge, a.force)
         else:

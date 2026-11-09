@@ -1,4 +1,4 @@
-"""What the release zips contain (scripts/package.py; add-mapping-workspace task 4.9).
+"""What the release zips contain (scripts/package.py).
 
 Packages this checkout with a stand-in build folder (a fake proxy DLL and example mods), so it runs without a
 compiler, then reads the zips back.
@@ -40,9 +40,8 @@ def zips(tmp_path_factory):
     for m in package.EXAMPLES:
         (build / 'mods' / m).mkdir(parents=True)
         (build / 'mods' / m / 'mod.toml').write_text(f'id = "{m}"\n')
-    for m in package.BUNDLED:
-        (build / 'gameplay-mods' / m).mkdir(parents=True)
-        (build / 'gameplay-mods' / m / 'mod.toml').write_text(f'id = "{m}"\n')
+    (build / 'gameplay-mods' / 'mod_manager').mkdir(parents=True)          # built, but not the release's to carry
+    (build / 'gameplay-mods' / 'mod_manager' / 'mod.toml').write_text('id = "mod_manager"\n')
     (build / 'dev-mods' / 'kyubu_probe' / 'bin' / 'Release').mkdir(parents=True)       # where MSVC puts it
     (build / 'dev-mods' / 'kyubu_probe' / 'bin' / 'Release' / 'kyubu_probe.dll').write_bytes(b'MZ stand-in probe')
     out = tmp / 'dist'
@@ -75,17 +74,12 @@ def test_sdk_has_the_ghidra_pair(zips):
     assert '`ghidra/`' in readme and 'apply.py' in readme and 'cubeworld' in readme
 
 
-def test_player_release_carries_mod_manager_only(zips):
-    # the player release carries ModManager in mods/, where the installer takes it from; the gameplay mods come
-    # from the catalog
+def test_player_release_carries_no_mods(zips):
+    # every mod, ModManager too, comes from the catalog: the installer downloads ModManager, ModManager the rest
     player, _ = zips
-    assert package.BUNDLED == ['mod_manager']
-    for m in package.BUNDLED:
-        assert (Path(ROOT) / 'mods-gameplay' / m / 'mod.toml').is_file()
-        assert f'mods/{m}/mod.toml' in player
-        assert f'example-mods/{m}/mod.toml' not in player
-    assert not any(n.startswith('gameplay-mods/') for n in player)
-    assert 'ModManager is installed with Kyubu' in player['README.txt'].decode()
+    assert not any(n.startswith(('mods/', 'gameplay-mods/')) for n in player)
+    assert 'example-mods/mod_manager/mod.toml' not in player
+    assert 'the installer downloads ModManager from the mod catalog' in player['README.txt'].decode()
 
 
 def test_sdk_and_player_have_the_game_reference(zips):

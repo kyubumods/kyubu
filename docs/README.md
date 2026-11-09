@@ -6,7 +6,7 @@ Kyubu is a mod loader for Cube World Alpha v0.1.1. It loads mods made of assets,
 
 - [install.md](install.md): installing, adding mods, safe mode, crash recovery, `config.toml`, uninstalling.
 - [config.md](config.md): changing a mod's options in `kyubu\config\<id>.toml`.
-- [mod-manager.md](mod-manager.md): the MODS page on the title screen: enabling, installing, modpacks, undo.
+- the `mod_manager` repository: the MODS page on the title screen: enabling, installing, modpacks, undo.
 
 ## Mod authors
 
@@ -28,7 +28,7 @@ Kyubu is a mod loader for Cube World Alpha v0.1.1. It loads mods made of assets,
 | [dev-tools.md](dev-tools.md) | Console, dev mode, diagnostics panel, notices, `kanim`, the Animator and the rig file format, `kyubu-voxedit` (the voxel model editor). |
 | [probes.md](probes.md) | The `kyubu_probe` developer mod: inspector, field finder, call tracer; probe records and replays for mapping (native on Windows, Wine deprecated). |
 | the `level_rework` repository | The `level_rework` gameplay mod: the level, XP, creature and item tables, the compatibility rules for saves and multiplayer, its options. |
-| [mod-manager.md](mod-manager.md) | ModManager: the Mods page, the change queue, the catalog, modpacks and `tools/kcat`; the `label` / `group` / `restart` option fields. |
+| the `mod_manager` repository | ModManager: the Mods page, the change queue, the catalog, modpacks and `tools/kcat`; the `label` / `group` / `restart` option fields. |
 | the `emtweaks` repository | The `emtweaks` gameplay mod (EMTweaks, the mod other mods depend on): the shockwave (a flat ring that expands and fades in the 3D world), the game's own particles by name (presets, the trace), their interfaces for other mods, the console commands and options, how it is drawn. |
 | the `skills_unleashed` repository | The `skills_unleashed` gameplay mod (SkillsUnleashed): one fourth ability for every specialization, delivered one at a time; its tuning table, the effects and combat helpers, the bundler, the icon style envelope and how to build and check an icon, testing and the limits. |
 

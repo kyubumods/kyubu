@@ -1,0 +1,132 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world (seed 1234). The call tracer watches the World step, the creature constructor and destructors, and three sites
+# inside the step, in three phases: standing still, a creature dying (the bush next to the start, its hp set to 0) and
+# walking for 100 s (creatures ahead are created, the ones left behind removed).
+# Sites: 0x60E958 follows the constructor call that builds a creature from a zone's creature record (EAX = the new
+# creature); 0x60CD5B and 0x60E04B load the vtable of a creature about to be deleted (ECX = the creature): the first in
+# the loop that removes living creatures, the second in the loop that removes dead ones.
+id = "creature-lifecycle"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced cube::World::update, the Creature constructor, destructor and deleting destructor, and three sites",
+    "Standing still for 5 s: counted the steps and checked their this (a cube::World with a creature map)",
+    "Set the hp of the creature with the top id (a bush) to 0 and traced for 5 s",
+    "Walked (W) for 100 s while tracing and watching the size of the World's creature map",
+]
+observations = [
+    "Wine replay 1 passed, 19 of 19 held (the discovery run before it showed the same paths); screenshots per phase",
+    "standing 5 s: 290 World steps in 20 ms steps from GameController::update, this = the World at controller + 0x2DC",
+    "standing: no creature built or deleted; the World's map holds 17 creatures",
+    "the bush (top id, 25 hp) set to hp 0: deleted once, about 1.7 s later, by the dead-creature loop (ret 0x60E053)",
+    "in the same step the bush was rebuilt from its zone record under the same id (discovery: same id, same block)",
+    "walking 100 s: 28 creatures built at the create site, 29 deleted at the despawn site; the map ended at 15",
+    "walking: one creature died on its own (44 s) and went through the dead-creature site",
+    "0x487770 built and deleted a temporary creature on a worker thread at 93 s (discovery: at 105 s)",
+    "zone creature ids are (zone x << 24) | (zone y << 8) | index, the zone being position >> 24",
+]
+
+[[confirms]]
+entry = "cube::World::update"
+observed = "290 calls in 5 s standing, 5,323 in the 100 s walk; this is a complete cube::World holding the creature map"
+
+[[confirms]]
+entry = "cube::World::creatureCreateSite"
+observed = "never passed standing; 28 times while walking, each followed by a creature in the map"
+
+[[confirms]]
+entry = "cube::World::creatureDespawnSite"
+observed = "never passed standing or for the dead bush; 29 times while walking (creatures left behind)"
+
+[[confirms]]
+entry = "cube::World::creatureDeathRemoveSite"
+observed = "passed once, for the bush whose hp was set to 0, and once for a creature that died walking"
+
+[[confirms]]
+entry = "cube::Creature::Creature"
+observed = "0 calls standing; 30 walking: 28 from the create site, 1 from 0x487770 (a temporary creature)"
+
+[[confirms]]
+entry = "cube::Creature::~Creature"
+observed = "0 standing; once for the dead bush (via 0x43D0B0 from 0x60E053); 32 walking, via the deleting destructor"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "17 creatures standing; the map's size changed 51 times while walking, 17 to 15"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+input = [
+    "until 8.3: start", "shot 01-start",
+    "until 8.3: bush hp 0", "wait 3", "shot 02-bush-hp-0",
+    "until 8.3: walk",
+    "hold w 50", "shot 03-walk-50", "hold w 50", "shot 04-walk-100",
+]
+script = """
+log creature lifecycle (task 8.3): the World step, and creatures created and removed standing, dying and walking
+wait world
+wait 15
+trace args 3
+trace add @0x60AEA0
+trace add cube::Creature::Creature
+trace add cube::Creature::~Creature
+trace add @0x43D0B0
+trace add @0x60E958
+trace add @0x60CD5B
+trace add @0x60E04B
+inspect creatures [@0x7691C8] + 0x2DC
+# phase 1, standing: GameController::update steps the World in 20 ms steps; nothing is created or removed
+trace start
+log 8.3: start
+wait 5
+trace stop
+trace report
+expect cube::World::update calls @0x60AEA0 > 100
+# the step's this is a complete cube::World (".?AVWorld@cube@@": "Worl", "d@cu"; locator offset 0) whose map holds
+# the creatures
+expect cube::World::update value u32 == 1819438935 [[[ecx(@0x60AEA0)] - 4] + 0xC] + 0xC
+expect cube::World::update value u32 == 1969438820 [[[ecx(@0x60AEA0)] - 4] + 0xC] + 0x10
+expect cube::World::update value u32 == 0 [[ecx(@0x60AEA0)] - 4] + 4
+expect cube::World.creatures creatures > 1 ecx(@0x60AEA0)
+expect cube::Creature::Creature calls cube::Creature::Creature == 0
+expect cube::Creature::~Creature calls cube::Creature::~Creature == 0
+# phase 2, a creature dying: the creature with the top id (a bush, 25 hp) gets hp 0; about a second later the
+# dead-creature loop deletes it
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+inspect set data.hp 0
+log 8.3: bush hp 0
+wait 5
+trace stop
+trace report
+expect cube::World::creatureDeathRemoveSite calls @0x60E04B == 1
+expect cube::World::creatureDespawnSite calls @0x60CD5B == 0
+expect cube::Creature::~Creature calls @0x43D0B0 == 1
+expect cube::Creature::~Creature caller @0x43D0B0 0x60E053
+expect cube::Creature::~Creature calls cube::Creature::~Creature == 1
+expect cube::Creature::~Creature caller cube::Creature::~Creature 0x43D0BB
+inspect creatures
+# phase 3, walking: creatures ahead are built from their zones' records and put in the map, the ones left behind
+# are deleted by the living-creature loop
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 8.3: walk
+wait 100
+trace stop
+watch
+trace report
+inspect creatures
+inspect cube::Creature ecx(cube::Creature::Creature)
+expect cube::World::creatureCreateSite calls @0x60E958 > 5
+expect cube::Creature::Creature calls cube::Creature::Creature > 5
+expect cube::World::creatureDespawnSite calls @0x60CD5B > 5
+expect cube::Creature::~Creature calls cube::Creature::~Creature > 5
+expect cube::World.creatures watch count changed
+watch clear
+expect - hooks == 0
+"""

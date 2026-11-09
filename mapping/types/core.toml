@@ -1,0 +1,709 @@
+# The objects everything else hangs from, and the members that lead from one to the next (task 7.2), then the
+# local player's creature and the creature collection (task 7.3). Only the access paths are mapped here; the rest of
+# each object is still unknown bytes. Checked in the running game by the probes game-access-client (Cube.exe),
+# game-access-server (Server.exe) and creature-collection.
+
+[[type]]
+name = "cube::World"
+kind = "class"
+size = 0x80029C
+status = "verified"
+evidence = ["probe:game-access-client", "probe:game-access-server"]
+source = "kyubu"
+notes = "the same size in both builds: Server.exe allocates it with operator new(0x80029C); in Cube.exe it is embedded in the controller and ends before the next member. Its RTTI vtable is at +0"
+
+[[type.field]]
+offset = 0x4
+name = "creatures"
+type = "std::map"
+status = "verified"
+evidence = ["probe:creature-collection", "probe:creature-lifecycle", "manual:Server.exe main walks World+4 every tick", "probe:creature-server", "probe:creature-spawn"]
+source = "kyubu"
+notes = "every live creature by id: the key is a uint64 id at node+0x10, the value the cube::Creature* at node+0x18. The controller's constructor inserts the player under id 1. Run-time ids (pets, bombs, summons) are min(0, lowest id in the map) - 1 as signed 64-bit: -1, -2, ..."
+
+[[type.field]]
+offset = 0x14
+name = "projectiles"
+type = "std::list"
+status = "verified"
+evidence = ["xref:cube::World::projectileSpawnSite", "xref:cube::World::projectileUpdateSite", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "the live cube::Projectile objects (0x78-byte nodes: the list links, then the 0x70-byte projectile). The projectile modes push onto it, and the World step moves each one and removes it after a hit or when too old"
+
+[[type.field]]
+offset = 0xB4
+name = "joined"
+type = "bool"
+status = "verified"
+evidence = ["xref:client_connect", "xref:cube::World::applyHit", "xref:cube::World::abilityDispatchSite", "probe:hit-damage", "probe:hit-authority"]
+source = "kyubu"
+notes = "set by client_connect (GameController+0x390) when the client joins a server; Server.exe's World takes it from its constructor. While set, the World runs only local_player's mode, records its hits without applying them, and applies received hits only to local_player"
+
+[[type.field]]
+offset = 0xB8
+name = "local_player"
+type = "cube::Creature*"
+status = "verified"
+evidence = ["xref:cube::World::abilityDispatchSite", "xref:cube::World::applyHit", "probe:ability-dispatch", "probe:hit-authority"]
+source = "kyubu"
+notes = "the player's creature in Cube.exe (as cube::GameController.player), 0 in the server's World. With 0, cube::World::applyHit forwards the hits on players instead of applying them"
+
+[[type.field]]
+offset = 0xBC
+name = "regions"
+type = "cube::Region*[1048576]"
+status = "verified"
+evidence = ["manual:Cube 0x434A90 and Server 0x406210 read +0xBC + 4*(x*1024+y)", "xref:cube::World::getBlock", "probe:world-block-client", "probe:world-block-server"]
+source = "kyubu"
+notes = "the loaded regions by region x and y (0 to 1023, index x*1024 + y), null where none. A region is 64 by 64 zones. The zone thread fills and empties it; its slot is cleared while the thread holds cube::World.lock, so a read under the lock sees a live region or null"
+
+[[type.field]]
+offset = 0x8000C0
+name = "lock"
+type = "win32::CriticalSection"
+status = "verified"
+evidence = ["manual:0x4D3D50 (Server), 0x59ACD0 (Cube) enter it; the constructors set it up", "xref:cube::GameController::update", "probe:world-lock-server", "probe:world-lock-client", "probe:world-lock"]
+source = "kyubu"
+notes = "the World's lock. The game thread holds it around cube::World::update (Server.exe's main; all of Cube.exe's GameController::update). The zone thread, Cube.exe's 0x469B80 and each client's receive and send threads take it too, single-player included. Another critical section follows at +0x8000D8"
+
+[[type]]
+name = "cube::Creature"
+kind = "class"
+size = 0x1E60
+status = "verified"
+evidence = ["probe:creature-collection", "manual:operator new(0x1E60) before each constructor call"]
+source = "kyubu"
+notes = "the same size in both builds. Its RTTI vtable is at +0, its id at +8 and cuwo's creature data at +0x10 (8.1); after +0x1178 only the ability limits of 9.4 are mapped (stamina, ability_cooldowns, spent_mp)"
+
+[[type.field]]
+offset = 0x8
+name = "id"
+type = "uint64_t"
+status = "verified"
+evidence = ["probe:creature-data", "probe:creature-server"]
+source = "kyubu"
+notes = "the creature's key in cube::World.creatures (1 for the local player), right after the vtable"
+
+[[type.field]]
+offset = 0x10
+name = "data"
+type = "cube::CreatureData"
+status = "verified"
+evidence = ["probe:creature-data", "cuwo:cuwo/entity.pyx", "probe:creature-server"]
+source = "kyubu"
+notes = "cuwo's EntityData block (0x1168 bytes) embedded as is: the network format is the memory layout. Placed in 8.1; 8.2 verified the fields the creature deep dive needs (probe:creature-fields)"
+
+[[type.field]]
+offset = 0x1190
+name = "stealth"
+type = "float"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:the step adds or drains it, clamps 0..1, camouflage sets 1.0", "xref:cube::CombatBehavior::update", "xref:cube::GameController::render"]
+source = "kyubu"
+notes = "0 to 1, not network data. The World step (0x618490 to 0x618553) raises it with sneak or drains it, holds 1.0 under camouflage (buff 3). It shrinks the first-target scan's range (to 0.1 of it at most), draws the creature in render's later pass and shows the HUD bar (atlas creatures.md, Stealth)"
+
+[[type.field]]
+offset = 0x1194
+name = "stamina"
+type = "float"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the HUD's staminabar shows it while below 1 (0x492FF8)", "probe:ability-costs"]
+source = "kyubu"
+notes = "0 to 1, not sent over the network (outside data). The World step drains it while swimming and climbing and refills it otherwise (0.0001 per ms); a dodge roll (0x4A71FA) takes 0.25 and sets data.roll_time to 600"
+
+[[type.field]]
+offset = 0x139C
+name = "ability_cooldowns"
+type = "std::map"
+status = "verified"
+evidence = ["xref:cube::Creature::canUseAbility", "xref:cube::World::cooldownStartSite", "probe:ability-costs"]
+source = "kyubu"
+notes = "std::map<int, int>: ability id (node+0x10) to the ms left (node+0x14). Each mode start stores ability_cooldown(mode, -1); the World step counts it down; canUseAbility refuses an id whose entry is above 0"
+
+[[type.field]]
+offset = 0x13A4
+name = "threat"
+type = "std::map"
+status = "verified"
+evidence = ["xref:cube::World::applyHit", "xref:cube::CombatBehavior::update", "probe:taunt-target"]
+source = "kyubu"
+notes = "std::map<uint64_t, float>: attacker id (node+0x10) to its threat (node+0x18). applyHit adds damage x 2 (x 1 ranged, x 10 for entity type 25, x 20 for a tank weapon) + 0.01. A combat AI attacks the largest key from any distance and keeps it; an entry stays until the map is cleared"
+
+[[type.field]]
+offset = 0x13AC
+name = "hit_counts"
+type = "std::map"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "xref:cube::CombatBehavior::update", "manual:read from the code, not run"]
+source = "kyubu"
+notes = "std::map<uint64_t, float>: victim id (node+0x10) to the number of hits this creature made on it (applyHit adds 1.0). A pet's combat AI (hostile_type 5) picks the entry with the most hits as its target"
+
+[[type.field]]
+offset = 0x1184
+name = "hit_flash"
+type = "float"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:hitCreature sets it, the step eases it to 0, render draws with it", "manual:read from the code, not run"]
+source = "kyubu"
+notes = "0 to 1: the render passes it to the vertex shader before drawing the creature (0x4B5B29, 0x4BA838). hitCreature sets 1.0 on a hit (0.3 in mode 0x1C); the World step eases it to 0"
+
+[[type.field]]
+offset = 0x13B4
+name = "spent_mp"
+type = "float"
+status = "candidate"
+evidence = ["xref:cube::World::abilityCostSite", "xref:cube::World::chargedMpSpendSite", "probe:ability-costs"]
+source = "kyubu"
+notes = "the mp the current attack spent: its ability_cost, or the charged mp (halved for 5 and 11); modes 17, 20 and 5 spend all mp, and 21, 54, 87, 88 set 1. Probably the attack's strength"
+
+[[type.field]]
+offset = 0x13C4
+name = "behavior_time"
+type = "int32_t"
+status = "verified"
+evidence = ["xref:cube::World::aiTickSite", "manual:dt is added each step; the behaviour runs at 32 ms and it is zeroed"]
+source = "kyubu"
+notes = "ms since the creature's behaviour last ran (server copy, computer creatures). The same offset on Server.exe"
+
+[[type.field]]
+offset = 0x13E4
+name = "behavior"
+type = "cube::Behavior*"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the zone default is stored here, 0x60ECE8", "manual:the constructor zeroes it (Server.exe too)", "probe:spawn-behavior"]
+source = "kyubu"
+notes = "the creature's behaviour (a cube::SequentialBehavior for the zone default), or null. ~Creature and cube::Creature::reset free it with operator_delete only (no virtual destructor), so its children stay allocated. The bomb path sets none"
+
+[[type.field]]
+offset = 0x11DC
+name = "inventory"
+type = "cube::Inventory"
+status = "verified"
+evidence = ["xref:cube::GameController::onMouseDown", "manual:the loot paths pass it to inventory_add", "probe:inventory-add"]
+source = "kyubu"
+notes = "the creature's bags: the object the loot code passes to inventory_add (the player's, at least). The held item sits inside it at +0x10 (Creature+0x11EC), and its coin counters at +0x128 and +0x12C"
+
+[[type]]
+name = "cube::Inventory"
+kind = "class"
+size = 0x130
+status = "candidate"
+evidence = ["xref:inventory_add"]
+source = "kyubu"
+notes = "size is a lower bound: only the members below are known (the loot list of a Spawn at +0xF6C is another object of this kind). Four bags, each a vector of 0x11C-byte slots (a count word, then the 0x118-byte ItemData)"
+
+[[type.field]]
+offset = 0x0
+name = "tabs"
+type = "std::vector"
+status = "verified"
+evidence = ["xref:inventory_add", "probe:inventory-add"]
+source = "kyubu"
+notes = "the bags: a vector of vectors of slots; inventory_add resizes the outer one to the item's bag + 1 and appends to a bag's vector when it has no empty slot (item_tab gives 0 to 3)"
+
+[[type.field]]
+offset = 0x128
+name = "coins"
+type = "uint32_t"
+status = "verified"
+evidence = ["xref:inventory_add", "probe:inventory-add"]
+source = "kyubu"
+notes = "coins (item type 0x0C) are not kept in a slot: inventory_add adds the amount here, times 1, 100 or 10,000 for the coin material 10, 12 or 11 (copper, silver, gold)"
+
+[[type]]
+name = "cube::GameController"
+kind = "class"
+size = 0x1001018
+builds = ["cube-0x51EA955E"]
+status = "verified"
+evidence = ["xref:WinMain", "manual:WinMain allocates it with operator new(0x1001018)"]
+source = "kyubu"
+notes = "one per process, built by WinMain and kept in cube::game_controller"
+
+[[type.field]]
+offset = 0x11C
+name = "window_width"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize"]
+source = "kyubu"
+notes = "the window's client width in pixels; cube::GameController::onResize lays every panel out from it and window_height (the start menu at (window_width - 200) / 2)"
+
+[[type.field]]
+offset = 0x120
+name = "window_height"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize"]
+source = "kyubu"
+notes = "the window's client height in pixels; the start menu's top is window_height / 2 + 50"
+
+[[type.field]]
+offset = 0x140
+name = "camera_position"
+type = "cube::LongVector3"
+status = "candidate"
+evidence = ["probe:shockwave-ring", "xref:cube::GameController::render"]
+source = "kyubu"
+notes = "the camera's position in world units, whole blocks; render adds render_origin and divides by 65,536 to make the shader's cameraPosition"
+
+[[type.field]]
+offset = 0x1A0
+name = "quit_requested"
+type = "uint8_t"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "set to 1 by a left click on the start menu's Exit row (cube::StartMenuWidget.hover 2); the game then closes"
+
+[[type.field]]
+offset = 0x1D8
+name = "render_origin"
+type = "int64_t[2]"
+status = "candidate"
+evidence = ["probe:shockwave-ring", "xref:cube::GameController::render", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "x and y, world units, minus the world's middle (-8396928 blocks each): the game's render space is the world moved to put its middle at 0, z unmoved"
+
+[[type.field]]
+offset = 0x2E4
+name = "world"
+type = "cube::World"
+status = "verified"
+evidence = ["probe:game-access-client", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "embedded, not a pointer: the constructor runs cube::World::World on this+0x2E4. Single-player simulates this world; there is no in-process server"
+
+[[type.field]]
+offset = 0x8006CC
+name = "socket"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:channel-transport-client", "import:ws2_32.dll!recv", "xref:client_receive_loop", "xref:client_send_loop", "xref:client_disconnect"]
+source = "kyubu"
+notes = "the SOCKET of the joined game: client_receive_loop reads it before every recv, client_send_loop before every send, client_disconnect closes it"
+
+[[type.field]]
+offset = 0x8006D0
+name = "player"
+type = "cube::Creature*"
+status = "verified"
+evidence = ["probe:creature-collection", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the local player's creature, the one the constructor inserts into world.creatures under id 1. The client never applies network updates to it"
+
+[[type.field]]
+offset = 0x800710
+name = "engine"
+type = "plasma::D3D9Engine*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the one plasma::D3D9Engine, passed to the constructor; the same object as plasma::d3d9_engine. Everything the UI draws goes through it"
+
+[[type.field]]
+offset = 0x800750
+name = "text_fx"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named textFX at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "a top-level node named textFX; it has no children on the title screen"
+
+[[type.field]]
+offset = 0x800754
+name = "minimap"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named minimap at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named minimap, in the HUD group; a leaf"
+
+[[type.field]]
+offset = 0x800758
+name = "land_name"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:landname node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named landname, in the HUD group (8 children)"
+
+[[type.field]]
+offset = 0x800814
+name = "ability_bar"
+type = "std::vector"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:every read is in update (static scan)", "probe:ability-slot4", "probe:ability-bar-soak", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "embedded std::vector<int>: the player's skill bar, one ability id per slot (M1, M2, then 1 to 4), rebuilt every frame by cube::GameController::update (clear, then push_back by class; 5 ids). The input loop and the HUD read it by index. The game keeps the id as a byte: 255 is the highest usable id"
+
+[[type.field]]
+offset = 0x800820
+name = "ability_icons"
+type = "std::map"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:constructor, destructor and HUD reads (static)", "probe:ability-icons", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "std::map<int, T*>: ability id (node+0x10) to the icon object (node+0x14, 4 bytes), filled by 72 inserts in the constructor. The HUD looks ids up with IntMap::operator[] and skips a null. The destructor frees nodes only, never the values"
+
+[[type.field]]
+offset = 0x800828
+name = "skill_icons"
+type = "std::map"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:constructor inserts", "probe:ability-skilltree", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "std::map<int, T*> beside ability_icons: skill button index (node+0x10) to its icon (node+0x14). Keys 0 to 5 come from the constructor. The panel uses it for every button except 6, 7 and 8, skips a null, and inserts null nodes for keys 9 and 10. An icon in key 9 draws on button 9"
+
+[[type.field]]
+offset = 0x800844
+name = "skill_buttons"
+type = "std::vector"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:constructor builds 11", "probe:ability-skilltree", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "embedded std::vector of the skill panel's 11 button objects, one per skill (index = Creature.skills index). A button's node is at +0x3C; its visible flag is node[+0x94][node[+0x68]]. The game hides button 10 in the loop and button 9 every frame; 0 to 8 are shown"
+
+[[type.field]]
+offset = 0x800858
+name = "landscape"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named landscape at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named landscape, in the HUD group (6 children)"
+
+[[type.field]]
+offset = 0x800860
+name = "info"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named info at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named info, in the HUD group (1 child)"
+
+[[type.field]]
+offset = 0x800868
+name = "quest_tag"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:questtag node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named questtag, in the HUD group (4 children)"
+
+[[type.field]]
+offset = 0x80086C
+name = "small_quest_tag"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:smallquesttag node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named smallquesttag, in the HUD group (7 children)"
+
+[[type.field]]
+offset = 0x800874
+name = "start_scene"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "xref:cube::GameController::update", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the start scene's group (logo, picroma, the start menu node). Its display's visible value is 1 on the title screen and 0 once Start Game is clicked; update moves the options panel under it while it is shown"
+
+[[type.field]]
+offset = 0x800878
+name = "logo"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named cubeworld at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the title logo: the node named cubeworld of start.plx, in the start scene next to picroma; 7 children (see the ui atlas page, The title screen)"
+
+[[type.field]]
+offset = 0x80087C
+name = "picroma"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named picroma at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named picroma, in the start scene: a mesh and the two texts Picroma and 2013"
+
+[[type.field]]
+offset = 0x800898
+name = "wait"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named wait at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "a top-level node named wait (1 child)"
+
+[[type.field]]
+offset = 0x8008AC
+name = "crosshair"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named crosshair at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named crosshair, in the HUD group (5 children)"
+
+[[type.field]]
+offset = 0x8008B0
+name = "zoom_crosshair"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:zoomcrosshair node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named zoomcrosshair, in the HUD group (5 children)"
+
+[[type.field]]
+offset = 0x8008B4
+name = "locked_enemy"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:lockedenemy node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named lockedenemy, in the HUD group (a leaf)"
+
+[[type.field]]
+offset = 0x8008B8
+name = "locked_friend"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:lockedfriend node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named lockedfriend, in the HUD group (a leaf)"
+
+[[type.field]]
+offset = 0x8008F1
+name = "skills_open"
+type = "uint8_t"
+status = "verified"
+evidence = ["manual:toggleSkills flips it; the skill-button handler runs only while it is 1", "probe:skill-points", "probe:ability-skilltree", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "1 while the skill panel is open; the key X and HUD button 3 flip it (cube::GameController::toggleSkills)"
+
+[[type.field]]
+offset = 0x800888
+name = "character_select"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "xref:cube::GameController::GameController", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the character-selection panel (Select, Delete Character, the character list): Start Game hides start_scene and shows this"
+
+[[type.field]]
+offset = 0x80090C
+name = "skill_widget"
+type = "void*"
+status = "candidate"
+evidence = ["manual:11 working skill ranks at +0x160, a back pointer at +0x190", "probe:su-spec-switch-0720", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the cube::SkillWidget of the skill tree (404 bytes): 11 working ranks at +0x160 (a copy of Creature+0x1138) and the working specialization, an int32 at +0x18C. Opening the panel copies both from the player, a specialization button sets +0x18C, LEARN writes both back, CANCEL restores them"
+
+[[type.field]]
+offset = 0x800884
+name = "templates"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "xref:cube::GameController::update", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node of interface templates (button, blackwidget, leftbutton and about 55 more) the constructor finds by name. Most are detached after the lookup and kept only in locals, so after start-up they are gone from here; blackwidget is kept in blackwidget_template"
+
+[[type.field]]
+offset = 0x8008C8
+name = "blackwidget_template"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "manual:found by name blackwidget in templates, then detached", "probe:mods-page", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the blackwidget template (the dark see-through panel with the white stepped edge), detached from the tree and never shown itself; plasma::Node::clone under a parent gives a new panel"
+
+[[type.field]]
+offset = 0x800984
+name = "characters"
+type = "std::vector"
+status = "candidate"
+evidence = ["xref:character_select_click", "xref:character_list_selected", "xref:delete_character"]
+source = "kyubu"
+notes = "the saved characters of the character list, as cube::Creature* (begin +0x800984, end +0x800988), indexed by selected_character"
+
+[[type.field]]
+offset = 0x80099C
+name = "creation_back_button"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "xref:cube::GameController::onResize", "probe:mods-page", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the Back button of character creation: a clone of the button template, 200 x 40, connected to the back handler 0x4814F0, at (20, 20). A clone of it gets no connection, so a mod can clone it for a game button"
+
+[[type.field]]
+offset = 0x800918
+name = "start_menu_node"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "xref:cube::GameController::onResize", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "an unnamed node made with plasma::create_node under start_scene that carries start_menu. update sets its visible value to 1 exactly while options_panel is hidden"
+
+[[type.field]]
+offset = 0x80091C
+name = "start_menu"
+type = "cube::StartMenuWidget*"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "xref:cube::GameController::onMouseDown", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the title screen's Start Game / Options / Exit menu, 200 x 100, drawn as text by cube::StartMenuWidget::draw (no button nodes)"
+
+[[type.field]]
+offset = 0x800974
+name = "character_name"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:charactername node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named charactername, in the character panel (2 children: a text and an edit)"
+
+[[type.field]]
+offset = 0x8009AC
+name = "server_name"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:serverName node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named serverName, in the connect panel (2 children: a text and an edit)"
+
+[[type.field]]
+offset = 0x8009B8
+name = "world_seed"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:worldSeed node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named worldSeed, in the new-world panel (2 children: a text and an edit)"
+
+[[type.field]]
+offset = 0x8009BC
+name = "world_name"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["manual:worldName node at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named worldName, in the new-world panel (2 children: a text and an edit)"
+
+[[type.field]]
+offset = 0x8009F4
+name = "name_error"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named nameError at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "a top-level node named nameError (1 child)"
+
+[[type.field]]
+offset = 0x8009F8
+name = "connection_error"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene", "manual:node named connectionError at run time", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the node named connectionError, in the connect panel (1 child)"
+
+[[type.field]]
+offset = 0x800A00
+name = "options_panel"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "xref:cube::GameController::update", "manual:8 bytes later than in 07-02 (07-20 has one more member at 0x198)"]
+source = "kyubu"
+notes = "the options panel: the start menu's Options row shows it. While start_scene is shown, update moves it under start_scene and hides the logo and start_menu_node while it is visible"
+
+[[type.field]]
+offset = 0x80088C
+name = "world_select"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:character_select_click", "xref:world_select_click", "manual:Select and Delete World are cloned into it (0x4658F3)"]
+source = "kyubu"
+notes = "the world list panel: character_select_click shows it after loading a character, world_select_click hides it; onBack goes from it back to character_select"
+
+[[type.field]]
+offset = 0x800890
+name = "world_create"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:world_select_click", "manual:shown when the selected world index is past the end of the list"]
+source = "kyubu"
+notes = "the world creation panel (name and seed edits, Create World)"
+
+[[type.field]]
+offset = 0x8009DC
+name = "worlds"
+type = "std::vector"
+status = "candidate"
+evidence = ["xref:world_select_click", "manual:begin +0x8009DC, end +0x8009E0, indexed by selected_world"]
+source = "kyubu"
+notes = "the saved worlds of the list on screen, as WorldInfo pointers: name std::string at +0x8, seed int32 at +0x20 (what world_select_click passes to change_world)"
+
+[[type.field]]
+offset = 0x800A0C
+name = "selected_character"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:character_select_click", "xref:character_list_selected", "xref:delete_character"]
+source = "kyubu"
+notes = "index into the character list (vector of cube::Creature* at +0x800984, end +0x800988); out of range (or -1) means the Create Character slot"
+
+[[type.field]]
+offset = 0x800A10
+name = "selected_world"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:world_select_click"]
+source = "kyubu"
+notes = "index into worlds; past the end means the Create World slot"
+
+[[type]]
+name = "cube::Server"
+kind = "class"
+size = 0x54
+builds = ["server-0x51D2CE9B", "server-0x51EA94D5"]
+status = "verified"
+evidence = ["probe:game-access-server", "manual:main allocates it with operator new(0x54)"]
+source = "kyubu"
+notes = "one per process, built by main after the World; main keeps both only as locals, so no global leads here"
+
+[[type.field]]
+offset = 0x4
+name = "world"
+type = "cube::World*"
+status = "verified"
+evidence = ["probe:game-access-server"]
+source = "kyubu"
+notes = "the World main built, passed to cube::Server::Server; the Server methods main calls every tick lock it through here"
+
+[[type]]
+name = "cube::Connection"
+kind = "struct"
+size = 0xB0
+builds = ["server-0x51EA94D5"]
+status = "verified"
+evidence = ["rtti:cube::Connection", "manual:server_accept_loop allocates it with operator new(0xB0)"]
+source = "kyubu"
+notes = "one per joined client, in the server's std::vector<cube::Connection*> by slot; the receive and send threads' closures hold the vector at +4 and the slot at +8. Its vtable is at +0"
+
+[[type.field]]
+offset = 0x8
+name = "socket"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:channel-transport-server", "import:ws2_32.dll!recv", "xref:server_accept_loop", "xref:connection_receive_loop", "xref:connection_send_loop"]
+source = "kyubu"
+notes = "the client's SOCKET: server_accept_loop stores the accepted socket here, both threads read it before each recv and send"
+
+[[type.field]]
+offset = 0x10
+name = "creature_id"
+type = "int64_t"
+status = "verified"
+evidence = ["probe:channel-transport-server", "xref:server_accept_loop", "manual:the accept loop stores the new player's id here"]
+source = "kyubu"
+notes = "the id of the player's creature (1 to 10, the first free one), stored by server_accept_loop after the join"

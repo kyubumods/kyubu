@@ -1,0 +1,9 @@
+id = "pose_join_proto"
+name = "Pose join prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe pose-join): a read-only mid hook at the join site of draw_creature (0x41F135, after the switch and its smoothing, before the four adds of the hand vectors). It logs the draw record's pose vectors for the local player (per class, creature mode and pose id) and for other creatures, and counts the join site against the entry of draw_creature."
+[scripts]
+client = "scripts/client.lua"

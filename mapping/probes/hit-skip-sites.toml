@@ -1,0 +1,75 @@
+# Replay it with KEEP=1 in a sandbox that holds the save of character Tester and world testworld (kyubu-mapping/tmp/fast_replay.sh hit-skip-sites <out>).
+# Written 2026-11-06 for task 2.3 of add-dragon-boss (M3). Question: can a mod cancel the push, the velocity reset, the slow/lock timer and the
+# stun that cube::World::applyHit gives its target with mid hooks that only edit registers (and, for the velocity, save and restore state)?
+# The dev mod mods-dev/hit_skip_proto forces Hit.stun = Hit.slow = 3000 and a push (0, 4, 6) at hitListSite on every hit, and parks the first of two
+# pink slimes in front of the player: it is "flagged" (the five applyHit sites cancel the effects); the second is the control (no cancelling).
+id = "hit-skip-sites"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-06"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "`spawner hostile 1 PINK_SLIME` puts two pink slimes near the player",
+    "hit_skip_proto parks slime 0 (flagged) 1.5 blocks in front of the player; the script holds mouse1 so the player hits it; the mod logs pos, velocity, extra_vel, stun and slow for 8 frames after the first forced-stun hit",
+    "then slime 1 (control) is parked in front and hit the same way",
+]
+observations = [
+    "run 5 (evidence/dragon-hit-skip-2026-11-06/run5): two hostile pink slimes (hostile_type 1, 100 hp), parked in front of the player; the player's basic attack hit each; the mod forced Hit.stun = Hit.slow = 3000 and a push (0, 4, 6) at hitListSite",
+    "flagged slime: the push site was reached with push (0, 4, 6) and its extra_vel stayed 0; velocity was not zeroed (-0.30 before and after); stun_time kept its old negative value and the +0x130 timer stayed 0 (the stun and slow sites were reached); hp fell 100 -> 82.1 (damage untouched); position did not move",
+    "control slime (same forced hit, no cancelling): extra_vel became (0, 4, 6), velocity was zeroed, stun and the +0x130 timer 3000, the slime rose and drifted (+0.04 y, +0.06 z per frame); hp 100 -> 94.5",
+    "a creature whose hostile_type byte (creature+0x60) is 6 (a bush, a still/monster spawn picked in runs 1-4) never reaches the push site: applyHit skips the push for hostile_type 6, but it does reach the stun, slow and velocity sites",
+    "no crash; all seven hooks installed (draw_creature_end_site, hitListSite and the five new sites); the sites are single-player, one World: the creature pointer in applyHit is the one the renderer draws",
+]
+
+[[confirms]]
+entry = "cube::World::hitPushSite"
+observed = "reached with the hit's push in XMM5-XMM7; setting them to the target's current extra_vel left it 0; the control got (0, 4, 6)"
+
+[[confirms]]
+entry = "cube::World::hitVelocityResetSite"
+observed = "reached once per stunning hit; the mod saved the velocity here and restored it at the end site: -0.30 before and after, the control's was zeroed"
+
+[[confirms]]
+entry = "cube::World::hitVelocityResetEndSite"
+observed = "reached after the reset (and without it); the saved velocity written back there held"
+
+[[confirms]]
+entry = "cube::World::hitSlowSite"
+observed = "reached for a hit with Hit+0x1C = 3000; ECX set to the target's own timer at +0x130: it stayed 0, the control's became 3000"
+
+[[confirms]]
+entry = "cube::World::hitStunSite"
+observed = "reached for a hit with a stun of 3000; ECX set to the target's own stun_time: it kept its old negative value, the control's became 3000"
+
+[[confirms]]
+entry = "cube::World::hitListSite"
+observed = "the mod wrote Hit.stun, Hit.slow and a push (0, 4, 6) into the Hit at ESP+0xC4 here; the control slime received exactly those values"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/hit_skip_proto", "mods-examples/entity_spawner"]
+input = [
+    "until hsk: A", "console entity_spawner:spawner hostile 1 PINK_SLIME",
+    "until hsk: B", "hold mouse1 2.0",
+    "until hsk: C", "hold mouse1 2.0",
+    "until hsk: D",
+]
+script = """
+log hit-skip-sites: hit_skip_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log hsk: A
+wait 5
+log hsk: B
+wait 6
+log hsk: C
+wait 6
+log hsk: D
+expect - hooks == 0
+"""

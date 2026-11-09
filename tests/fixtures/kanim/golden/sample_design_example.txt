@@ -1,0 +1,9 @@
+clip: design_example.anim.toml, duration 1000 ms, base pose all zeros
+t 0 (0 ms), weight 0
+  hand_r: rot 0 0 0
+t 0.35 (350 ms), weight 1
+  hand_r: rot -110 0 10
+t 0.5 (500 ms), weight 1
+  hand_r: rot 30 0 0
+t 1 (1000 ms), weight 0
+  hand_r: rot 0 0 0

@@ -1,0 +1,9 @@
+id = "kyubu_probe"
+name = "Kyubu probe"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+description = "Developer tools for mapping the game: object inspector, field finder, call tracer. Active only in dev mode."
+
+[native]
+common = "bin/kyubu_probe.dll"

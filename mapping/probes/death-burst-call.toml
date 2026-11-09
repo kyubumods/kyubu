@@ -1,0 +1,57 @@
+# Replay it with KEEP=1 in a sandbox that holds the save of character Tester and world testworld (copy $KMAP_HOME/tmp/replay-seed-testworld to
+# $KMAP_HOME/tmp/replay-death-burst-call, delete its game/kyubu/logs/latest.log): mods-dev/auto_enter then enters the world with no clicks.
+# Written 2026-11-06 for task 2.2 of add-dragon-boss (M2). Question: can a mod burst a model of its own into voxel particles with the
+# game's cube::GameController::createParticles (0x470D80) from creature_death_burst_site (0x4B3A31), and does writing 0 to
+# [creature+0x1D10] there skip the game's own burst of the creature's parts? The dev mod mods-dev/death_burst_proto sets one
+# creature's hp to 0 (client memory) and, at the site, bursts the quiver model (0x347) tinted red.
+id = "death-burst-call"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-06"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: the saved character Tester enters the saved world testworld by itself (runs 1-4 used gamepilot's menu clicks, about 32 s)",
+    "`spawner PINK_SLIME 1 still` puts one pink slime near the player",
+    "death_burst_proto writes its hp 0; at creature_death_burst_site it calls createParticles(quiver, head matrix, red) and clears the draw flag",
+]
+observations = [
+    "run 1: a hp write on an ambient creature at call 1 reached the site (flag 1, burst 1, then the flag stayed 0 for 3,000 more frames), but no screenshot could show it",
+    "runs 2-3: a hp write on the pink slime (client memory) never reached the site: the game deletes a dead non-player creature in the step before it renders (no dying mode started), so a mod cannot test with a slime this way",
+    "run 4 (evidence/dragon-death-burst-2026-11-06/run4): the script's boosted player (20000 hp) set to hp 0 three seconds after it was first seen; at creature_death_burst_site the mod called createParticles(quiver 0x347, the head matrix, red) once (log 'burst 1', matrix translation -0.78 -0.65 214.82 = the player's place in world blocks) and wrote 0 to [creature+0x1D10]",
+    "after it the site was reached every frame (hp stays 0) with the flag 0, and the game made no burst of its own: no blond or skin cubes, only red ones; one red cube lies on the ground at the right in 02-burst.png and 03-later.png; the revive prompt shows the player is dead",
+    "no crash, no change to the other creatures; the pink slime next to the player stayed whole",
+]
+
+[[confirms]]
+entry = "cube::GameController::createParticles"
+observed = "called from the site with the quiver model, the player's head matrix (world blocks, absolute) and a red colour: red voxel cubes appear and rest on the ground; one burst, no crash"
+
+[[confirms]]
+entry = "creature_death_burst_site"
+observed = "reached every frame for a creature with hp <= 0; ESI the creature, EDI the GameController; writing 0 to [ESI+0x1D10] at its first visit skipped the game's own burst (no cubes of the player's parts)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/death_burst_proto", "mods-examples/entity_spawner"]
+input = [
+    "until dbc: A", "console entity_spawner:spawner PINK_SLIME 1 still", "shot 01-slime",
+    "until dbc: B", "shot 02-burst",
+    "until dbc: C", "shot 03-later",
+]
+script = """
+log death-burst-call: death_burst_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log dbc: A
+wait 4
+log dbc: B
+wait 2
+log dbc: C
+wait 5
+expect creature_death_burst_site hooks == 0
+"""

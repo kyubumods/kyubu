@@ -1,0 +1,5 @@
+# Phase 1: wear pose 2 (the pose vanilla mode 57 draws), at the mode's own pace.
+duration = 800
+
+[borrow]
+mode = 2

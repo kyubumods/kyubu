@@ -1,0 +1,47 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 4.6 of add-ability-api (the placeholder), unattended under Wine 9.0 (WSL,
+# Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. No mod
+# is installed: slot 4 holds kyubu:placeholder (111) with [abilities] placeholder = false in the sandbox's config.toml (env CONFIG of wine_sandbox.sh).
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-placeholder-off"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "class_type set to 3 (the mage); screenshot of the bar",
+    "key 4 held for 1 s; screenshots of the overlay and the slot, then 5 s later",
+]
+observations = [
+    "Wine run 1 passed with CONFIG=<a config.toml that holds `[abilities] placeholder = false`> (the env var of wine_sandbox.sh passes through kmap probe replay); evidence: evidence/ability-placeholder-2026-10-05/ (the off-* files). 2 expectations held",
+    "class_type 3: slot 4 is the empty grey square (off-01-bar.png), index 5 of the bar is not 111; there is no `ability 111 shows the icon` line in the log",
+    "key 4 held for 1 s: nothing shows (off-02-pressed.png: no overlay text, no sweep), the log has no `not made yet` and no `kyubu:placeholder ends` line, and the mode is 0 at the end",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "set to 3 by the inspector, the bar and the placeholder's text followed on the next frames"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+input = [
+    "until placeholder A", "shot 01-bar", "hold 4 1", "wait 2", "shot 02-pressed", "wait 6", "shot 03-later",
+]
+script = """
+log placeholder: task 4.6 of add-ability-api, [abilities] placeholder = false
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.class_type 3
+wait 20
+expect cube::CreatureData.class_type value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+# the bar has no sixth id: index 5 is not 111
+expect - value i32 != 111 [[@0x7691C8] + 0x80080C] + 20
+log placeholder A
+wait 4
+# key 4 pressed (by gamepilot): nothing starts
+wait 12
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+log placeholder done
+"""

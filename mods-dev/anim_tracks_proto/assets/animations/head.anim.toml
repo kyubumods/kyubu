@@ -1,0 +1,8 @@
+# Phase 2: `set` replaces the vector: the head turned 60 degrees about the vertical, whatever the game had.
+duration = "ability"
+
+[[track]]
+part = "head"
+channel = "rot"
+mode = "set"
+keys = [ { t = 0, v = [0, 0, 60] } ]

@@ -1,0 +1,63 @@
+# Task 5.5 of add-mod-manager. ModManager's Mods page shell: a click on Mods opens a page of nodes cloned from the game's own
+# (blackwidget frames, the Back button for every button), the title menu's three labels are blanked and its text is drawn by the
+# page. The input opens the page, hovers a tab, opens and closes the Actions menu, clicks INSTALL, then BACK; then it collects
+# pending changes on the console and checks the confirmation (Escape and BACK ask, NO keeps the page, YES closes it).
+id = "mod-page"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built the page shell in ModManager (src/page.h places the pieces and keeps the state; main.cpp clones the nodes at startMenuShownSite and draws the text from the title menu's draw)",
+    "Replayed at the start menu under Wine at 1024 x 768: opened the page from Mods, hovered and clicked the tabs and the Actions button, then BACK and Escape with and without pending changes",
+]
+observations = [
+    "replay 9 passed under Wine at 1024 x 768 (evidence/mod-page-2026-10-24/run9): a click on Mods builds the page once and opens it; the logo is hidden (0) and the start scene stays shown (1) while it is open; the title menu's own hover is held at -1",
+    "the game's plates cannot be shorter than 67 px: setSize with height 36 read back 67 (run 2), and poking the layout floats at +0x74, +0x78 and +0x7C changed nothing; widths are kept. A blackwidget clone is drawn about 62 px tall at the least (its corner pieces), so the tabs and ACTIONS are frames of 62 and DISCARD and APPLY plates of 67",
+    "moving start_menu_node under start_scene again (setParent) makes the menu's text draw over the cloned frames: the title, tab labels, placeholders and Actions rows are readable on the frames (01-page, 04-menu-delete-hover)",
+    "the Actions button toggled the menu (actions 1 then 2), a click on the Delete row counted once (rows 1) and closed it; Escape with the menu open closed only the menu (escapes 1, page still open)",
+    "with 3 pending changes BACK showed the confirmation (confirm 1, open 1); NO closed it and kept the page; Escape closed the confirmation, not the page; BACK then YES closed the page and zeroed the changes",
+    "after YES the title came back with START GAME, OPTIONS, MODS and EXIT (06-title-again), labels_blank 0, hover -1 at the state read; logo 1 and quit_requested 0 at the end",
+    "not replayed: 1024 x 600 and 1920 x 1080 (the replay window is 1024 x 768); the layout is unit-tested at both",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook here clones the page once, places it for the window size, hides the logo and tests clicks and Escape"
+
+[[confirms]]
+entry = "plasma::Node::setParent"
+observed = "moving start_menu_node under start_scene again made its text draw over the cloned frames"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 700
+mods = ["mods-gameplay/mod_manager"]
+input = [
+    "until modpage open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 01-page",
+    "console mod_manager:state",
+    "move 269 142", "wait 3", "shot 02-tab-hover", "click 269 142", "wait 4", "console mod_manager:state",
+    "click 107 142", "wait 3",
+    "click 731 228", "wait 4", "shot 03-menu", "move 700 376", "wait 3", "shot 04-menu-delete-hover", "click 700 376", "wait 3", "console mod_manager:state",
+    "click 731 228", "wait 3", "key Escape", "wait 3", "console mod_manager:state",
+    "console mod_manager:pending 3", "wait 2", "click 120 53", "wait 4", "shot 05-confirm", "console mod_manager:state",
+    "click 593 418", "wait 3", "console mod_manager:state",
+    "key Escape", "wait 3", "console mod_manager:state", "key Escape", "wait 3", "console mod_manager:state",
+    "click 120 53", "wait 3", "click 431 418", "wait 8", "shot 06-title-again", "console mod_manager:state",
+    "until modpage done",
+]
+script = """
+log modpage: task 5.5 of add-mod-manager
+wait 15
+log modpage open
+wait 40
+expect - value i32 == 0 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+wait 330
+log modpage done
+wait 5
+expect - value i32 == 1 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 20
+"""

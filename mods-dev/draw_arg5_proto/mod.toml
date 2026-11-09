@@ -1,0 +1,9 @@
+id = "draw_arg5_proto"
+name = "draw_creature argument 5 prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe draw-arg5): a mid hook on draw_creature (0x4129C0) that reads argument 5 and logs it per frame beside the frame's dt (frame.begin), GameController + 0x8006E0 (the source of the argument) and GameController + 0x2A4 (what update copies it from). It only reads."
+[scripts]
+client = "scripts/client.lua"

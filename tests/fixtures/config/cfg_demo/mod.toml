@@ -1,0 +1,6 @@
+id = "cfg_demo"
+name = "Config Demo"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+description = "Fixture: declares options (tests/fixtures/config/README.md)."

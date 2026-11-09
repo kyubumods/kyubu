@@ -1,0 +1,92 @@
+# (Part c of the pose catalogue: the mod's FIRST and LAST are 84 and 110 for this record; anim-catalogue ran with 0 and 110 and the game stopped at mode 65, anim-catalogue-b with 66 and 110 and it stopped at 83.)
+# Task 4.5 of add-ability-animation (the pose catalogue, D8): mods-dev/anim_catalogue_proto forces the local player into each vanilla mode id 84 to 110 in turn (the
+# ability-force technique: current_mode and mode_start_time written on every draw) with the mode time pinned at 100, 450 and 800 ms, in three steps of five draws.
+# A mid hook at the join site of draw_creature (0x41F135) logs, per step, the mode the game left, the pose id and the time of the draw record and the smoothed hand
+# vectors; the second step logs "animcat: shotNNN" and the input takes a screenshot (the camera zoomed out by 3 wheel ticks first). The player is the level-1 human
+# warrior Tester of the replay's setup, with his club: the class byte alone does not change the equipment (task 2.4), so the other classes are not drawn.
+id = "anim-catalogue-c"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 80 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; 27 phases (mode 84 to 110) of three steps, a screenshot in the second step of each",
+]
+observations = [
+    "Wine replay 1 passed to the end (evidence/ability-animation-2026-10-07/anim-catalogue/run-c1/: 27 screenshots, modes 84 to 110, the mod's 'done' line); modes 106 and 107 were set back to 0 by the game"
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "the record's pose id for each forced vanilla mode, read at the join site: the catalogue table of the evidence README"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+mods = ["mods-dev/anim_catalogue_proto"]
+input = [
+    "until animcat: first draw",
+    "wheel down 3",
+    "until animcat: shot084 ",
+    "shot 084-mode84",
+    "until animcat: shot085 ",
+    "shot 085-mode85",
+    "until animcat: shot086 ",
+    "shot 086-mode86",
+    "until animcat: shot087 ",
+    "shot 087-mode87",
+    "until animcat: shot088 ",
+    "shot 088-mode88",
+    "until animcat: shot089 ",
+    "shot 089-mode89",
+    "until animcat: shot090 ",
+    "shot 090-mode90",
+    "until animcat: shot091 ",
+    "shot 091-mode91",
+    "until animcat: shot092 ",
+    "shot 092-mode92",
+    "until animcat: shot093 ",
+    "shot 093-mode93",
+    "until animcat: shot094 ",
+    "shot 094-mode94",
+    "until animcat: shot095 ",
+    "shot 095-mode95",
+    "until animcat: shot096 ",
+    "shot 096-mode96",
+    "until animcat: shot097 ",
+    "shot 097-mode97",
+    "until animcat: shot098 ",
+    "shot 098-mode98",
+    "until animcat: shot099 ",
+    "shot 099-mode99",
+    "until animcat: shot100 ",
+    "shot 100-mode100",
+    "until animcat: shot101 ",
+    "shot 101-mode101",
+    "until animcat: shot102 ",
+    "shot 102-mode102",
+    "until animcat: shot103 ",
+    "shot 103-mode103",
+    "until animcat: shot104 ",
+    "shot 104-mode104",
+    "until animcat: shot105 ",
+    "shot 105-mode105",
+    "until animcat: shot106 ",
+    "shot 106-mode106",
+    "until animcat: shot107 ",
+    "shot 107-mode107",
+    "until animcat: shot108 ",
+    "shot 108-mode108",
+    "until animcat: shot109 ",
+    "shot 109-mode109",
+    "until animcat: shot110 ",
+    "shot 110-mode110"
+]
+script = """
+log anim-catalogue: task 4.5 of add-ability-animation, the pose catalogue
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

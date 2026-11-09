@@ -1,0 +1,185 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop): kmap
+# probe replay starts Server.exe, then a Kyubu-loaded Cube.exe in the same Wine prefix that joins 127.0.0.1 with a new
+# character (client = "join", the fx_net setup of add-mod-loader 5.6) and walks. The script runs on the server: it
+# reads the joined player's creature through the creature layout mapped on the client (task 8.5), and traces the
+# server's zone generation and creature creation and removal sites.
+id = "creature-server"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Server.exe with --kyubu-dev, then Cube.exe joined 127.0.0.1 with a new character (Tester, warrior)",
+    "Traced the World step, generateZone, the Creature constructor and destructors and the three sites while joining",
+    "Read the joined player's server-side cube::Creature (World.creatures id 1) through the client's layout",
+    "Watched the player's pos.y on the server while the client walked for 120 s, tracing the sites again",
+    "Set the top-id creature's hp to 0 on the server and traced the dead-creature removal",
+]
+observations = [
+    "Wine replay 2 passed, 17 of 17 entries held (replay 1: 15 of 17, see below)",
+    "the client connected (Server.exe: Player 0 joined; client.log: connected to 127.0.0.1:12345)",
+    "joining: 25 generateZone calls from 0x549659 on a worker thread, this the World, zones around (0x8020, 0x8020)",
+    "joining: 18 creatures built, 17 at creatureCreateSite; the other one is the joined player (id 1 in the map)",
+    "the player's server creature read through the client layout: RTTI cube::Creature, id 1, Tester, warrior, level 1",
+    "its hp 265 and max_hp_multiplier 100 match the client's HUD (265/265); entity_type 2 (HUMAN_MALE)",
+    "walking back 120 s: the server's pos.y changed 4283 times (about two zones); 55 creatures built, 49 despawned",
+    "a zone creature set to hp 0 on the server: removed once at creatureDeathRemoveSite, rebuilt in the same step",
+    "replay 1 walked forward into a cliff (the server world spawns the character in a lake): no despawn; its",
+    "constructor caller check also caught the player's own construction; replay 2 walks back and checks it in phase 3",
+]
+
+[[confirms]]
+entry = "cube::World::update"
+observed = "runs about 50 times a second from main while a client plays; this is the World holding the creatures"
+
+[[confirms]]
+entry = "cube::World::generateZone"
+observed = "called by 0x5493D0 on a worker thread when the client joins and walks; this is the cube::World"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the server's World maps the joined player under id 1 and the zone creatures under their zone ids"
+
+[[confirms]]
+entry = "cube::Creature.id"
+observed = "the joined player's server-side creature has id 1 at +8, the same as its map key"
+
+[[confirms]]
+entry = "cube::Creature.data"
+observed = "the server's copy of the joined player holds the client's creature data at +0x10"
+
+[[confirms]]
+entry = "cube::CreatureData.pos"
+observed = "pos.y of the joined player changes on the server while the client walks"
+
+[[confirms]]
+entry = "cube::CreatureData.hp"
+observed = "the joined player's hp is positive; a zone creature set to hp 0 on the server is removed as dead"
+
+[[confirms]]
+entry = "cube::CreatureData.max_hp_multiplier"
+observed = "100 for the joined new character, as on the client"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "1 for the joined new character"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 (warrior) for the joined new character"
+
+[[confirms]]
+entry = "cube::CreatureData.entity_type"
+observed = "2 (HUMAN_MALE) for the joined new character"
+
+[[confirms]]
+entry = "cube::CreatureData.name"
+observed = "the joined player's name Tester"
+
+[[confirms]]
+entry = "cube::Creature::Creature"
+observed = "builds the joined player and each zone creature; the zone ones return to cube::World::creatureCreateSite"
+
+[[confirms]]
+entry = "cube::World::creatureCreateSite"
+observed = "passed once per zone creature built while the client joins and walks"
+
+[[confirms]]
+entry = "cube::World::creatureDespawnSite"
+observed = "passed for living creatures deleted while the client walks away"
+
+[[confirms]]
+entry = "cube::World::creatureDeathRemoveSite"
+observed = "passed once for a zone creature set to hp 0 on the server"
+
+[[confirms]]
+entry = "cube::Creature::~Creature"
+observed = "the deleting destructor (vtable slot 0) is called from the death site and calls ~Creature"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 390
+input = [
+    "shot 01-joined",
+    "until 8.5: walk",
+    "hold s 120", "shot 02-walked",
+]
+script = """
+log creature layout on the server (task 8.5): a client joins and walks; the script reads its server-side creature
+# phase 1, joining (the client connects about 95 s after the server is ready and loads for 30 s)
+trace args 3
+trace add @0x532260
+trace add @0x5183D0
+trace add @0x405FA0
+trace add @0x406E70
+trace add @0x407630
+trace add @0x535D18
+trace add @0x53411B
+trace add @0x53540B
+trace start
+wait 140
+trace stop
+trace report
+expect cube::World::update calls @0x532260 > 1000
+expect cube::World::update value u32 == 1819438935 [[[ecx(@0x532260)] - 4] + 0xC] + 0xC
+expect cube::World::update value u32 == 1969438820 [[[ecx(@0x532260)] - 4] + 0xC] + 0x10
+expect cube::World::generateZone calls @0x5183D0 > 3
+expect cube::World::generateZone caller @0x5183D0 0x549659
+expect cube::World::generateZone value u32 == 1819438935 [[[ecx(@0x5183D0)] - 4] + 0xC] + 0xC
+expect cube::World::generateZone value u32 == 1969438820 [[[ecx(@0x5183D0)] - 4] + 0xC] + 0x10
+expect cube::World::creatureCreateSite calls @0x535D18 > 5
+expect cube::Creature::Creature calls @0x405FA0 > 5
+# one construction more than the site passes: the joined player's creature
+expect cube::Creature::~Creature calls @0x406E70 == 0
+# the joined player is the map's leftmost node, id 1; its creature is read through the client's layout
+inspect creatures ecx(@0x532260)
+expect cube::World.creatures creatures > 5 ecx(@0x532260)
+expect cube::World.creatures value u32 == 1 [[ecx(@0x532260) + 4]] + 0x10
+inspect cube::Creature [[[ecx(@0x532260) + 4]] + 0x18]
+expect cube::Creature.id value u32 == 1634038339 [[[[[[ecx(@0x532260) + 4]] + 0x18]] - 4] + 0xC] + 0xC
+expect cube::Creature.id value u32 == 1701999988 [[[[[[ecx(@0x532260) + 4]] + 0x18]] - 4] + 0xC] + 0x10
+expect cube::Creature.id value u32 == 1 [[[ecx(@0x532260) + 4]] + 0x18] + 0x8
+expect cube::Creature.id value u32 == 0 [[[ecx(@0x532260) + 4]] + 0x18] + 0xC
+expect cube::Creature.data value u32 == 2 [[[ecx(@0x532260) + 4]] + 0x18] + 0x64
+expect cube::CreatureData.entity_type value u32 == 2 [[[ecx(@0x532260) + 4]] + 0x18] + 0x64
+expect cube::CreatureData.class_type value u8 == 1 [[[ecx(@0x532260) + 4]] + 0x18] + 0x140
+expect cube::CreatureData.hp value f32 > 0 [[[ecx(@0x532260) + 4]] + 0x18] + 0x16C
+expect cube::CreatureData.max_hp_multiplier value f32 == 100 [[[ecx(@0x532260) + 4]] + 0x18] + 0x178
+expect cube::CreatureData.level value i32 == 1 [[[ecx(@0x532260) + 4]] + 0x18] + 0x190
+# "Test", "er" and the terminator
+expect cube::CreatureData.name value u32 == 1953719636 [[[ecx(@0x532260) + 4]] + 0x18] + 0x1168
+expect cube::CreatureData.name value u32 == 29285 [[[ecx(@0x532260) + 4]] + 0x18] + 0x116C
+# phase 2, walking (backwards: the server's world puts the new character in a lake facing a cliff): the client's movement reaches the server's copy; zones ahead are built, the ones behind removed
+watch pos_y i32 [[[ecx(@0x532260) + 4]] + 0x18] + 0x18
+trace start
+log 8.5: walk
+wait 125
+trace stop
+watch
+trace report
+inspect creatures ecx(@0x532260)
+inspect cube::Creature [[[ecx(@0x532260) + 4]] + 0x18]
+expect cube::CreatureData.pos watch pos_y changed
+expect cube::World::creatureCreateSite calls @0x535D18 > 0
+expect cube::World::creatureDespawnSite calls @0x53411B > 0
+watch clear
+# phase 3, a creature dying: the creature with the top id gets hp 0 on the server; the dead-creature loop deletes it
+inspect cube::Creature [[[ecx(@0x532260) + 4] + 8] + 0x18]
+expect cube::CreatureData.hp value f32 > 0 [[[ecx(@0x532260) + 4] + 8] + 0x18] + 0x16C
+trace start
+inspect set data.hp 0
+log 8.5: top creature hp 0
+wait 5
+trace stop
+trace report
+expect cube::World::creatureDeathRemoveSite calls @0x53540B == 1
+expect cube::Creature::~Creature calls @0x407630 == 1
+expect cube::Creature::~Creature caller @0x407630 0x535413
+expect cube::Creature::~Creature calls @0x406E70 == 1
+expect cube::Creature::~Creature caller @0x406E70 0x40763B
+# as on the client, the dead creature is rebuilt from its zone record in the same step
+expect cube::World::creatureCreateSite calls @0x535D18 == 1
+expect cube::Creature::Creature caller @0x405FA0 0x535D18
+expect - hooks == 0
+"""

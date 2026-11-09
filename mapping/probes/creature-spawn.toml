@@ -1,0 +1,152 @@
+# Recorded with kyubu_probe, the entity_spawner mod and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the
+# Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior
+# "Tester" and a new world (seed 1234). Task 3.2 of add-entity-spawner recorded it on 2026-09-29 with the mod's raw
+# prototype (spawn_raw): the recipe of 3.1. Task 5.1 reran it on 2026-09-30 with the mod on the game API (0.2.0,
+# kyubu.game.creature_spawn, the loader's recipe; the MinGW loader of task 4.3), which is what the replay below runs.
+# `console entity_spawner:spawner GREEN_SLIME` builds a creature in front of the player; the probe traces the recipe's
+# functions while it happens, then sets the creature's hp to 0 itself (`inspect set`: the game API has no setter), then
+# the mod spawns a second one and a ring of four, and the player walks away from them.
+id = "creature-spawn"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Detoured cube::Creature::Creature and creature_map_slot (1 stack argument each); traced maxHp, the appearance function, the deleting destructor 0x43D0B0 and the two removal sites",
+    "Phase 1: `console entity_spawner:spawner GREEN_SLIME` (on the server side: 2026-09-29 the mod's raw prototype, spawn_raw; 2026-09-30 kyubu.game.creature_spawn); phase 2: hp 0 (2026-09-29 the prototype's `spawner kill`; 2026-09-30 the probe's `inspect set hp 0` on the creature with the lowest id); phase 3: a second spawn; phase 4: `spawner ring GREEN_SLIME` (four more, on the world axes); then walking (W) for 85 s away from all of them",
+    "2026-09-30 (task 5.1): two reruns with the mod on the game API; before the second, the mod's watcher changed from get() to valid() (get() on a removed creature makes the loader log one refusal)",
+    "The input's console steps run 20 to 40 s late under Wine, so each phase waits 80 s and the shots are taken 20 to 35 s after a console step (01-spawned-lagging.png was taken before the spawn showed)",
+]
+observations = [
+    "2026-09-29 (prototype): spawn_raw built a green slime (type 37, level 1) with id -1 (the id rule: min(0, lowest id) - 1, the map held only positive ids) and put it in the map: creatures 17 -> 18, and the map's first key read -1 as a uint64",
+    "2026-09-29 (prototype): hp equalled max hp at once: data.hp 100.0 from maxHp(creature) and maxHp again 100.0 in the log line, in every spawn",
+    "2026-09-29 (prototype): in the spawn window creature_map_slot ran once (the insert) and cube::Creature::Creature at least once (2: the second is the temporary creature the worker thread builds at 0x487867, as in creature-recipe); maxHp ran about 136,600 times and creature_appearance_for_type 188 times (the zone generators, style 0; the spawn passes NULL and the call is not told apart)",
+    "2026-09-29 (prototype): the slime is drawn: 04-ring.png shows three of the four ring slimes (bright green, near the player); 02-before-kill.png of the earlier runs showed the first one. Screenshots lag the console steps under Wine, so a shot right after a console step often shows nothing yet",
+    "2026-09-29 (prototype): the player's yaw differs between runs (-180, 97, 0, 90): a creature 4 blocks along body_yaw is often off-screen; the ring uses the world axes",
+    "2026-09-29 (prototype): `spawner kill` set data.hp to 0; about 3 s later (a second in the mode, the tracker samples every second) the creature left the map: creatureDeathRemoveSite once, creatureDespawnSite never, the deleting destructor 0x43D0B0 called twice in that window (the slime and one more, the temporary creature or a zone creature)",
+    "2026-09-29 (prototype): the next spawn after the kill got id -1 again (the map's lowest key), and the ring got -2, -3, -4, -5 in the order the messages arrived",
+    "2026-09-29 (prototype): walking away from the second slime and the four of the ring: all five left the map within 60 s of walking (last hp 100, so the despawn path: creatureDespawnSite 21 calls, zone creatures too), none through the death site",
+    "2026-09-29 (prototype): no fault, no error: the hooks were all removed (hooks == 0), the creature count returned to the zone's own",
+    "2026-09-30 (the game API), both reruns passed every expectation: the loader's recipe traced as the prototype's did (creature_map_slot once, cube::Creature::Creature twice with the worker's temporary creature, creature_appearance_for_type 188 and 217 calls, maxHp over 130,000) and built a green slime with id -1, level 1 (the player's), hp 100.0 (its max hp); the map's first key read -1 and the count went 17 -> 18",
+    "2026-09-30: the probe's `inspect set hp 0` (hp = 0, was 100) removed the slime within 2 s: creatureDeathRemoveSite once, creatureDespawnSite never. The mod's object then said it was gone (run 1: get() gave `the creature is gone` and valid() false; run 2: valid() false and tostring `creature 0x0000000102000000 (gone)`)",
+    "2026-09-30: the next spawn got id -1 again and the ring -2 to -5. In run 1 all five were reported gone 20 s into the walk (last hp 100: despawned; creatureDespawnSite 33 calls in the walk window). In run 2 the walk did not take the player far enough from them before the end (7 despawns, the zone's own), so run 1 is the evidence for the despawn",
+    "2026-09-30: 04-ring.png shows ring slimes (bright green) at the edges of the view in both runs; the shots of the first spawn show nothing, as before",
+]
+
+[[confirms]]
+entry = "cube::Creature::Creature"
+observed = "called from the mod's raw prototype (LuaJIT FFI, thiscall through the detour with one stack argument) for every spawn, no fault; the other call in the window is 0x487867's temporary creature"
+
+[[confirms]]
+entry = "creature_map_slot"
+observed = "called once per spawn with this = World+4 and the id -1, the returned slot stored the creature: the map grew by one and walks completely, first key -1"
+
+[[confirms]]
+entry = "cube::Creature::maxHp"
+observed = "called from Lua as a float-returning thiscall (LuaJIT reads st0 correctly): 100.0 for a level-1 green slime, the same value every time; the World step keeps calling it on every creature"
+
+[[confirms]]
+entry = "creature_appearance_for_type"
+observed = "called from Lua as cdecl with (&entity_type, &appearance, NULL): the slime was drawn as a green slime; the zone generators keep calling it with style 0"
+
+[[confirms]]
+entry = "cube::World::creatureDeathRemoveSite"
+observed = "one call, about a second after hp was set to 0 on the spawned slime, and no call for the ones left behind"
+
+[[confirms]]
+entry = "cube::World::creatureDespawnSite"
+observed = "none for the killed slime; 21 calls while walking away, after which the five spawned slimes (hp 100) had left the map"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the map's first key read -1 (both halves 0xFFFFFFFF) after a spawn and again after the kill and a second spawn; the count grew by one per spawn and fell by one after the kill"
+
+[[confirms]]
+entry = "cube::Creature::~Creature"
+observed = "the deleting destructor 0x43D0B0 ran twice in the kill window (the killed slime and one more: a temporary creature or a zone creature, not told apart) and 24 times while walking away"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 3.2: spawn", "console entity_spawner:spawner GREEN_SLIME", "wait 20", "shot 01-spawned-lagging",
+    "until 3.2: kill", "wait 5", "shot 02-before-kill", "wait 40", "shot 02b-after-kill",
+    "until 3.2: spawn again", "console entity_spawner:spawner GREEN_SLIME", "wait 35", "shot 03-spawned-again",
+    "until 3.2: ring", "console entity_spawner:spawner ring GREEN_SLIME", "wait 35", "shot 04-ring",
+    "until 3.2: walk", "hold w 40", "shot 05-walk-40", "hold w 40", "shot 06-walk-80",
+]
+script = """
+log creature spawn (task 3.2 of add-entity-spawner): a creature built by the mod's raw prototype
+wait world
+wait 15
+trace args 3
+trace detour 1 cube::Creature::Creature
+trace detour 1 creature_map_slot
+trace add cube::Creature::maxHp
+trace add creature_appearance_for_type
+trace add @0x43D0B0
+trace add @0x60CD5B
+trace add @0x60E04B
+inspect creatures [@0x7691C8] + 0x2DC
+# Under Wine the console steps of the input take 20 to 40 s (the typed keys queue up), and a shot is taken 20 s after
+# one, so every phase waits longer than that.
+# phase 1, a spawn: the console command asks the mod's server side, which builds the creature at the next frame
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 3.2: spawn
+wait 80
+trace stop
+watch
+trace report
+inspect creatures
+# the spawn, and the temporary creature the worker thread builds at 0x487867 now and then (as in probe creature-recipe)
+expect cube::Creature::Creature calls cube::Creature::Creature >= 1
+expect creature_map_slot calls creature_map_slot == 1
+expect creature_appearance_for_type calls creature_appearance_for_type >= 1
+expect cube::Creature::maxHp calls cube::Creature::maxHp > 100
+# the new creature has the lowest id, -1 (the first run-time id): the map's first key as a uint64
+expect cube::World.creatures value u32 == 4294967295 [[[@0x7691C8] + 0x2E0]] + 0x10
+expect cube::World.creatures value u32 == 4294967295 [[[@0x7691C8] + 0x2E0]] + 0x14
+expect cube::World.creatures watch count increased
+watch clear
+# phase 2, hp 0: the probe writes it into the creature with the lowest id, the spawned one (the game API has no setter);
+# about a second later the dead-creature loop deletes it
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 3.2: kill
+wait 20
+inspect cube::CreatureData [[[[@0x7691C8] + 0x2E0]] + 0x18] + 0x10
+inspect set hp 0
+wait 60
+trace stop
+watch
+trace report
+expect cube::World::creatureDeathRemoveSite calls @0x60E04B == 1
+expect cube::World::creatureDespawnSite calls @0x60CD5B == 0
+expect cube::Creature::~Creature calls @0x43D0B0 >= 1
+expect cube::World.creatures watch count changed
+watch clear
+# phase 3, a second spawn (the id rule gives -1 again), then walking away from it
+trace start
+log 3.2: spawn again
+wait 80
+inspect creatures
+expect cube::World.creatures value u32 == 4294967295 [[[@0x7691C8] + 0x2E0]] + 0x10
+expect cube::World.creatures value u32 == 4294967295 [[[@0x7691C8] + 0x2E0]] + 0x14
+trace stop
+# phase 4, a ring of four slimes around the player (for the screenshot), then walking away from all of them
+log 3.2: ring
+wait 80
+trace start
+log 3.2: walk
+wait 85
+trace stop
+trace report
+expect cube::World::creatureDespawnSite calls @0x60CD5B > 5
+expect cube::Creature::~Creature calls @0x43D0B0 > 5
+log 3.2: end
+wait 20
+expect - hooks == 0
+"""

@@ -1,0 +1,55 @@
+# The iterating-creatures scenario (game-atlas), played by hand on the Windows laptop: see "Session report" in
+# docs/probes.md. The script lists the World's creatures every 30 s while the player plays; the player compares the
+# probe window's Creatures list (F8) with the creatures in view and kills one of them.
+# Session 1 (2026-09-27, report in kyubu-mapping\evidence\creature-collection-2026-09-27\session\): the kills showed in
+# the list, but the crowd was too big to count by eye, and the game crashed (std::bad_alloc on a game thread) before
+# the final checks. The scenario's count-matches-what-is-visible half still needs a session near a small group.
+id = "iterating-creatures"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Played by hand with the script as probe.cfg: a new character and world, then walked up to enemies",
+    "Pressed Creatures in the probe window (F8) while near them, killed two, and pressed it again",
+    "Compared the 30 s lists in the log with what the player saw (kmap probe report on the log)",
+]
+observations = [
+    "session 1: the menu list held 1 creature (id 1, the local player); in the world 20, steady for 2 minutes",
+    "every listed value was a cube::Creature by RTTI; the walk always agreed with the map's size",
+    "after the player killed two enemies the list dropped to 18: exactly ids 0x8020802004 and 0x8020802005 left",
+    "later lists changed by whole groups (16, 19, 20) as the player moved: zones loading and unloading, a guess",
+    "ids other than 1 look like zone x << 24 | zone y << 8 | index (0x8020_8020_04), a guess",
+    "session 1 did not confirm that the count equals the creatures in view: too many to count by eye",
+    "session 1 crashed at 4.8 minutes: std::bad_alloc thrown by 0x46E7F0 on a game thread; not large-address-aware",
+]
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the list follows the world: 2 kills removed exactly 2 ids; the visible count is not yet compared"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+script = """
+log iterating creatures: enter a world, go to a group of enemies, compare F8 > Creatures with what you see, kill one
+inspect player [@0x7691C8]
+inspect creatures [@0x7691C8] + 0x2DC
+wait world
+log world entered
+watch creatures u32 [@0x7691C8] + 0x2E4
+wait 30
+inspect creatures
+wait 30
+inspect creatures
+wait 30
+inspect creatures
+wait 30
+inspect creatures
+wait 30
+inspect creatures
+wait 30
+inspect creatures
+expect cube::World.creatures creatures > 1 [@0x7691C8] + 0x2DC
+expect cube::World.creatures watch creatures changed
+"""

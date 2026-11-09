@@ -1,0 +1,48 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 4.7 of add-ability-api, unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. mods-examples/fourth_ability_demo
+# (trust full, Lua) claims the warrior's slot 4 with `any` as number 112 (800 ms, mp_cost 0.1, max_rank 3, cooldown 6000 - 500 * rank);
+# the loader's config.toml has [abilities] placeholder = false, so no other class gets kyubu:placeholder (111). P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-demo-mod-off"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay with [abilities] placeholder = false: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "bar index 5 read as the warrior, then class_type 3 (the mage) written and the bar read again; screenshots of both",
+]
+observations = [
+    "Wine run 1 passed. Evidence: evidence/ability-demo-2026-10-05/ (the files with the prefix off-). 3 expectation checks held",
+    "the warrior: bar index 5 held 112 (the demo's burst) with the placeholder off",
+    "the mage (class_type 3): off-02-mage.png shows slot 4 empty. Bar index 5 still read 112: the game rebuilds the bar's vector with five entries and does not clear the sixth, so a read past its end gives the old value; the screenshot is the proof, and the `!= 111` expectation only shows that the placeholder was not pushed",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "set to 3 by the inspector; slot 4 stayed empty (screenshot)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-examples/fourth_ability_demo"]
+input = [
+    "until demo A", "shot 01-warrior", "until demo mage", "shot 02-mage",
+]
+script = """
+log demo: task 4.7 of add-ability-api, [abilities] placeholder = false with fourth_ability_demo
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# the warrior keeps the demo's ability (112); the mage has no sixth id
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log demo A
+wait 4
+inspect set data.class_type 3
+wait 4
+expect cube::CreatureData.class_type value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect - value i32 != 111 [[@0x7691C8] + 0x80080C] + 20
+log demo mage
+wait 3
+log demo done
+"""

@@ -1,0 +1,11 @@
+id = "mod_manager"
+name = "ModManager"
+version = "0.1.3"
+authors = ["Penchev"]
+kyubu = "^1.2"
+manage_mods = true
+sides = ["client"]
+description = "A Mods page on the title screen to enable, disable, configure, install and remove mods."
+
+[native]
+client = "bin/mod_manager.dll"

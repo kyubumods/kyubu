@@ -1,0 +1,86 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with level_rework (mods-gameplay). Task 6.8 of add-level-rework: the adaption screen (price, draw, coin check, store).
+# P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its right weapon is equipment slot 7, P + 0xAA8; the level is P + 0x190,
+# the platinum coins P + 0x1308. The screen is opened by writing its visible flag, as the game does for the station entity (type 0x89).
+id = "item-adaption"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with level_rework installed; waited 15 s there",
+    "the script set the player's level, platinum coins and the right weapon's level word and rarity, opened the adaption screen and put the weapon in its slot",
+]
+observations = [
+    "Wine replay 3 passed, no fault, 9 of 9 expectations held (evidence item-adaption-2026-10-04/run3; run 2 was the same without the clicks and showed the preview fault below). The state was set by the probe: the player at level 14 (P + 0x190), 1000 platinum coins (P + 0x1308), the right weapon (P + 0xAA8) a mod item of stored level 2010 and rarity 2, the adaption screen opened by writing 1 to its visible flag (index 0 of the node's state array) and the weapon's address into the widget's slot (+0x160); the screen is opened by an entity of type 0x89 in the game",
+    "case 1, a mod level-10 item: the screen shows COST 52 PLATINUM COINS (the model of levels.hpp: 52), POWER 10 to POWER 14, DMG 13.6 to 14.8. A gamepilot click on ADAPT: the platinum went from 1000 to 948, the level word from 2010 to 2014, the adapted flag (bit 0 of +0xE) was set, and the screen then shows COST 0",
+    "case 2, a vanilla item of stored 500 (mod level 97, POWER 97 in red above the player's 14): COST 0 and the same POWER 97 in the preview; a click on ADAPT changed nothing: platinum 1000, the word 500, the flag 0 (the coin-check hook turns a price of 0 into a price no player can pay). The click is the same gamepilot click as in case 1 (the button is highlighted under the cursor in 04-vanilla-clicked.png)",
+    "replay 2 (the build before the preview hook): the screen showed the preview POWER 40 in red with DMG 25.5 for the level-10 item at player level 14, because the draw (0x40FAE0) writes the player's level N raw over a copy of the item (`mov [ebp-0x378], ax` at 0x40FE65) and a vanilla stored 14 is power 40, while the store writes 2000 + N. The hook level_rework:adaption_preview_site now writes the word that the store will write; replay 3 shows POWER 14",
+    "not shown: the real station (an entity of type 0x89 opens the screen, found statically in the interaction code at 0x488D54), a click on GOODBYE, the adaption of a vanilla item below the player's level (the formula test covers it)",
+]
+
+[[confirms]]
+entry = "adaption_price"
+observed = "at player level 14 a mod level-10 item of rarity 2 costs 52 platinum coins (COST line and the coins paid), a vanilla item at power 97 costs 0"
+
+[[confirms]]
+entry = "adaption_commit_level_site"
+observed = "the click paid 52 and stored 2014 over 2010 and set the adapted flag; for a vanilla item above the player's level (price 0) nothing was stored"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until ia: start",
+    "until ia: opened", "wait 10", "shot 01-open",
+    "move 838 475", "wait 3", "hold mouse1 0.5", "wait 6", "shot 02-adapted",
+    "until ia: case2", "wait 10", "shot 03-vanilla-open",
+    "move 838 475", "wait 3", "hold mouse1 0.5", "wait 6", "shot 04-vanilla-clicked",
+    "until ia: done",
+]
+script = """
+log item adaption of level_rework (task 6.8 of add-level-rework)
+wait world
+wait 15
+# the player's level (P + 0x190, through the int16 `level` of a window at P + 0x180), platinum coins (P + 0x1308, `modifier` of a window at P + 0x1304)
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x180
+inspect set level 14
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x1304
+inspect set modifier 1000
+# the right weapon: a mod item of level 10, rarity 2 (the price for 14 is 52 by the model of levels.hpp)
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set level 2010
+inspect set rarity 2
+expect - value i32 == 14 [[@0x7691C8] + 0x8006C8] + 0x190
+expect - value u32 == 1000 [[@0x7691C8] + 0x8006C8] + 0x1308
+expect - value i16 == 2010 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0x10
+log ia: start
+wait 5
+# the visible flag of the adaption node (index 0 of its state array) and the widget's slot pointer (+0x160) = the weapon's address
+inspect cube::ItemData [[[[@0x7691C8] + 0x8008F8] + 0x3C] + 0x94] - 4
+inspect set modifier 1
+inspect cube::ItemData [[@0x7691C8] + 0x8008FC] + 0x15C
+inspect set modifier from [@0x7691C8] + 0x8006C8 plus 0xAA8
+log ia: opened
+wait 40
+# case 1 (a click on ADAPT): 52 coins paid, the level word 2014, the adapted flag (bit 0 of +0xE) set
+expect - value u32 == 948 [[@0x7691C8] + 0x8006C8] + 0x1308
+expect - value i16 == 2014 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0x10
+expect - value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0xE
+log ia: case1 checked
+# case 2: a vanilla item of stored level 500 (mod level 97) above the player's 14: the price is 0 and the click does nothing
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set level 500
+inspect set flags 0
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x1304
+inspect set modifier 1000
+log ia: case2
+wait 40
+expect - value u32 == 1000 [[@0x7691C8] + 0x8006C8] + 0x1308
+expect - value i16 == 500 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0x10
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0xE
+log ia: done
+wait 5
+"""

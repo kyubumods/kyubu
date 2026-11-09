@@ -1,0 +1,11 @@
+# Windows types the game's objects embed (add-game-api task 2.2). Only their size is mapped: the layout is the x86
+# one in the Windows SDK (winnt.h), which code that uses them includes anyway.
+
+[[type]]
+name = "win32::CriticalSection"
+kind = "struct"
+size = 0x18
+status = "verified"
+evidence = ["manual:RTL_CRITICAL_SECTION (winnt.h): 0x18 bytes on x86", "import:KERNEL32.dll!EnterCriticalSection"]
+source = "kyubu"
+notes = "a Win32 CRITICAL_SECTION: pass its address to EnterCriticalSection and LeaveCriticalSection. Recursive (its owner may enter again); cast it to CRITICAL_SECTION* for OwningThread (+0xC) and RecursionCount (+8). In cube::World.lock the spin count (+0x14) reads 1024 in both builds"

@@ -1,0 +1,9 @@
+id = "model_draw_proto"
+name = "Model draw prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe model-part-draw): a mid hook on draw_creature_end_site that draws one of the game's own models (the quiver, model 0x347) next to every creature the game draws, with the game's Model::draw, setColour and setMatrices, using the last part's matrix moved up."
+
+[native]
+common = "bin/model_draw_proto.dll"

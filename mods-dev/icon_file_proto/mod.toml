@@ -1,0 +1,10 @@
+id = "icon_file_proto"
+name = "Icon file prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-icon-file): icon_file_proto:burst takes the warrior's slot 4 with its own icon (assets/icons/proto-burst.png, 14 x 14 like the vanilla ones) and smash's as the fallback."
+
+[scripts]
+client = "scripts/client.lua"

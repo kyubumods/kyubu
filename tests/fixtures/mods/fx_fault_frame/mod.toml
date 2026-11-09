@@ -1,0 +1,8 @@
+id = "fx_fault_frame"
+name = "Fixture: faulting frame handler"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Its frame.begin handler raises an access violation on the first frame (native-mod-api/Faulting event handler)."
+[native]
+client = "bin/fx_fault_frame.dll"

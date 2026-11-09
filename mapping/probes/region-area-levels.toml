@@ -1,0 +1,56 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 5.2 of add-level-rework: the mod level_rework hooks the area-level store of the client's region generator
+# (region_generate 0x5D8CD0, site 0x5D9701) and patches the eight "+p" compares (5, 10, 15, 19) to its own thresholds. The mod
+# logs the first 64 conversions (counter, vanilla level, mod level), and its dev command `levels areas` lists the regions the World
+# has built, with each area's and dungeon's level and "+p" read from memory.
+id = "region-area-levels"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 40 s there",
+    "Window A: the input turned dev_commands on and ran `level_rework:levels areas` in the console",
+    "Window B: 100 s later the same command again",
+]
+observations = [
+    "Wine replay 3 passed (runs 1 and 2 failed before the game window appeared, an environment fault of that start, not of the mod): 1 of 1 expectation held, no fault. The mod logged `area levels on the ladder` at load",
+    "the hook logged the counter, the vanilla level and the mod level for the first 64 calls (two regions): only EVEN counters 0 to 62 reach the store (no odd counter was ever logged). Vanilla levels by counter: 1, 1, 2, 3, 3, 4, 5, 6, 7, 8, 10, 11, 13, 14, 16, 18, 21, 23, 26, 30, 34, 39, 45, 52, 61, 72, 87, 109, 141, 194, 301, 621, exactly the static read's int((1/(1 - i/64) - 1)*20 + 1); mod levels 1, 4, 7, 10, 13, 16, 20, 23, 26, 29, 32, 36, 39, 42, 45, 48, 52, 55, 58, 61, 64, 68, 71, 74, 77, 80, 84, 87, 90, 93, 96, 100",
+    "`levels areas` listed the 9 regions the starting world built, in two windows 88 s apart (the same lists): each region has 16 dungeons whose levels are exactly the ladder at i = 2, 6, ..., 62 (4, 10, 16, 23, 29, 36, 42, 48, 55, 61, 68, 74, 80, 87, 93, 100) and 48 plain missions, 16 of them on the ladder (1, 7, 13, 20, 26, 32, 39, 45, 52, 58, 64, 71, 77, 84, 90, 96) and 32 at level 1 with no counter. The highest level is 100 and none is above 100",
+    "the rolled +p of every area and dungeon is inside vanilla's range for the VANILLA level of its counter, with the mod's patched thresholds (20, 32, 45, 52): 432 areas and 144 dungeons, 0 violations (evidence/region-area-levels-2026-10-03/check_result.txt). The dungeon's +p is read from its zone tile (+0xC), the area's from the mission (+0x28)",
+    "not from the ladder: in 3 of the 9 regions (row 513) some missions have the level 15 (14 missions in region 513,511 and 17 in 513,513) or 10 (2 in 513,512) instead of 1: another writer of the level, not found (static: stores of 0xF at +0x24 exist at 0x62F29B, 0x62F393 and 0x632513, not read); they are vanilla-scale and the mod leaves them",
+    "not tried: Server.exe (S3, task 8.x), the monsters and chest inside a dungeon (5.4 and 6.x), a joined client, the 64 levels of 'the starting region' as a list in-game (the log shows the conversion table and the regions' lists)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "region_generate"
+observed = "replaced in part by level_rework: only even counters 0 to 62 reached the area-level store, with vanilla levels 1 to 621; the mod's ladder (1 to 100) and the patched +p compares gave vanilla's +p ranges on all 9 regions"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until ra: A ready",
+    "console config level_rework dev_commands true",
+    "console level_rework:levels areas",
+    "until ra: B ready",
+    "console level_rework:levels areas",
+]
+script = """
+log region area levels of level_rework (task 5.2 of add-level-rework)
+wait world
+wait 40
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log ra: A ready
+wait 100
+log ra: B ready
+wait 100
+log ra: done
+"""

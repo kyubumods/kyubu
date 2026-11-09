@@ -1,0 +1,116 @@
+{
+  "format": 1,
+  "generated": "2026-10-24T22:03:00Z",
+  "name": "Kyubu mods",
+  "mods": [
+    {
+      "id": "cat_alpha",
+      "name": "cat_alpha",
+      "authors": [
+        "Kyubu tests"
+      ],
+      "description": "Test catalog mod.",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "kyubu": "^1.1",
+          "sides": [
+            "client"
+          ],
+          "url": "mods/cat_alpha/cat_alpha-1.0.0.zip",
+          "size": 547,
+          "sha256": "5525a50d165a94a16cbaf277a6c2c15860aac273029f75cf27b4661723dfc5fd",
+          "dependencies": {
+            "cat_lib": "^1.0"
+          },
+          "published": "2026-10-25",
+          "changes": ""
+        },
+        {
+          "version": "1.1.0",
+          "kyubu": "^1.1",
+          "sides": [
+            "client"
+          ],
+          "url": "mods/cat_alpha/cat_alpha-1.1.0.zip",
+          "size": 546,
+          "sha256": "d6a9797e340084af3e5bb4ea46492f990062fd56ca02bfe6a1adfc2a5b148216",
+          "dependencies": {
+            "cat_lib": "^1.0"
+          },
+          "published": "2026-10-25",
+          "changes": ""
+        }
+      ]
+    },
+    {
+      "id": "cat_beta",
+      "name": "cat_beta",
+      "authors": [
+        "Kyubu tests"
+      ],
+      "description": "Test catalog mod.",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "kyubu": "^1.1",
+          "sides": [
+            "client"
+          ],
+          "url": "mods/cat_beta/cat_beta-1.0.0.zip",
+          "size": 527,
+          "sha256": "16d01e5e891460fa1cf89e4184ea4996ff2dcf28fe0aaeb8a09216a1c258b7dd",
+          "dependencies": {},
+          "published": "2026-10-25",
+          "changes": ""
+        }
+      ]
+    },
+    {
+      "id": "cat_lib",
+      "name": "cat_lib",
+      "authors": [
+        "Kyubu tests"
+      ],
+      "description": "Test catalog mod.",
+      "versions": [
+        {
+          "version": "1.0.0",
+          "kyubu": "^1.1",
+          "sides": [
+            "client"
+          ],
+          "url": "mods/cat_lib/cat_lib-1.0.0.zip",
+          "size": 526,
+          "sha256": "f9119cf9af24cf76aed4f1a6349f4bae6ece9d794c9a1c2a27a6386ffa75cf93",
+          "dependencies": {},
+          "published": "2026-10-25",
+          "changes": ""
+        }
+      ]
+    }
+  ],
+  "packs": [
+    {
+      "id": "cat_pack",
+      "name": "Test pack",
+      "authors": [
+        "Kyubu tests"
+      ],
+      "version": "1.0.0",
+      "description": "Pins the older cat_alpha.",
+      "kyubu": "^1.2",
+      "mods": {
+        "cat_alpha": "1.0.0",
+        "cat_beta": "1.0.0",
+        "cat_lib": "1.0.0"
+      },
+      "config": {
+        "cat_alpha": {
+          "strength": 8
+        }
+      },
+      "reset_unlisted": true
+    }
+  ]
+}

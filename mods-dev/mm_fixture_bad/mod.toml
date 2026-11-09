@@ -1,0 +1,10 @@
+id = "mm_fixture_bad"
+name = "Fixture Failed"
+version = "1.0.0"
+kyubu = "^9.0"
+sides = ["client"]
+authors = ["someone"]
+description = "Asks for a loader API that does not exist, so it fails to load."
+
+[scripts]
+common = "scripts/common.lua"

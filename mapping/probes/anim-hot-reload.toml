@@ -1,0 +1,47 @@
+# A loader check, not a game observation: the clip registry of add-ability-animation task 3.3 and its dev-mode hot reload.
+# Recorded with kyubu_probe and mods-dev/anim_clips_proto, unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay, setup new-world. The `modfile` input steps copy the files of anim_clips_proto's edits/ over its clips while the game runs.
+id = "anim-hot-reload"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Start in dev mode with anim_clips_proto (clips slam, jab and a broken one); make a character and a world",
+    "Copy a good edit over slam.anim.toml, then a bad one, then a new file fresh.anim.toml, each after the log line of the one before",
+]
+observations = [
+    "Wine runs 3 and 4 passed (run 2 the same in the menu; runs 2 and 3 with the mod under its first name fx_anim). Evidence: evidence/ability-animation-2026-10-07/ (run2/ to run4/). Boot: `loaded the clip` for anim_clips_proto:jab and anim_clips_proto:slam, an error for broken.anim.toml:4, `2 clip(s), set hash 3e813f8b...`; the session manifest at the world's start has `animations` with that hash",
+    "About 3 s after each copy: `hot reload: reloaded the clip 'anim_clips_proto:slam'` and a new hash; then `slam.anim.toml:8:` with `keeps its previous version` and no new hash; then `hot reload: loaded the clip 'anim_clips_proto:fresh'` and `3 clip(s)`. Every scan repeats the errors of the files that are still bad",
+    "Wine run 5 passed (evidence/ability-animation-2026-10-07/anim-hot-reload-run5/: report.md, latest.log), after the Hold change of 5.3's follow-up: each reload that publishes logs `animation: freed 1 replaced clip set(s), 0 still held` once the new set is in; the first scan logs no freed line; the bad edit logs the same ERROR and WARN as before",
+]
+
+[[confirms]]
+entry = "cube::GameController::render"
+observed = "called in the menu (run 2: 549 calls in 60 s) and in the world (run 4: 1,452): the loader's frame.begin, where the dev poll of the clip files runs, comes from the same loop"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 330
+mods = ["mods-dev/anim_clips_proto"]
+input = [
+    "wait 5",
+    "modfile anim_clips_proto edits/slam_good.anim.toml assets/animations/slam.anim.toml",
+    "until hot reload: reloaded the clip 'anim_clips_proto:slam'",
+    "wait 2",
+    "modfile anim_clips_proto edits/slam_bad.anim.toml assets/animations/slam.anim.toml",
+    "until the clip 'anim_clips_proto:slam' keeps its previous version",
+    "wait 2",
+    "modfile anim_clips_proto edits/new.anim.toml assets/animations/fresh.anim.toml",
+    "until hot reload: loaded the clip 'anim_clips_proto:fresh'",
+]
+script = """
+log anim-hot-reload: task 3.3 of add-ability-animation, the clip registry
+wait world
+trace add cube::GameController::render
+trace start
+wait 60
+trace stop
+expect cube::GameController::render calls cube::GameController::render > 10
+expect - hooks == 0
+"""

@@ -1,0 +1,55 @@
+# Task 12.2a of add-skills-unleashed (the Fire Mage's held charge). Wine replay run 5 passed (runs 1 and 2 read the wrong key byte, run 3 had a 3 s cooldown, run 4 logged the cause). mods-dev/charge_proto defines a mod ability on the
+# warrior's slot 4 (the mechanic does not depend on the class) that grows charged_mp itself in on_step while key 4 is held (the key byte
+# is GameController + 8), at the game's rate, and spends it on release. It logs every 250 ms: the mode, the key byte, charged_mp, mp.
+id = "fire-mage-charge"
+build = "cube-0x51D2CE9C"
+kyubu = "1.1"
+date = "2026-10-18"
+steps = [
+    "Start in dev mode with charge_proto; make a character (a human warrior) and a world; set the rank of charge_proto:circle to 3 on the console",
+    "Hold key 4 for 4 s: does the ability keep running while the key is held, does charged_mp rise as written (the game must not zero it), is the mode held at 115",
+    "Release: on_step sees the key byte fall, spends the charge and ends the ability; does mp drop by the charge",
+    "Hold key 4 for 4 s with a cooldown of 60 s (the second hold, 5 s, is refused for the cooldown): does the ability run past 3 s while the key is held",
+]
+observations = [
+    "the key byte of the 4th ability (bar index 5) is GameController + 9 (GameController + 4 + index), 1 while held: runs 1 and 2 read +8 and +5 and saw a release at step 1",
+    "a mod ability's mode stays 112 while the key is held and on_step runs every 20 ms. CORRECTED 2026-10-18 (the Fire Mage's script, task 12.6): the probe mod read and wrote the float at Creature + 0x134, which is cuwo 0x124, not charged_mp (cuwo 0x134 is Creature + 0x144: a cuwo offset needs +0x10), so it proves nothing about charged_mp; the rise 0.1972, 0.3982, 0.5902 at 263, 531, 787 ms is a float the game does not touch. mp (Creature + 0x170) was read right, and the warrior's mp (rage) falls by about 0.05 a second",
+    "with cooldown_ms 3000 the ability ended `interrupted` at 3.04 to 3.12 s with the key still held (mode time 3134, mode 112 until the last step) and started again at once; with cooldown_ms 60000 (run 5) it ran to the release at 3759 ms. So the end at 3 s was the cooldown running out under a held key, not a rule of the mode",
+    "on release (key byte 0) on_step spent the charge: mp 0.8130 less 0.8130 gave -0.0009 (mp had moved on after the capped write: clamp the spend), and ability_end ended it `cancelled` after 199 steps, 3779 ms",
+    "not tested: a hold past 10 s (the game's rule at cube::GameController::update 0x49C4A8 needs the key byte at 0 as well, by the ability-mode-end probe)",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the new level-1 warrior: key 4 is the probe mod's ability"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/charge_proto"]
+input = [
+    "until fmcharge ready",
+    "console ability rank charge_proto:circle 3",
+    "wait 3",
+    "hold 4 4", "shot 01-held",
+    "wait 3",
+    "hold 4 5", "shot 02-long",
+]
+script = """
+log fmcharge: task 12.2a of add-skills-unleashed, a held charge grown by the script
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch charged f32 [[@0x7691C8] + 0x8006C8] + 0x134
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+inspect set data.mp 1
+log fmcharge ready
+wait 60
+log fmcharge end
+watch
+watch clear
+log fmcharge done
+"""

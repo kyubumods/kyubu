@@ -1,0 +1,93 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/prop_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. For a ranger of specialization 4 the mod asks its server side for a creature whose body models are all -1 and whose
+# right weapon slot holds a bow, puts it 18 blocks above the player and lets it down and round (task 8.2d of add-skills-unleashed).
+# The pictures show whether only the bow is drawn. Replay 3 puts the first prop on the point under the crosshair, where the game
+# names it, and then (specialization 5) fills the frame's look-at list without it: the name and the health bar go.
+id = "world-model-draw"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2, then specialization 4: the mod's client side asked its server side (a channel message) for two props",
+    "Each prop: a green slime (type 37) spawned still, the eight model ids at Creature+0x8C to +0x9A written -1, equipment 7 (+0xAA8) a bow (type 3, sub_type 6), the scale vector at +0x80 written 0.3; the server side moves each 0.8 block a tick down from 18 blocks above the player and turns its yaw 20 degrees a tick",
+]
+observations = [
+    "Wine replay 2 passed, 1 of 1 check held; replay 1 (one prop, scale kept, aimed at by the crosshair) showed a large bow turning alone and, with the crosshair on it, the name SLIME and a health bar under it (evidence/skills-unleashed-sniper-2026-10-12/world-model-draw-1 and -2)",
+    "the spawn call is the server side's (creature_spawn; the client reaches it with a channel message) and answered at once in single-player: ids -1 and -2",
+    "a creature with its body model ids at -1 draws nothing of its body and still draws its weapon slots: only the bow was seen, at the creature's place, turned by its yaw (03-landed.png: two small bows 3 blocks left and right of the player, one above each other seen from behind)",
+    "the creature's scale vector (Creature+0x80) was 0.8 for a green slime; writing 0.3 made the bow smaller in proportion",
+    "position and yaw are plain writes (+0x10 as int64 x 3 in world units, +0x30 yaw in degrees), repeated each server tick; velocity zeroed (+0x34); the creature did not fall between the ticks",
+    "the name and health bar of a creature showed only while the crosshair was on it (replay 1); with the two props to either side no label was drawn",
+    "Wine replay 3 passed, 4 of 4 checks held; evidence evidence/skills-unleashed-sniper-fixes-2026-10-12/world-model-draw-3. The first prop came down on the player's aimed point (ray_hit 0, 30, 1.6 blocks)",
+    "replay 3: with the prop on the aimed point the look-at target (GameController+0x800A68) was the prop's id (-1) and the picture has SLIME and a blue health bar over the crosshair (04-named.png)",
+    "replay 3: with the prop's hp written 0 at lookListFillSite and its own 100 back at lookListFilledSite the look-at target read 0 a frame later and the name and the bar were gone (05-nameless.png); the hp read 100 at the bar site every frame, and the prop was neither hurt nor deleted in 8 s. Without the two writes the name was back in the next frame (06-named-again.png)",
+    "replay 3: the two sites were reached the same number of times at every reading (1705 and 1705 at the first, 1920 and 1920 at the last, one more each a frame), in the menus too",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.appearance"
+observed = "the model ids -1 on a spawned creature drew no body part; the weapon slots were drawn"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "written 2 through the inspector; the HUD line read LVL 1 RANGER"
+
+[[confirms]]
+entry = "cube::GameController::lookListFillSite"
+observed = "reached once a frame; a creature whose hp was written 0 here was not the look-at target and had no name or health bar"
+
+[[confirms]]
+entry = "cube::GameController::lookListFilledSite"
+observed = "reached once for every pass of lookListFillSite; the hp written back here read unchanged for the rest of the frame"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 160
+mods = ["mods-dev/prop_proto"]
+input = [
+    "until prop before",
+    "shot 01-before",
+    "until prop falling",
+    "shot 02-falling",
+    "until prop landed",
+    "shot 03-landed",
+    "until prop named",
+    "shot 04-named",
+    "until prop nameless",
+    "shot 05-nameless",
+    "until prop named again",
+    "shot 06-named-again",
+]
+script = """
+log world-model-draw: task 8.2d of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.class_type 2
+wait 2
+log prop before
+wait 2
+inspect set data.specialization 4
+wait 3
+log prop falling
+wait 3
+log prop landed
+wait 6
+expect cube::GameController::lookListFillSite value u32 > 0 [@0x7691C8] + 0x800A68
+log prop named
+wait 4
+inspect set data.specialization 5
+wait 4
+expect cube::GameController::lookListFilledSite value u32 == 0 [@0x7691C8] + 0x800A68
+log prop nameless
+wait 4
+inspect set data.specialization 4
+wait 4
+expect cube::GameController::lookListFillSite value u32 > 0 [@0x7691C8] + 0x800A68
+log prop named again
+wait 4
+expect cube::CreatureData.class_type value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0x140
+"""

@@ -1,0 +1,144 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 3.2 of add-level-rework (M2): creature_level_up's calling convention, and that kill_record_apply runs it for
+# the player's pet as well as for the player. The entity_spawner mod makes a nameless troll companion (id -1); the script
+# registers it as the player's pet (its id at Creature+0x11C8) and kills the top-id creature with the player's forced
+# cyclone (mode 86), as kill-xp does. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "creature-level-up"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Detoured creature_level_up (0 stack arguments: the creature is passed in ECX) and traced kill_record_apply",
+    "The input spawned a nameless troll companion with entity_spawner (id -1, the lowest id of the map, owner id 1 already in Creature+0x198); the script made it level 1 with 49 XP, stunned it and put it 40 blocks from the player",
+    "Made it the game's pet in one burst of edits: the pet item (type byte 0x13 at the player's Creature+0x1020, its XP at +0x1024 and its level at +0x1030, copied from the troll), the troll's id into the player's Creature+0x11C8, and hostile type 5 for the troll",
+    "Kill: the top-id creature made hostile, level 10, hp 1, stunned and put half a block from the player; the player made level 1 with 49 XP; a forced cyclone (mode 86) killed it",
+]
+observations = [
+    "Wine replay 5 passed, 14 of 14 expectations held (runs 1 to 4 failed, see the pet requirements below); no fault, and the probe's hooks were all removed at the end",
+    "the detour on creature_level_up with 0 stack arguments ran 2 calls without a fault, ECX = the creature. CORRECTION (task 4.1, 2026-10-01): that does NOT show that the function takes no stack argument. It is a __thiscall with ONE stack argument (the World) popped by `ret 4`; a detour with n = 0 leaves the caller's pushed word unpopped, and these two calls did not fault by luck. A mod replacement that popped nothing froze the game at the first kill (level-up-replacement)",
+    "kill_record_apply: 1 call, from 0x59513D (applyHit). It called creature_level_up twice: from 0x59F5E7 with ECX = the player, and from 0x59F636 (the call at 0x59F631) with ECX = the pet, the troll with id -1",
+    "the kill (level 10, floor(20*f(10)) = 6 XP) took the player and the pet from level 1 with 49 XP to level 2 with 5 XP: 49 + 6 = 55, minus the 50 of level 1",
+    "kill_record_apply then copied the pet's XP and level into the player's pet item: Creature+0x1024 = 5 and +0x1030 = 2",
+    "pet requirements (runs 1 to 4): cube::World::update (0x60D296, where the player's Creature+0x1020 is not type 0x13) sets the registered pet's hp to 0 and clears the registration at +0x11C8. A troll registered without the pet item died within 2 s, with type 2 (runs 1 to 3) and with type 5 and its owner id set (run 4). With the pet item, the registration and type 5, the troll stayed",
+    "the pet is the creature the player's Creature+0x11C8 names (8-byte id) with hp above 0; kill_record_apply also needs the World not to be a joined client's",
+    "not tried: a pet from the game's own summon (a real pet item), a pet that dies, a kill by the pet, the pet item's other fields, a joined client, Server.exe",
+]
+
+[[confirms]]
+entry = "creature_level_up"
+observed = "ECX = the creature and one stack argument, the World (corrected in task 4.1: first read as none, see the observations); called twice in one kill, from 0x59F5E7 (the player) and 0x59F636 (the pet)"
+
+[[confirms]]
+entry = "kill_record_apply"
+observed = "called once, from 0x59513D; it levelled the player and, since the player's Creature+0x11C8 named a pet with hp above 0, the pet too (6 XP each), and copied the pet's XP and level into the player's pet item (+0x1024, +0x1030)"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "49 + 6 = 55 minus the 50 of level 1 left 5, for the player and for the pet"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "1 -> 2 for the player and for the pet"
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+mods = ["mods-examples/entity_spawner"]
+input = ["until lu: spawn", "console entity_spawner:spawner TROLL companion unnamed"]
+script = """
+log creature_level_up for the player and the pet (task 3.2 of add-level-rework): kill_record_apply credits both
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 1
+trace detour 0 creature_level_up
+# KNOWN WRONG (task 4.1): creature_level_up has one stack argument, so this needs `trace detour 1` and a new replay before the record is relied on again
+trace add kill_record_apply
+trace start
+# the input spawns a nameless troll companion (id -1, the lowest id of the map) after this line
+log lu: spawn
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect - value i32 == -1 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 8
+# the pet: level 1, 49 XP (a level-up at 50), stunned, put 40 blocks away from the cyclone, made the game's pet (below)
+inspect set data.level 1
+inspect set data.current_xp 49
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+# a pet needs the pet item (type byte 0x13 at Creature+0x1020, XP at +0x1024, level at +0x1030) or World::update kills it
+# (0x60D296), then its id at +0x11C8 and hostile type 5; its owner id (+0x198) is already 1. All within a few ms, one tick
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x100C
+inspect set critical 19
+inspect set stun_duration from [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x194
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+inspect set stun_duration from [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x190
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x11C8
+inspect set entity_id from [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 8
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+inspect set data.hostile_type 5
+expect - value i32 == -1 [[@0x7691C8] + 0x8006C8] + 0x11C8
+wait 2
+log lu: after the registration
+inspect creatures [@0x7691C8] + 0x2DC
+# the victim: the creature with the top id, level 10 (floor(20*f(10)) = 6 XP), hp 1, stunned, half a block from the player
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 1
+inspect set data.current_xp 49
+inspect set data.mp 1
+wait 2
+log lu: before the kill
+inspect creatures [@0x7691C8] + 0x2DC
+log lu: kill, the player and the pet at level 1 with 49 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+log lu: cyclone 1 s
+inspect creatures [@0x7691C8] + 0x2DC
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 5 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.level value i32 == 2 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 5 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x194
+expect cube::CreatureData.level value i32 == 2 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x190
+# kill_record_apply copies the pet's XP and level into the player's pet record (+0x1024, +0x1030)
+expect - value i32 == 5 [[@0x7691C8] + 0x8006C8] + 0x1024
+expect - value u16 == 2 [[@0x7691C8] + 0x8006C8] + 0x1030
+trace stop
+trace report
+expect kill_record_apply calls kill_record_apply >= 1
+expect creature_level_up calls creature_level_up >= 2
+expect creature_level_up from creature_level_up @0x59F5E7 this [[@0x7691C8] + 0x8006C8]
+expect creature_level_up from creature_level_up @0x59F636 this [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+wait 5
+expect - hooks == 0
+"""

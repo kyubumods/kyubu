@@ -1,0 +1,137 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (task 2.3 of add-ability-api): the game running five minutes with id 115 as the sixth bar entry. Every 30 s the
+# script writes mp 1 and key 4 is held for 2 s; at rounds 3, 5, 7 and 9 class_type and specialization are changed
+# (the mage 2, ranger 3, rogue 4 ... bars follow), so the HUD and input loops run over bars of every class with 115
+# appended. The bar's sixth entry (begin + 20) is read after each round. P is the player's cube::Creature.
+id = "ability-bar-soak"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the level-1 warrior Tester and a new world; slot4_proto pushed 115 as slot 4",
+    "Eleven rounds of 30 s: mp 1, key 4 held 2 s, bar entry 5 read; classes cycled in rounds 3, 5, 7 and 9",
+]
+observations = [
+    "Wine replay 1 passed: 13 expectations held, 0 failed; no WARN or ERROR line in the log",
+    "115 stayed the sixth bar entry (begin + 20) at every one of 11 reads over 5 min 21 s (22:40:42 to 22:46:03), with the class changed in rounds 3, 5, 7 and 9: the bar read [57, 59, 21, 50, 99, 115] (ranger), [42, 59, 34, 103, 49, 115] (mage, spec 1), [57, 59, 48, 79, 97, 115] (rogue) and [57, 59, 54, 86, 101, 115] (warrior, spec 1)",
+    "each of the 11 holds of key 4 took the mode from 0 to 115 (mp near 1); the game kept running its input and HUD loops over a six-entry bar without a fault",
+]
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-dev/slot4_proto"]
+input = [
+    "until soak start",
+    "shot 01-soak-start",
+    "until soak round 1 press",
+    "hold 4 2",
+    "shot 02-soak-30s",
+    "until soak round 2 press",
+    "hold 4 2",
+    "until soak round 3 press",
+    "hold 4 2",
+    "until soak round 4 press",
+    "hold 4 2",
+    "until soak round 5 press",
+    "hold 4 2",
+    "until soak round 6 press",
+    "hold 4 2",
+    "shot 03-soak-180s",
+    "until soak round 7 press",
+    "hold 4 2",
+    "until soak round 8 press",
+    "hold 4 2",
+    "until soak round 9 press",
+    "hold 4 2",
+    "until soak round 10 press",
+    "hold 4 2",
+    "until soak round 11 press",
+    "hold 4 2",
+    "shot 04-soak-330s",
+]
+script = """
+log soak: task 2.3 of add-ability-api, 115 on the bar for five minutes
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 8
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak start
+inspect set data.mp 1
+log soak round 1 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 1 t=30 s
+inspect set data.mp 1
+log soak round 2 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 2 t=60 s
+inspect set data.mp 1
+inspect set data.class_type 2
+inspect set data.specialization 0
+log soak round 3 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 3 t=90 s
+inspect set data.mp 1
+log soak round 4 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 4 t=120 s
+inspect set data.mp 1
+inspect set data.class_type 3
+inspect set data.specialization 1
+log soak round 5 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 5 t=150 s
+inspect set data.mp 1
+log soak round 6 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 6 t=180 s
+inspect set data.mp 1
+inspect set data.class_type 4
+inspect set data.specialization 0
+log soak round 7 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 7 t=210 s
+inspect set data.mp 1
+log soak round 8 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 8 t=240 s
+inspect set data.mp 1
+inspect set data.class_type 1
+inspect set data.specialization 1
+log soak round 9 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 9 t=270 s
+inspect set data.mp 1
+log soak round 10 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 10 t=300 s
+inspect set data.mp 1
+log soak round 11 press
+wait 29
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log soak round 11 t=330 s
+inspect set data.class_type 1
+inspect set data.specialization 0
+wait 2
+expect - value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+watch
+watch clear
+log soak done
+"""
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "fires for 115 on each of the 11 key-4 holds of a five-minute run, for the bars of all four classes"

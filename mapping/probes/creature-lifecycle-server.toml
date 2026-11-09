@@ -1,0 +1,48 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop): kmap
+# probe replay starts Server.exe with no client connected. The tracer watches the World step main calls each pass
+# (cube::World::update, the twin of Cube.exe's 0x60AEA0) and the creature constructor and destructor.
+id = "creature-lifecycle-server"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Wine replay: Server.exe started with --kyubu-dev, no client",
+    "Traced cube::World::update (0x532260) and the creature constructor and destructor for 10 s, then stopped",
+    "Checked that the traced step's this is a complete cube::World (RTTI)",
+]
+observations = [
+    "Wine replay 2 passed, 8 of 8 held (replay 1 passed its first 5, before the caller and count checks)",
+    "cube::World::update ran about 50 times a second, always from main (ret 0x549F33), with the elapsed ms",
+    "its this is a complete cube::World",
+    "with no client connected, no creature was built or deleted (the constructor and destructor were not called)",
+]
+
+[[confirms]]
+entry = "cube::World::update"
+observed = "called by main once a pass with the elapsed ms, about 50 times a second; this is a cube::World"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+seconds = 90
+script = """
+log creature lifecycle, server side (task 8.3): the World step main calls each pass
+trace args 3
+trace add @0x532260
+trace add @0x405FA0
+trace add @0x406E70
+trace start
+wait 10
+trace stop
+trace report
+expect cube::World::update calls @0x532260 > 100
+# this is a cube::World (".?AVWorld@cube@@": "Worl", "d@cu"; locator offset 0)
+expect cube::World::update value u32 == 1819438935 [[[ecx(@0x532260)] - 4] + 0xC] + 0xC
+expect cube::World::update value u32 == 1969438820 [[[ecx(@0x532260)] - 4] + 0xC] + 0x10
+expect cube::World::update value u32 == 0 [[ecx(@0x532260)] - 4] + 4
+expect cube::World::update caller @0x532260 0x549F33
+# no client, so no creature is built or removed
+expect - calls @0x405FA0 == 0
+expect - calls @0x406E70 == 0
+expect - hooks == 0
+"""

@@ -1,0 +1,234 @@
+# Server.exe: the world object, its regions and zones.
+
+[[function]]
+name = "cube::World::World"
+address = 0x4C8580
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::World", "correlated:cube-0x51D2CE9C:cube::World::World"]
+source = "kyubu"
+notes = "sizeof 8389276 (operator new); no direct caller"
+
+[[function]]
+name = "cube::World::~World"
+address = 0x4CD920
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::World", "manual:only caller is vtable slot 0 (the deleting destructor)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::World::saveZone"
+address = 0x4D7DB0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::saveZone", "string:\"zone\""]
+source = "kyubu"
+
+[[function]]
+name = "cube::Region::Region"
+address = 0x4F72D0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::Region", "correlated:cube-0x51D2CE9C:cube::Region::Region"]
+source = "kyubu"
+
+[[function]]
+name = "cube::Zone::Zone"
+address = 0x5489B0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::Zone", "correlated:cube-0x51D2CE9C:cube::Zone::Zone"]
+source = "kyubu"
+notes = "only caller is cube::World::generateZone, as in Cube.exe"
+
+[[function]]
+name = "cube::World::generateZone"
+address = 0x5183D0
+convention = "thiscall"
+prototype = "void __thiscall cube::World::generateZone(cube::World* this, int32_t zone_x, int32_t zone_y)"
+subsystem = "world"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::generateZone", "manual:same imports, calls cube::Zone::Zone and cube::Spawn::Spawn", "probe:creature-server"]
+source = "kyubu"
+notes = "37,562 bytes against the client's 37,430 (task 8.5). Only caller 0x5493D0 (from 0x549659), a smaller loader than zone_loader_step, unnamed. Runs on a worker thread while a client joins and walks, this the World, zones around (0x8020, 0x8020)"
+
+# Task 8.3: the World's simulation step, the twin of Cube.exe's (same layout, 0xD8C40 lower).
+
+[[function]]
+name = "cube::World::update"
+address = 0x532260
+convention = "thiscall"
+prototype = "void __thiscall cube::World::update(cube::World* this, int32_t dt_ms, void* step_out, void* step_in)"
+subsystem = "world"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::update", "xref:main", "probe:creature-lifecycle-server", "probe:creature-server", "probe:game-detours-server", "probe:server-tick"]
+source = "kyubu"
+notes = "Server.exe's tick: main calls it once per loop pass, on the main thread inside the World lock (0x4D3D50), with the ms since the last pass; 0x427FF0 and 0x427F30 fill step_in, 0x427020 sends step_out; step_in is null-checked before the received-hit block (0x532A74)"
+
+[[function]]
+name = "cube::World::creatureCreateSite"
+address = 0x535D18
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::creatureCreateSite", "xref:cube::World::update", "probe:creature-server"]
+source = "kyubu"
+notes = "EAX is a creature just built from a zone's creature record, before it goes into World.creatures"
+
+[[function]]
+name = "cube::World::creatureDespawnSite"
+address = 0x53411B
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::creatureDespawnSite", "xref:cube::World::update", "probe:creature-server"]
+source = "kyubu"
+notes = "ECX is a living creature about to be deleted and erased from World.creatures"
+
+[[function]]
+name = "cube::World::creatureDeathRemoveSite"
+address = 0x53540B
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::creatureDeathRemoveSite", "xref:cube::World::update", "probe:creature-server"]
+source = "kyubu"
+notes = "ECX is a dead creature (hp <= 0, not a player, 1000 ms or more in its current mode) about to be deleted and erased"
+
+# Regions, their missions and dungeons, and where creature levels come from (read statically on 2026-09-30).
+
+[[function]]
+name = "region_generate"
+address = 0x50DE10
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:cube::Region::Region", "manual:builds a region's 64 missions (areas) and its zone tiles"]
+source = "kyubu"
+notes = "a counter i runs 0-63 over the sorted missions (Region+0x14018, 0x68 each); only EVEN i get an area level from level_from_power_fraction(i/64); (i>>1) odd is a dungeon (zone tile kind 3). Each rolls a +N (0-4) from its vanilla level. Corrected 2026-10-03 (Cube.exe twin 0x5D8CD0)"
+
+[[function]]
+name = "level_from_power_fraction"
+address = 0x410A20
+convention = "cdecl"
+prototype = "float __cdecl level_from_power_fraction(float fraction)"
+subsystem = "world"
+status = "candidate"
+evidence = ["manual:returns (1/(1 - fraction) - 1)*20 + 1, the inverse of level_curve", "xref:region_generate"]
+source = "kyubu"
+notes = "fraction p gives the level whose power is about 1 + 100p. Other callers 0x413E10, 0x4FBF20, 0x4FD6C0 and 0x4FDC30 (not read; probably item generation), so a mod should change the area-level call site (0x50E834), not this helper"
+
+[[function]]
+name = "region_at"
+address = 0x405DB0
+convention = "thiscall"
+prototype = "void* __thiscall region_at(cube::World* this, int32_t region_x, int32_t region_y)"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:mission_at", "manual:reads the 1024 x 1024 region pointer grid at World+0xBC"]
+source = "kyubu"
+notes = "null outside 0-1023 or when the region isn't generated"
+
+[[function]]
+name = "mission_at"
+address = 0x428460
+convention = "thiscall"
+prototype = "cube::MissionData* __thiscall mission_at(cube::World* this, int32_t x, int32_t y)"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:region_at", "manual:returns region + 0x14018 + (8*(x%8) + y%8)*0x68"]
+source = "kyubu"
+notes = "x and y are in 1/8-region cells (0 to 0x1FFF); null when the region isn't there"
+
+[[function]]
+name = "spawn_level_from_mission"
+address = 0x4D22B0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:mission_at", "manual:the covering mission's area_level when inside its radius, else 1"]
+source = "kyubu"
+notes = "used by generateZone for one kind of hostile spawn; inside means mission_influence <= 1"
+
+[[function]]
+name = "mission_influence"
+address = 0x52C5F0
+convention = "thiscall"
+subsystem = "world"
+status = "guess"
+evidence = ["xref:spawn_level_from_mission", "manual:0 for a size below 0.001; special cases for categories 11-14"]
+source = "kyubu"
+notes = "read in part: a position's distance to the mission relative to its size, where <= 1 counts as inside"
+
+[[function]]
+name = "site_generate"
+address = 0x4E2630
+convention = "thiscall"
+subsystem = "world"
+status = "guess"
+evidence = ["xref:creature_level_range", "manual:builds cube::Spawn records with hostile type 5 and the mission's +N"]
+source = "kyubu"
+notes = "a large generator (about 8,400 decompiled lines) read only in part: it rolls creature_level_range for the spawns it builds and copies the covering mission's +N (dword28) into their power_base"
+
+[[function]]
+name = "cube::Dungeon::Dungeon"
+address = 0x4F70D0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::Dungeon", "xref:dungeon_generate"]
+source = "kyubu"
+notes = "stores the vtable and the three sizes (+0xC, +0x10, +0x14) and allocates x*y*z zeroed u16 cells (+0x18): the dungeon's layout grid"
+
+[[function]]
+name = "cube::Dungeon::~Dungeon"
+address = 0x4F74A0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::Dungeon", "manual:restores the vtable and frees the cell grid"]
+source = "kyubu"
+
+[[function]]
+name = "dungeon_generate"
+address = 0x5000A0
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:cube::World::generateZone", "manual:only for zone tiles of kind 3 and 5; builds the layout and spawns"]
+source = "kyubu"
+notes = "every monster gets the zone's level (Zone+0x80, at least 1), its +N (Zone+0x84, into power_base) and appearance flag 0x1000, which keeps it out of the 1% elite roll. Chests (entity 143, TARGET) get the level and spawn_add_loot"
+
+[[function]]
+name = "spawn_add_loot"
+address = 0x4FDB20
+convention = "thiscall"
+subsystem = "world"
+status = "guess"
+evidence = ["xref:dungeon_generate", "manual:called with (chest spawn + 0xF6C, dungeon level)"]
+source = "kyubu"
+notes = "not read; probably fills the chest with items at that level"
+
+[[function]]
+name = "cube::World::regionAreaLevelSite"
+address = 0x50E841
+convention = "cdecl"
+kind = "site"
+sig_len = 7
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:region_generate", "correlated:cube-0x51D2CE9C:cube::World::regionAreaLevelSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "in region_generate, the 7-byte store of the area level into mission+0x24: EAX = vanilla level, ESI = even counter. Twin of Cube.exe's (0x5D9701). The 0x50E834 of the design is the call just before it. The +p compares are in 8.2's symbol file."

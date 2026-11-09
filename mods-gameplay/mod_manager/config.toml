@@ -1,0 +1,4 @@
+[options.catalog_url]
+type = "string"
+default = "https://kyubumods.github.io/catalog/"
+description = "Web address of the mod list the manager downloads. Leave it alone unless you run your own list."

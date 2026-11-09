@@ -1,0 +1,102 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/bow_modes_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on
+# the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior
+# "Tester" and a new world. The script makes the player a ranger (class_type 2) holding a bow (the right weapon slot, +0xAA8,
+# sub_type 6) and reads what the game does with it: the bar, the mode chain of a held M2 and of a tapped M1, the arrows each
+# mode makes, and, with specialization 1, M1 turned into a held M2 by the mod (task 8.2a of add-skills-unleashed).
+id = "bow-modes"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2 and sub_type 6 on the right weapon slot (+0xAA8) through the inspector; read the first two bar ids",
+    "Set mp to 1 and held the right button (mouse3) for 1.5 s, then the left button (mouse1) for 1.5 s; the mod logged the mode, the mode time, mp, charged_mp, spent_mp and each new arrow",
+    "Wrote specialization 1: the mod copies the M1 key byte onto the M2 byte for a ranger of specialization 1; held the left button for 1.5 s again",
+]
+observations = [
+    "Wine replay 3 passed, 6 of 6 checks held (replay 1 had the arrow sites on a relative call, which the hook engine refuses; replay 2 passed with the sites after the call, now moved to just before it); evidence evidence/skills-unleashed-sniper-2026-10-12/bow-modes-3",
+    "a level-1 warrior made a ranger with a bow in slot 7 (type 3, sub_type 6): the bar read [22, 25, 0, 0, 0, 111], from [57, 59, 0, 0, 0, 111] the frame before",
+    "right button held 1.5 s: mode 0 -> 25 (charged_mp 0 at the start, 0.917 at the release, mp 0.917), then 25 -> 55 as the key byte fell, then four arrows 100 to 110 ms apart at chargedShotSite: kind 0, skill 1, velocity (0, 149.79, 7.89), scale 1, mana 0.229, damage 9.6 to 10.7",
+    "left button held 1.5 s: mode 55 -> 22, then an arrow every 0.6 s at bowShotSite: kind 0, skill 0, velocity (0, 99.86, 5.26), scale 1, mana 0, damage 7 to 10.7; mp read 0.000 after the release of the charge (charged_mp had been taken into spent_mp 0.917)",
+    "with the mod's M1-to-M2 copy: mode 22 -> 25 on the first frame (keys M1 1, M2 1), charged_mp 0.866 at the release, 25 -> 55, four arrows at chargedShotSite",
+    "the aim of gamepilot's new character is (0, 30, 1.58): the arrows' velocity is that vector normalised times 100 (a plain 22) or 150 (55), as read statically",
+    "the sites 0x615E03 and 0x6162D6 passed 3 and 8 times: the arrow is complete on the stack there, EBP-0x578 and EBP-0xDE0",
+]
+
+[[confirms]]
+entry = "cube::World::bowShotSite"
+observed = "3 passes in the run, one for each mode 22 shot; the new arrow (kind 0, skill 0, velocity 100 along the aim) read at EBP-0x578"
+
+[[confirms]]
+entry = "cube::World::chargedShotSite"
+observed = "8 passes in the run, four for each release of the held M2 (mode 55); kind 0, skill 1, velocity 150 along the aim, read at EBP-0xDE0"
+
+[[confirms]]
+entry = "cube::CreatureData.equipment"
+observed = "sub_type 6 written on slot 7 (+0xAA9) was read back and changed the bar, the modes and the model"
+
+[[confirms]]
+entry = "cube::GameController.ability_bar"
+observed = "[22, 25] for a ranger with a bow in slot 7, [57, 59] before; the first two ids are M1 and M2"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+mods = ["mods-dev/bow_modes_proto"]
+input = [
+    "until bow m2",
+    "hold mouse3 1.5",
+    "until bow m1",
+    "hold mouse1 1.5",
+    "until bow bridge",
+    "hold mouse1 1.5",
+]
+script = """
+log bow-modes: task 8.2a of add-skills-unleashed, a ranger's bow
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch time u32 [[@0x7691C8] + 0x8006C8] + 0x6C
+watch charged f32 [[@0x7691C8] + 0x8006C8] + 0x144
+watch spent f32 [[@0x7691C8] + 0x8006C8] + 0x13B4
+watch plist u32 [@0x7691C8] + 0x2F4
+# the right weapon slot is slot 7 (type 3, a weapon); a bow is sub_type 6
+inspect set data.class_type 2
+inspect set data.specialization 0
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+expect cube::CreatureData.equipment value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set sub_type 6
+wait 3
+expect cube::CreatureData.equipment value u8 == 6 [[@0x7691C8] + 0x8006C8] + 0xAA9
+# the bar of a ranger with a bow: M1 22 (nextAttackMode), M2 25 (the held charge), then kick 21, retreat 50, aim 99
+expect cube::GameController.ability_bar value i32 == 22 [[@0x7691C8] + 0x80080C]
+expect cube::GameController.ability_bar value i32 == 25 [[@0x7691C8] + 0x80080C] + 4
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace args 3
+trace add @0x615E03
+trace add @0x6162D6
+trace add @0x486670
+trace add @0x61F5B8
+trace start
+log bow m2
+wait 6
+log bow m1
+wait 6
+# specialization 1 on a ranger: the mod copies the M1 byte onto the M2 byte
+inspect set data.specialization 1
+inspect set data.mp 1
+wait 2
+log bow bridge
+wait 6
+trace stop
+trace report
+watch
+expect cube::World::bowShotSite calls @0x615E03 >= 1
+expect cube::World::chargedShotSite calls @0x6162D6 >= 1
+watch clear
+wait 3
+expect - hooks == 0
+"""

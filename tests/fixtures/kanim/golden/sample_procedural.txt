@@ -1,0 +1,17 @@
+clip: procedural.anim.toml, duration 800 ms, base pose all zeros, charge 0.5, speed 0, rank 1
+t 0 (0 ms), weight 0
+  body: pos 0 0 0
+  head: rot 0 0 0
+  hand_r: rot 0 0 0
+t 0.25 (200 ms), weight 1
+  body: pos 0 0 0
+  head: rot 1.4 0 2.1
+  hand_r: rot 30 0 8
+t 0.5 (400 ms), weight 1
+  body: pos 0 0 -2.57
+  head: rot 0.32 0 0.48
+  hand_r: rot 30 0 0
+t 1 (800 ms), weight 0
+  body: pos 0 0 0
+  head: rot 0 0 0
+  hand_r: rot 0 0 0

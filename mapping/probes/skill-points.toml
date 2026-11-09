@@ -1,0 +1,160 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 3.5 of add-level-rework (M10): where the skill points come from. The theory is that no counter is stored and
+# no level-up grants anything: the budget is computed from the level (2 * level - 2, plus mana_cubes / 4 where a click
+# adds a rank). creature_level_up writes only the level, the XP and +0x16C, so the budget must follow the level even when
+# the level is written directly. The probe opens the skill panel (the key X) in four windows and reads the Points text's
+# limit (EAX at 0x4DCCDF) in each: level 30 written directly, the same with 8 mana cubes, level 9, then level 10 after a
+# real level-up by a kill. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "skill-points"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced two sites: the Points text's limit (0x4DCCDF, a mid hook) and the skill panel's toggle (0x488EC0), 1 stack argument recorded",
+    "Window A: the player's level written to 30 with no XP or level-up call; the key X opened the skill panel; 70 s of trace; a screenshot",
+    "Window B: the same with mana_cubes written to 8 (the click handler would add 2 points for them; the text should not)",
+    "Window C1: the level written to 9 with 334 XP (a level-up needs 335); the panel opened; then closed",
+    "Kill: the creature with the top id made hostile, level 10, hp 1, stunned and put half a block from the player; the player's forced cyclone (mode 86) killed it for 6 XP, as kill-xp does: 334 + 6 = 340, minus 335, gives level 10 with 5 XP",
+    "Window C2: the panel opened again at level 10",
+]
+observations = [
+    "Wine replay 1 passed, 7 of 7 entries held; no fault, and the probe's hooks were all removed at the end (hooks == 0)",
+    "window A (level 30 written directly, no level-up call): the Points text's limit site was passed 368 times, about 5 a second, and each of the last 32 passes had EAX = 58 = 2 * 30 - 2. The screenshot shows POINTS: 0/58. ECX (the ranks spent) was 0. The first pass came 0.03 s after the toggle, so the text is built only while the panel is open",
+    "window B (the same level with mana_cubes 8): EAX stayed 58 (309 passes) and the screenshot shows POINTS: 0/58: the text has no mana-cube term, while the click handler's limit (static) adds mana_cubes / 4",
+    "window C1 (level 9, 334 XP): EAX = 16 = 2 * 9 - 2 (229 passes). The kill (level 10, 6 XP) then took the player to level 10 with 5 XP: 334 + 6 = 340, minus 335",
+    "window C2 (level 10 after that real level-up): EAX = 18 (257 passes), the screenshot shows POINTS: 0/18, and the chat line shows YOU GAIN 5 XP. The limit grew by 2, as a vanilla level-up from 9 to 10 gives, and nothing but creature_level_up's own writes (level, XP, +0x16C) happened in between",
+    "the budget therefore follows the level whether it came from a level-up (C) or from a direct write (A): no grant exists. Windows A and B are what tell a computed budget from a granted one",
+    "the toggle (0x488EC0) was called once in window A, from 0x47ECF6 (the call at 0x47ECF1 in onKeyDown) with EBX = 0x58, the key X, and ECX = the GameController. GameController+0x8008E9 was 1 while the panel was open",
+    "not tried: a click on a skill button (the add branch, 0x47BE34, and the apply with its respec price, 0x4DEAB0, stay static only), spent ranks other than 0, a character with real mana cubes from the world, Server.exe",
+]
+
+[[confirms]]
+entry = "cube::SkillWidget::pointsLimitSite"
+observed = "passed 368, 309, 229 and 257 times in four 70 s windows (about 5 a second while the panel is open), with EAX = 58, 58, 16 and 18, the limit 2 * level - 2 for levels 30, 30, 9 and 10; ECX = 0 (no ranks spent). 8 mana cubes did not change it"
+
+[[confirms]]
+entry = "cube::GameController::toggleSkills"
+observed = "called once when the key X was pressed (from 0x47ECF6, EBX = 0x58, ECX = the GameController), and GameController+0x8008E9 became 1 with the panel on screen"
+
+[[confirms]]
+entry = "cube::GameController.skills_open"
+observed = "1 while the skill panel was open after the key X"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "9 -> 10 for the player in the kill that made the level-up (window C)"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "334 + 6 - 335 = 5 after the kill at level 9"
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1500
+input = [
+    "until sp: A open", "key x", "wait 12", "shot 01-A-level30",
+    "until sp: A done", "key x", "wait 3",
+    "until sp: B open", "key x", "wait 12", "shot 02-B-level30-mana8",
+    "until sp: B done", "key x", "wait 3",
+    "until sp: C1 open", "key x", "wait 12", "shot 03-C1-level9",
+    "until sp: C1 done", "key x", "wait 3",
+    "until sp: C2 open", "key x", "wait 12", "shot 04-C2-level10",
+    "until sp: C2 done", "key x", "wait 3",
+]
+script = """
+log skill points (task 3.5 of add-level-rework, M10): the budget follows the level, a level-up grants nothing
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 1
+trace add @0x4DCCDF
+trace add @0x488EC0
+# window A: level 30 written directly, no level-up call: the limit should read 2 * 30 - 2 = 58
+inspect set data.level 30
+inspect set data.mana_cubes 0
+trace start
+log sp: A open
+wait 70
+trace stop
+trace report
+expect cube::GameController::toggleSkills calls @0x488EC0 >= 1
+expect cube::GameController.skills_open value u8 == 1 [@0x7691C8] + 0x8008E9
+expect cube::SkillWidget::pointsLimitSite calls @0x4DCCDF >= 1
+expect cube::SkillWidget::pointsLimitSite reg @0x4DCCDF eax == 58
+log sp: A done
+wait 5
+# window B: the same level with 8 mana cubes: the click handler's limit would be 58 + 2, the text stays 58
+inspect set data.mana_cubes 8
+trace start
+log sp: B open
+wait 70
+trace stop
+trace report
+expect cube::SkillWidget::pointsLimitSite calls @0x4DCCDF >= 1
+expect cube::SkillWidget::pointsLimitSite reg @0x4DCCDF eax == 58
+log sp: B done
+wait 5
+# window C1: level 9 with 334 XP, no mana cubes: the limit should read 2 * 9 - 2 = 16
+inspect set data.mana_cubes 0
+inspect set data.level 9
+inspect set data.current_xp 334
+trace start
+log sp: C1 open
+wait 70
+trace stop
+trace report
+expect cube::SkillWidget::pointsLimitSite calls @0x4DCCDF >= 1
+expect cube::SkillWidget::pointsLimitSite reg @0x4DCCDF eax == 16
+log sp: C1 done
+wait 12
+# the kill: level 10, power_base 0, flags 0: floor(20*f(10)) = 6 XP, so 334 + 6 = 340 and the level-up at 335 leaves 5
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 9
+inspect set data.current_xp 334
+inspect set data.mp 1
+log sp: kill at level 9 with 334 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 10 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 5 [[@0x7691C8] + 0x8006C8] + 0x194
+# window C2: level 10 from a real level-up: the limit should read 2 * 10 - 2 = 18, two more than at level 9
+trace start
+log sp: C2 open
+wait 70
+trace stop
+trace report
+expect cube::SkillWidget::pointsLimitSite calls @0x4DCCDF >= 1
+expect cube::SkillWidget::pointsLimitSite reg @0x4DCCDF eax == 18
+log sp: C2 done
+wait 5
+expect - hooks == 0
+"""

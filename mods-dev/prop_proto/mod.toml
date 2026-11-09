@@ -1,0 +1,11 @@
+id = "prop_proto"
+name = "Prop prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+trust = "full"
+description = "Development only (probe world-model-draw): when the player is a ranger of specialization 4 the server side spawns two creatures (a friendly one and a target) whose body models are all -1 and whose right weapon slot holds a bow, so that only the bow is drawn, shrinks them through the scale vector, puts them above the player and lets them down and round, a step at a time."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

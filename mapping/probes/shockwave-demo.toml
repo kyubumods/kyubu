@@ -1,0 +1,43 @@
+# Probe record (live-probes) for add-particle-effects: the example ability shockwave_demo:wave (mods-examples/shockwave_demo) draws its
+# rings through emtweaks:shockwave when key 4 is pressed. A mod check as much as a game observation.
+id = "shockwave-demo"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; the rank of shockwave_demo:wave was set to 3 on the console (a new character has not learned a mod ability), and key 4 was held for 0.8 s",
+    "screenshots right after the press and 1.5 s later",
+]
+observations = [
+    "(to fill in after the run)",
+]
+
+[[confirms]]
+entry = "cube::CubeShader::setMatrices"
+observed = "(to fill in after the run)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-gameplay/emtweaks", "mods-examples/shockwave_demo"]
+input = [
+    "until shockwave-demo: ready",
+    "shot 00-idle",
+    "console ability rank shockwave_demo:wave 3",
+    "wait 3",
+    "hold 4 0.8",
+    "shot 01-press",
+    "wait 1",
+    "shot 02-after",
+    "until shockwave-demo: done",
+]
+script = """
+log shockwave-demo: start
+wait world
+wait 40
+log shockwave-demo: ready
+wait 60
+log shockwave-demo: done
+expect - hooks == 0
+"""

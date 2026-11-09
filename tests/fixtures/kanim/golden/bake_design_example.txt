@@ -1,0 +1,25 @@
+# baked by kanim from design_example.anim.toml
+duration = "ability"
+end = "hold"
+blend_in = 60
+blend_out = 120
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+mode = "add"
+keys = [
+  { t = 0, v = [0, 0, 0], ease = "linear" },
+  { t = 0.35, v = [-110, 0, 10], ease = "ease_out" },
+  { t = 0.5, v = [30, 0, 0], ease = "ease_in" },
+  { t = 1, v = [0, 0, 0], ease = "smooth" },
+]
+
+[[hide]]
+from = 0
+to = 0.2
+parts = ["head"]
+
+[[marker]]
+t = 0.5
+name = "hit"

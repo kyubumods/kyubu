@@ -1,0 +1,46 @@
+# Task 6.3 of add-mod-manager. The settings form of the Mods page: ModManager reads a mod's options with mods_option_get and draws one
+# row per option under the details (a picker, sliders, number fields, a text field), steps and sets drafts, checks each draft with
+# mods_option_check, and blocks APPLY while one fails. The replay installs the fixture mm_fixture_opts (one option of each kind,
+# two groups, a label, a restart option) beside ModManager.
+id = "mod-form"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built the form model (src/form.h) and drew it under the details of the selected mod in ModManager",
+    "Replayed at the start menu under Wine at 1024 x 768 with mm_fixture_opts: opened the page and the form, stepped and set values, typed a value that is not allowed",
+]
+observations = ["first run: the page opens with the form of Fixture Options (to be filled after the screenshots)"]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook here reads the options of the selected mod and keeps the drafts while the page is open"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 500
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_opts"]
+input = [
+    "until modform open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 01-form", "click 145 370", "wait 4", "shot 02-opts", "move 700 450", "wait 1", "wheel down 12", "wait 3", "shot 03-scrolled", "console mod_manager:state",
+    "click 911 301", "wait 2", "click 875 353", "wait 2", "click 911 430", "wait 2", "click 913 508", "wait 2", "shot 04-steps", "console mod_manager:state",
+    "click 815 534", "wait 2", "type 0", "wait 3", "shot 05-bad", "console mod_manager:state",
+    "click 845 694", "wait 3", "console mod_manager:state",
+    "click 785 456", "wait 2", "type Hi", "wait 3", "shot 06-title", "console mod_manager:state",
+    "click 645 694", "wait 3", "shot 07-discard", "console mod_manager:state",
+    "console mod_manager:state",
+    "until modform done",
+]
+script = """
+log modform: task 6.3 of add-mod-manager
+wait 15
+log modform open
+wait 40
+expect - value i32 == 0 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+wait 60
+log modform done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 20
+"""

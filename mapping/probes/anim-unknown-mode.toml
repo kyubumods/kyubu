@@ -1,0 +1,84 @@
+# Task 2.2 of add-ability-animation (A2 and A8). Same mod as anim-draw-record (mods-dev/draw_record_proto, which logs the draw
+# record per caller, pose id and creature mode), driven by forced modes: an id above render's switch (115), the trail modes
+# that reach render's first call site (0x4B5CD3: 17, 5, 20, 48, 93), and the deferred pass (0x4BA8DE, 0x4BA985) through the
+# `draw_record_proto:aura` command. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "anim-unknown-mode"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Forced the player's current_mode to 115 (above render's switch), rewritten each second for 3 s, then held 6 s",
+    "Forced 17, 5, 20, 48 and 93 for 2 s each, then 0; ran draw_record_proto:aura 1 (Creature + 0x1190 = 0.5)",
+]
+observations = [
+    "Wine replay 5 passed, 2 of 2 expectations held (runs 1 to 3 failed on the record's format or lost the Wine display to another session; run 4's console step used a wrong command name)",
+    "current_mode 115 (above render's switch): the record's pose id stayed 0 in every draw, from the same call site 0x4B5D97, while the creature's mode stayed 115 and its mode time counted up for the 9 s it was held; the screenshot is a close view from behind that does not show the weapon arm",
+    "forced modes map to pose ids as the static map says: 17 gives 35, 5 gives 33, 20 gives 50, 48 gives 34, 93 gives 49; draw_creature's argument 5 was 0x77, 0x76, 0x77, 0x79, 0x70 for them (a different integer per mode, read as a count)",
+    "modes 48 and 93 reached render's first call site (return address 0x4B5CD8): 20 and 80 trail draws with argument 5 = 0 and a different second argument (0x31E510 against 0x31C2B8), and the normal draw at 0x4B5D97 ran as well; modes 17, 5 and 20 did not reach it",
+    "draw_record_proto:aura 1 (the float at Creature + 0x1190 set to 0.5) gave the player 6 draws at 0x4BA8E3 and 6 at 0x4BA98A, the two calls of render's later pass (the second has the record's time written as 0 and argument 5 = 0), before the game rewrote the float and the draws returned to 0x4B5D97",
+    "no draw_creature call from CharacterPreviewWidget (0x426AE1) or WorldPreviewWidget (0x6068C1) and no record without a creature was logged during the character creation and the world load of the replay",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a mode above 110 gives pose id 0, drawn from 0x4B5D97 like an idle creature; modes 48 and 93 add the trail loop (0x4B5CD8); a nonzero float at Creature + 0x1190 adds the later pass (0x4BA8E3, 0x4BA98A) until the game rewrites the float"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/draw_record_proto"]
+input = [
+    "until anim-unknown show115",
+    "wait 2",
+    "shot 01-mode115",
+    "until anim-unknown aura",
+    "console draw_record_proto:aura 1",
+]
+script = """
+log anim-unknown: task 2.2, forced modes and the draw sites
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch recmode u32 [[@0x7691C8] + 0x8006C8] + 0x14A0
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+log anim-unknown phase 115 rewritten each second
+inspect set data.current_mode 115
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 115
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 115
+inspect set data.mode_start_time 0
+wait 1
+log anim-unknown phase 115 held
+log anim-unknown show115
+wait 6
+log anim-unknown phase trail
+inspect set data.current_mode 17
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 5
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 20
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 48
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 93
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 3
+log anim-unknown aura
+wait 60
+watch
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+expect draw_creature watch recmode changed
+watch clear
+"""

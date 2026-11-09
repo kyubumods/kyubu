@@ -1,0 +1,43 @@
+# Recorded with kyubu_probe, the Kyubu loader of task 5.2 of add-ability-api (ability_rank_bind: the detours of load_character and
+# save_character, the ranks file) and, where `mods` has it, mods-dev/ability_api_proto, unattended under Wine 9.0 (WSL, Xvfb, software
+# rendering): kmap probe replay, setup menu with clicks as input steps. The Save/ is the prepared one of record character-vanilla-refusal (slot 0
+# the level-34 `testi`, slot 1 `Tester`, the world "testopia"), and the ranks file of the earlier record of the chain
+# (evidence/ability-ranks-2026-10-05/run52.sh copies each run's Save/ into the next sandbox: the game "starts again").
+id = "ability-ranks-other"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "The game starts again with the Save and the ranks file of ability-ranks-set; SELECT on the second card (slot 1, Tester) and on the world",
+    "console: ability rank (another character: the default), ability_rank_set 2 for it and the command again"
+]
+observations = [
+    "Wine run 1 passed. Evidence: evidence/ability-ranks-2026-10-05/ (README, other/). SELECT on slot 1 (Tester) read rank 1 in the ability slot 0 had set to 3; set 2 for it; the file then held both characters",
+]
+
+[[confirms]]
+entry = "character_select_click"
+observed = "the controller's selected index (+0x800A04) is the slot SELECT loads; the loader's detour of load_character selects that slot's ranks"
+
+[[confirms]]
+entry = "cube::CreatureData.name"
+observed = "the player's name is the key check of the ranks file"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 270
+mods = ["mods-dev/ability_api_proto"]
+input = [
+    "click 511 457", "wait 10", "move 512 400", "wait 3", "click 691 435", "wait 8", "shot 01-marked", "move 512 230", "wait 3", "click 691 322", "wait 20", "shot 02-world",
+    "console ability rank ability_api_proto:burst",
+    "console ability_api_proto:rankset2",
+    "console ability rank ability_api_proto:burst",
+]
+script = """
+log ability-ranks-other: task 5.2 of add-ability-api, the ranks of the played character
+wait world
+wait 150
+expect character_select_click value u32 == 1 [@0x7691C8] + 0x800A04
+expect - hooks == 0
+"""

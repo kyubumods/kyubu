@@ -1,0 +1,53 @@
+# Recorded with kyubu_probe, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay
+# with gamepilot, which creates the level-1 human warrior "Tester" and a new world. A new character carries a lamp in equipment
+# slot 10 (Creature+0xDF0, type 0x18). cube::World::update clears bit 0x200 of cube::CreatureData.flags (Creature+0x124) of any
+# creature whose slot 10 is not a lamp, and the creature draw code and the light list test the same bit: the probe sets the bit by
+# hand and looks (task 8.2e of add-skills-unleashed).
+id = "lamp-light"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+]
+observations = [
+    "not run yet",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.flags"
+observed = "not run yet"
+
+[[confirms]]
+entry = "cube::CreatureData.equipment"
+observed = "not run yet"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 120
+input = [
+    "until lamp off",
+    "shot 01-off",
+    "until lamp on",
+    "shot 02-on",
+    "until lamp off again",
+    "shot 03-off-again",
+]
+script = """
+log lamp-light: task 8.2e of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.equipment value u8 == 24 [[@0x7691C8] + 0x8006C8] + 0xDF0
+expect cube::CreatureData.flags value u16 < 512 [[@0x7691C8] + 0x8006C8] + 0x124
+log lamp off
+wait 4
+inspect set data.flags 512
+log lamp on
+wait 6
+expect cube::CreatureData.flags value u16 >= 512 [[@0x7691C8] + 0x8006C8] + 0x124
+inspect set data.flags 0
+log lamp off again
+wait 4
+"""

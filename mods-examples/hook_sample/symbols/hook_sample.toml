@@ -1,0 +1,10 @@
+# Symbols defined by this mod. Names must start with "hook_sample:".
+build = "cube-0x51EA955E"
+
+[[symbol]]
+name = "hook_sample:ModelLoader::loadAll"
+address = 0x4EE230
+signature = "55 8B EC 6A FF 68 ?? ?? ?? ?? 64 A1 00 00 00 00"
+convention = "thiscall"
+status = "candidate"
+notes = "same function as the loader's ModelLoader::loadAll; shows how a mod ships its own symbols"

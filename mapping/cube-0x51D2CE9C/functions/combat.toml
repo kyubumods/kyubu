@@ -1,0 +1,996 @@
+# Cube.exe: abilities and their stats.
+
+[[function]]
+name = "ability_cooldown"
+address = 0x43EF40
+convention = "thiscall"
+prototype = "int32_t __thiscall ability_cooldown(cube::Creature* this, int32_t ability_id, int32_t rank)"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:skill_description_fill", "manual:returns the cooldown in ms of ability id N, per the skill tooltips", "probe:ability-start", "probe:ability-stats"]
+source = "kyubu"
+notes = "thiscall on a creature, args ability id and skill level; returns ms. Ids from the tooltips: 21 ranger kick, 48 intercept, 49 teleport, 50 retreat, 54 smash, 79 sneak, 86 cyclone, 88 fire explosion, 96 shuriken; World::update calls it per mode start (0x616E13) into the cooldown map at +0x139C"
+
+[[function]]
+name = "ability_power"
+address = 0x43F600
+convention = "thiscall"
+prototype = "float __thiscall ability_power(cube::Creature* this, int32_t ability_id, int32_t rank)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:skill_description_fill", "manual:returns the strength of ability id N (bulwark, war frenzy, mana shield)", "manual:ret 8, result in st0", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "args ability id and rank; the result is rank/(rank+10), a float. A negative rank means the creature's own skill level of the id's track (ability_track). Rank 0 on a hostile creature gets the monster rule (ability_power_rank_site). Probe: args, rank rule. Static: float return, ret 8"
+
+[[function]]
+name = "ability_track"
+address = 0x43D250
+convention = "cdecl"
+prototype = "int32_t __cdecl ability_track(int32_t ability_id)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:a jump table on ability_id - 21 (0 to 82) with three results, else -1", "xref:ability_power", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "which of the creature's skill-level slots an id reads: 6 for ids 21, 34, 48, 54, 88; 7 for 50, 79, 86, 103; 8 for 49, 96, 97, 99, 100, 101, 102; -1 for any other. The slot is Creature+0x1138 + 4*track (the player's skills 6 to 8). ability_power calls it first Probe: id 79 only. Static: the other ids"
+
+[[function]]
+name = "ability_duration"
+address = 0x447960
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:skill_description_fill", "manual:returns the duration in ms of ability id N (cyclone, 86)", "probe:ability-dispatch"]
+source = "kyubu"
+notes = "args ability id; the tooltip uses it for cyclone (86); also called by the CombatBehavior update"
+
+[[function]]
+name = "ability_cost"
+address = 0x4450E0
+convention = "thiscall"
+prototype = "float __thiscall ability_cost(cube::Creature* this, int32_t ability_id, int32_t rank)"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:skill_description_fill", "manual:returns the cost of ability id N (healing stream, 34)", "probe:ability-stats"]
+source = "kyubu"
+notes = "args ability id and skill level; a fraction of mp (the tooltip shows it times 800). Non-zero only for 3 and 4 (0.1), the spell ids 31, 33, 37, 43, 45, 46, 95 (0.3, or 0 with a kind-9 entry in Creature+0x1178) and 34 (0.125, less with ability_power(34))"
+
+[[function]]
+name = "skill_description_fill"
+address = 0x478D30
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["string:\"@smashcooldown\"", "manual:fills the @ placeholders of a skill tooltip from ability stats"]
+source = "kyubu"
+notes = "replaces @level, @health, @<ability>cooldown/duration/amount/... in a skill description; the ability ids come from here; called by 0x4A58D0 (skill:level, skill:nextlevel); tooltip code, kept in combat for the ids"
+
+# The input-to-ability-start path (task 9.1). cube::GameController::update walks the player's ability table (a
+# std::vector<int> at GameController+0x80080C, one id per slot) each frame. Slot 0 is the primary attack
+# (cube::Creature::primaryAttack); for a pressed slot 1 or higher it asks modeInterruptible and canUseAbility, then
+# switches on the id and writes it to current_mode (abilityStartSite for most ids).
+
+[[function]]
+name = "cube::GameController::abilityStartSite"
+address = 0x49BF68
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:the ability switch's shared tail: mode time = 0", "probe:ability-start"]
+source = "kyubu"
+notes = "current_mode was just set to the pressed slot's ability id (the default case and ids 5, 10, 11, 17, 20); the next instructions clear the mode time (+0x6C) and +0x128. EDI is the game controller, [esp+0x48] the player"
+
+# The player's walk speed while an ability runs (add-skills-unleashed, probe ability-walk-speed, runs 12 to 18). After the
+# input each frame, cube::GameController::update sets bit 0x40 of data.flags (Creature+0x124, "full speed") when
+# GameController+0x14 is 0 (0x498500). Then it sets bit 4 (lock-on) and clears bit 0x40 for the whole of a hold mode and
+# for the first modeDuration + 200 ms of most others (the lists are in mapping/atlas/combat.md, "Walk speed"). cube::World::update caps the walk at a
+# rate that starts at 6.0 and is doubled while bit 0x40 is set (0x618653), so an ability halves the walk's cap (a mod ability's
+# walk peaked 0.72 times lower). Setting the bit back at walkLockEndSite, in mode 112, gave 9.55 blocks/s against 9.85 on foot
+# and 7.11 without.
+
+[[function]]
+name = "cube::GameController::walkLockSite"
+address = 0x4985D2
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:setFlag(player data, 0x40, 0) follows", "probe:ability-walk-speed"]
+source = "kyubu"
+notes = "only on the mode rule's path: bit 0x40 of the player's data.flags (Creature+0x124) is cleared next, and still holds what the input gave it; bit 4 (lock-on) was just set unless the mode is 0x57 to 0x59 or 0x5C. EDI is the game controller, the player [EDI+0x8006C8]"
+
+[[function]]
+name = "cube::GameController::walkLockEndSite"
+address = 0x4985E4
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:every path from the bit-0x40 write joins here", "probe:ability-walk-speed"]
+source = "kyubu"
+notes = "after the player's bit 0x40 (full speed) and bit 4 (lock-on) are settled for the frame. EDI is the game controller, the player is [EDI+0x8006C8]. Setting bit 0x40 here gives the next World steps the doubled walk cap"
+
+[[function]]
+name = "cube::World::lockOnWalkPenaltySite"
+address = 0x6192C7
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:cap *= 0.5 * cos + 1 when the velocity points away from the facing"]
+source = "kyubu"
+notes = "with lock-on (data.flags bit 4) and the walk pointing away from the facing (Creature+0x160): XMM0 is 0.5 * cos + 1 of their angle, about to scale the walk cap at [EBP-0x2B58] (0.5 straight away). The creature is [EBP-0x2B14]. Not reached in the probe"
+
+[[function]]
+name = "cube::Creature::modeInterruptible"
+address = 0x43EBF0
+convention = "thiscall"
+prototype = "bool __thiscall cube::Creature::modeInterruptible(cube::Creature* this)"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:true when the mode is over (time >= modeDuration) or interruptible", "probe:ability-start"]
+source = "kyubu"
+notes = "false in mode 48 or while +0x144 > 0; true when the current mode has run its modeDuration, or is 0 or one of about 35 interruptible modes. The ability loop calls it for a pressed slot each frame"
+
+[[function]]
+name = "cube::Creature::canUseAbility"
+address = 0x43EE40
+convention = "thiscall"
+prototype = "bool __thiscall cube::Creature::canUseAbility(cube::Creature* this, int32_t ability_id)"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:checks ability_cost against mp and a cooldown map at +0x139C", "probe:ability-stats"]
+source = "kyubu"
+notes = "(int ability id) -> bool: false while +0x12C > 0 (except id 101), when ability_cost(id, -1) > mp, or when the id's entry in the cooldown map at +0x139C is still running. Also called each frame for slots 1-4 from 0x48C273 (the skill bar)"
+
+[[function]]
+name = "cube::Creature::primaryAttack"
+address = 0x445A10
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "xref:cube::CombatBehavior::update"]
+source = "kyubu"
+notes = "slot 0 (the primary attack) and the AI: once the current attack has run its time, sets current_mode to nextAttackMode() and the mode time to 0; returns false in mode 48 or while +0x128 is set"
+
+[[function]]
+name = "cube::Creature::nextAttackMode"
+address = 0x445620
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::primaryAttack", "manual:the next primary-attack mode from the weapon and the combo count +0x70"]
+source = "kyubu"
+
+[[function]]
+name = "cube::Creature::weaponAttack"
+address = 0x445CA0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "xref:cube::CombatBehavior::update"]
+source = "kyubu"
+notes = "the ability switch's case for ids 3, 4, 23, 31, 33, 37, 45, 46, 65, 66, 94, 95 (weapon attacks): picks the mode from the weapon (0x4458A0), checks ability_cost, sets current_mode and the mode time"
+
+[[function]]
+name = "cube::Creature::modeDuration"
+address = 0x43DA30
+convention = "thiscall"
+prototype = "int32_t __thiscall cube::Creature::modeDuration(cube::Creature* this)"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::Creature::modeInterruptible", "manual:a switch on current_mode returning its length in ms", "probe:ability-stats"]
+source = "kyubu"
+notes = "the length of the current mode in ms (some scaled by 0x447D50 and +0x17C); mode time (+0x6C) at or past it means the mode is over"
+
+# The per-frame ability dispatch (task 9.3). cube::World::update runs, for each creature in each step, a switch on
+# current_mode - 1 (110 cases, 1 to 110; index table 0x621518, targets 0x6214D0) into 18 case blocks. A case runs a
+# creature's mode when World+0xB4 is 0 and the creature is not a player (hostile_type != 0), or when the creature is
+# World+0xB8 (the local player); otherwise it goes to the default 0x6147C9.
+
+[[function]]
+name = "cube::World::abilityDispatchSite"
+address = 0x610745
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:switch on current_mode - 1 (110 cases) per creature", "probe:ability-dispatch"]
+source = "kyubu"
+notes = "EAX is the creature, EDI the World. 18 case blocks: 0x6144BC takes 59 (and 24, 25, 27, 36, 63, 64), 0x610CA3 is the melee case (57, 60, 86 and most attack ids), mode 0 and about 20 ids go to the default; the atlas page combat.md lists every group"
+
+# Costs and limits (task 9.4), all inside cube::World::update. A mode's fixed cost (ability_cost, non-zero only for
+# 3, 4, 31, 33, 34, 37, 43, 45, 46 and 95) is taken from mp on the mode's first step; the hold modes (8, 24, 25, 27,
+# 36, 59, 63, 64) instead build up charged_mp while held, and the melee case spends it (mp -= charged_mp) on the next
+# step. The step also stores each new mode's cooldown in the creature's map and counts every cooldown down.
+
+[[function]]
+name = "cube::World::abilityCostSite"
+address = 0x611E74
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:ability_cost(mode) > 0 on the mode's first step; mp -= it next", "probe:ability-costs"]
+source = "kyubu"
+notes = "in the melee dispatch case, when the mode time is 0 and ability_cost(mode, -1) > 0; ESI is the creature. The next instructions store the cost at Creature+0x13B4 (spent_mp) and subtract it from data.mp. Vortices (31, 33) pay per step at 0x6120B4 instead; 34 and 28 have their own blocks"
+
+[[function]]
+name = "cube::World::chargedMpSpendSite"
+address = 0x611ECA
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:charged_mp > 0 in the melee case: mp -= charged_mp, charged_mp = 0", "probe:ability-costs"]
+source = "kyubu"
+notes = "EAX is the creature. The charged mp becomes spent_mp (halved for modes 5 and 11), mp drops by it, then charged_mp is set to 0 and mp clamped at 0"
+
+[[function]]
+name = "cube::World::mpChargeSite"
+address = 0x619064
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:a hold mode past its start time: charged_mp += dt * 0.00075 * speed", "probe:ability-costs"]
+source = "kyubu"
+notes = "hold modes 8, 24, 25, 27, 59, 63, 64 (36 has its own rule at 0x618FE9); ESI is the creature. The growth is scaled by 0x447D50 (attack speed?), by the combo count for a class-2 creature, by 1 + 9 * ability_power(102) with buff 2; with buff 10 charged_mp = mp. It is capped at mp (0x6191AC)"
+
+[[function]]
+name = "cube::World::cooldownStartSite"
+address = 0x616DE7
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:mode time 0: cooldowns(mode) = ability_cooldown(mode, -1)", "probe:ability-costs"]
+source = "kyubu"
+notes = "ESI is the creature; every new mode (0 too) gets its entry in cube::Creature.ability_cooldowns. The same step counts each entry down by the step's ms, not below 0 (0x6109EE), and refills it while 0x444C40(id) holds (0x61094E)"
+
+# Hits and damage (task 9.5). A hit is a cube::Hit record (cuwo's hit packet: attacker and target ids, damage, stun
+# and slow times, position, direction, hit type). The side that runs the attacker's mode detects it: the melee case
+# and the other dispatch blocks compute the damage and call hitCreature, which records the hit in the step's output
+# (sent to the server by a joined client) and applies it with applyHit unless the World is a joined client's.
+# The server's World step also applies the hits its clients sent (cube::World::update's third argument; Cube.exe
+# passes none). A joined client applies the hits the server forwards to its player in cube::GameController::update.
+
+# Buffs (add-skills-unleashed 11.2b and 11.2c, read 2026-10-19). A creature's buffs are the std::list at Creature+0x1178;
+# a node's value starts at +8 with the kind byte (cuwo's passive packet: kind, modifier, duration, and a source id that
+# cuwo says is set only for poison). Kinds made in Cube.exe: 1 bulwark, 2 war frenzy, 3 camouflage, 6 mana shield,
+# 12 swiftness (from ability ids 101, 102, 97, 103, 100 at 0x5940FB), and 7, 8, 9, 10, 11 elsewhere. No site makes
+# kind 4 or 5 and Cube.exe has no "poison" string: this build has no poison.
+
+[[function]]
+name = "cube::Creature::findBuff"
+address = 0x444500
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:finds a node of Creature+0x1178 by its kind byte", "xref:cube::World::update"]
+source = "kyubu"
+notes = "one stack argument, the kind; non-zero when the creature has it. Callers ask for 2, 3, 9, 10, 11, 12; with 3 (camouflage) the step sets stealth to 1.0 (0x618546)"
+
+[[function]]
+name = "cube::Creature::addBuff"
+address = 0x447140
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:kinds 1-3, 6, 7, 9-11 replace one of the same kind", "xref:cube::World::update"]
+source = "kyubu"
+notes = "ret 4: one stack argument, the buff record (kind byte +0, a float +4, the ms +8); other kinds stack. The ability buffs come from 0x5940A0, a switch on the ability id: 101 -> 1, 102 -> 2, 97 -> 3 (its time ability_power(97)), 103 -> 6, 100 -> 12"
+
+[[function]]
+name = "cube::World::applyHit"
+address = 0x5942B0
+convention = "thiscall"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:finds target (hit+8) and attacker (hit+0); target hp -= hit+0x10", "probe:hit-damage"]
+source = "kyubu"
+notes = "(const cube::Hit*, step output*, ?). With no local player (the server) it forwards a hit on a player (hitForwardSite). Else stun, slow, knockback, hit types, then the damage (hitDamageSite), on a joined client only to its own player. Negative damage heals. Called by hitCreature and other step code"
+
+[[function]]
+name = "cube::World::hitCreature"
+address = 0x595580
+convention = "thiscall"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:builds a cube::Hit, pushes it on the step output (0x486760), applyHit", "probe:hit-damage", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "(target, attacker, float damage, crit, ..., step output*, ?) -> bool. On a joined client it skips its own player as target. It builds the cube::Hit, pushes it on the output's hit list and, unless the World is joined, applies it (applyHit). Seven callers in cube::World::update; the melee one 0x613088"
+
+[[function]]
+name = "cube::World::alertAllies"
+address = 0x59F260
+convention = "thiscall"
+prototype = "void __thiscall cube::World::alertAllies(cube::World* this, cube::Creature* attacker, cube::Creature* victim, void* step_output)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "xref:cube::CombatBehavior::update", "manual:read from the code, not run"]
+source = "kyubu"
+notes = "ret 0xC. Pushes the victim's threat for the attacker on the step output's list (+0x50), then gives 0.5 threat for the attacker to each creature within 8 blocks of the victim that is its enemy and holds none. Called by applyHit after a hit and by the combat AI on picking a target"
+
+[[function]]
+name = "creatures_are_enemies"
+address = 0x5954F0
+convention = "stdcall"
+prototype = "bool __stdcall creatures_are_enemies(cube::Creature* a, cube::Creature* b)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::CombatBehavior::update", "xref:cube::World::alertAllies", "manual:from both hostile_types and flags +0x124", "manual:not run"]
+source = "kyubu"
+notes = "ret 8. False for a pet (type 5) against a player or when either is type 6; type 1 against another type is true, 1 against 1 compares 0x444C80; else true only with flag 0x20 at +0x124. The combat AI's scan uses it; a creature already in the threat map skips it"
+
+[[function]]
+name = "cube::World::canHit"
+address = 0x5970F0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:(attacker, target) -> bool from both hostile_types and flags +0x124"]
+source = "kyubu"
+notes = "(attacker, target) -> bool: false for itself; true if either hostile_type is 6; for types 1 with 1 or 0 with 1 it compares 0x444C80; else true only with flag 0x20 at Creature+0x124. So players and monsters hit each other, monsters don't hit monsters"
+
+[[function]]
+name = "cube::Creature::modeDamageFactor"
+address = 0x43F530
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:a switch on mode - 5 (0x43F5B0/0x43F590) returning a float"]
+source = "kyubu"
+notes = "(int mode) -> float, this unused: 2 for 37, 43, 57, 58, 68; 0.6 for 31, 33; 0.5 for 5, 26; 0.4 for 30, 32; 0.25 for 55; 0.1 for 21, 72; 1 otherwise. The melee damage (0x612E81) is this * 0x43E4F0() * (5 * spent_mp^2 + a base) * a random 0.75 to 1.25, times 2 on a critical hit"
+
+[[function]]
+name = "cube::World::hitDamageSite"
+address = 0x59483E
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::applyHit", "manual:target hp -= hit.damage (damage > 0, hit type not 5)", "probe:hit-damage", "probe:taunt-target"]
+source = "kyubu"
+notes = "in cube::World::applyHit: ESI is the target, EBX the cube::Hit. Reached only when the World isn't a joined client's or the target is its own player. A write of the float at EBX+0x10 here scales the hit: hp falls by exactly that factor"
+
+[[function]]
+name = "cube::World::hitListSite"
+address = 0x596EC9
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "manual:the normal path inserts its Hit inline here"]
+source = "kyubu"
+notes = "in cube::World::hitCreature, before the normal path copies its cube::Hit into the output's hit list and calls applyHit with it: the Hit is at ESP+0xC4, the damage the float at +0x10. A write there changes the number shown and the hp"
+
+[[function]]
+name = "cube::World::hitForwardSite"
+address = 0x59435C
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:World+0xB8 = 0 and a player target: the hit goes to the output list"]
+source = "kyubu"
+notes = "in cube::World::applyHit: EBX is the cube::Hit. Only a World without a local player (the server's) gets here; the hit is queued for the player's client, which applies it"
+
+[[function]]
+name = "cube::GameController::receivedHitDamageSite"
+address = 0x49049B
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:a hit from the server: player hp -= hit.damage, clamped to 0..max hp"]
+source = "kyubu"
+notes = "the joined client's side of a monster's hit: the server forwards it (hitForwardSite) and the client applies it to its own player here, not through applyHit (its World step gets no received hits). ESI is the cube::Hit; before it, stun and the mp factor; hit type 5 goes to the shields"
+
+[[function]]
+name = "cube::Creature::armor"
+address = 0x43D880
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "string:\"ARMOR\"", "manual:the character sheet (0x435620) shows it; grows with data.level", "probe:level-terms"]
+source = "kyubu"
+notes = "() -> float. cube::World::hitCreature subtracts it, times a factor, from a physical hit's damage and clamps at 0, so a weak attacker's hits carry no damage (probe hit-damage, phase 2a)"
+
+[[function]]
+name = "cube::Creature::resistance"
+address = 0x446DF0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "string:\"RESI\"", "manual:the character sheet (0x435620) shows it after armor", "probe:level-terms"]
+source = "kyubu"
+notes = "() -> float, the armor of spells: hitCreature subtracts it instead of cube::Creature::armor when its caller flags the hit as magic (the vortex modes 30-33)"
+
+# Projectiles (task 9.6). The dispatch block of the projectile modes (37-46, 108; 0x616303) builds a cube::Projectile
+# on the stack when the mode time passes the release time (0x43D330), pushes it on cube::World.projectiles (+0x14)
+# and on the step output's shoot list (+0x20, sent to the server by a joined client), and plays a sound. Each World
+# step moves every projectile in sub-steps and hits the creatures it meets (cube::World::hitCreature from 0x6206DC);
+# a spell (kind 1 with the skill flag, the fireball) explodes where it stops and hits the creatures in its box from
+# 0x621305. Then it is queued for removal, as it is when too old.
+
+[[function]]
+name = "cube::World::projectileSpawnSite"
+address = 0x616A26
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::abilityDispatchSite", "manual:pushes the new cube::Projectile [ebp-0x3E4] on World+0x14", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "in the projectile block (0x616303): ECX is the World, EDI the shooter, [EBP-0x3E4] the new projectile. Once per shot, only when data.ray_hit (the aim) isn't zero. 45 and 46 shoot again every third of ability_duration. The next push (0x616B38) copies it to the step output's shoot list"
+
+[[function]]
+name = "cube::World::projectileUpdateSite"
+address = 0x61F31D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the loop over World+0x14 (from 0x61F2CB), EDI the projectile", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "once per projectile per World step; EDI is the cube::Projectile. Kind 2 (boomerang) flies back to its shooter after 1100 ms; kinds 0, 3, 4 fall; 1 flies straight. Then pos += velocity * dt in sub-steps, age += dt, and each sub-step looks for creatures to hit (0x61FCB5 on)"
+
+[[function]]
+name = "cube::World::projectileRemoveSite"
+address = 0x61F5B8
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the projectile's iterator goes on a removal list (0x4466A0)", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "EDI is the cube::Projectile. Reached when its age passes 5000 ms (kinds other than 2), when a boomerang's shooter is gone or it is back (1200 ms), or when its flight ends at a block or a creature (kinds 0, 1, 4; a spell explodes first)"
+
+# Levels, power and experience (read statically on 2026-09-30 for the level-rework design).
+
+[[function]]
+name = "level_curve"
+address = 0x43D2F0
+convention = "cdecl"
+prototype = "float __cdecl level_curve(float level)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:returns 1 - 1/(0.05*(level-1) + 1): 0 at level 1, tends to 1", "xref:item_tooltip", "probe:level-terms"]
+source = "kyubu"
+notes = "the saturating level curve f behind power (int(f*100+1)), XP to next level (int(f*1000+50)), kill XP and pet XP. Max HP uses 2^(3f) with the same term inlined. 22 call sites (item power, kill XP, the HUD, world code)"
+
+[[function]]
+name = "creature_level_up"
+address = 0x448150
+convention = "thiscall"
+prototype = "void __thiscall creature_level_up(cube::Creature* this, cube::World* world)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:while xp >= int(f(level)*1000 + 50): xp -= that, level += 1, hp = max hp", "xref:cube::Creature::maxHp", "probe:kill-xp", "probe:creature-level-up", "probe:level-up-replacement"]
+source = "kyubu"
+notes = "level-up loop (level_curve inlined): XP to next 50 at level 1, no cap. ECX = creature, ONE stack argument popped by `ret 4` (0x44826D): the World, never read; all 3 callers push it (0x59F5E2, 0x59F631, 0x48FB17). Not 0 arguments, as creature-level-up first read it"
+
+[[function]]
+name = "kill_record_apply"
+address = 0x59F4E0
+convention = "thiscall"
+prototype = "void __thiscall kill_record_apply(cube::World* this, void* record)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:adds the record's XP (+0x14) to the local player, then levels up", "probe:kill-xp", "probe:creature-level-up"]
+source = "kyubu"
+notes = "record: killer id, victim id, ..., XP at +0x14. The local player gains it when it is the killer and the victim is HOSTILE; outside a joined client, the killer's pet (Creature+0x11C8, hp above 0) gains it too and the pet item (+0x1024 XP, +0x1030 level) is updated. Multiplayer unverified"
+
+[[function]]
+name = "cube::World::killXpSite"
+address = 0x594BDD
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:20*f(level+power_base), min 1, x20 giant, x10 flag 0x200, 0 flag 0x800", "probe:kill-xp", "probe:kill-xp-replacement"]
+source = "kyubu"
+notes = "in cube::World::applyHit's death branch, right after the kill XP is computed (once per death): EBX is the victim, the XP is the float at [EBP-0x2F8]. A mod writes its own value there (level_rework does). No branch enters 0x594B50-0x594BDD from outside"
+
+[[function]]
+name = "cube::World::killRecordXpSite"
+address = 0x5950E4
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:cvttss2si of [EBP-0x2F8] into the kill record's XP (record+0x14)", "probe:kill-xp"]
+source = "kyubu"
+notes = "in applyHit's loop over the victim's threat map, once per player that gets a kill record: cvttss2si eax,[EBP-0x2F8] (8 bytes) truncates the XP into the record, which kill_record_apply takes next. EDI is the map node (+0x10 the player's id, +0x18 its creature)"
+
+[[function]]
+name = "cube::GameController::itemXpSite"
+address = 0x48FB04
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:item type 13 adds 10 * quantity XP, then runs creature_level_up", "probe:kill-xp"]
+source = "kyubu"
+notes = "in cube::GameController::update's loop over received items: a type 13 item adds 10 * its quantity (the item's level word) to the local player's current_xp (ECX), then runs creature_level_up. applyHit's zone-completion block makes these items. level_rework divides the 10 by 10 (task 4.6)"
+
+[[function]]
+name = "is_giant_creature"
+address = 0x444BC0
+convention = "fastcall"
+prototype = "bool __fastcall is_giant_creature(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:true for entity types 101, 107-109 and 114-119"]
+source = "kyubu"
+notes = "Dragon, SeaCrab, Troll, DarkTroll, Yeti, Cyclops, Mammoth, Lich, RuneGiant, Saurian (cuwo names). applyHit multiplies such a victim's kill XP by 20"
+
+[[function]]
+name = "creature_attacks_from_range"
+address = 0x444B10
+convention = "fastcall"
+prototype = "bool __fastcall creature_attacks_from_range(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:true for mages, bows, crossbows, boomerangs, staffs, wands, bracelets"]
+source = "kyubu"
+notes = "also true for entity types 86, 104 and 117 (Spitter, SnoutBeetle, Lich), checked on the weapon in equipment slot 7. applyHit adds threat = damage x 1 for such an attacker, x 2 otherwise (x 10 for entity type 25, x 20 for one guardian-weapon case)"
+
+[[function]]
+name = "creature_attack_speed"
+address = 0x447D50
+convention = "fastcall"
+prototype = "float __fastcall creature_attack_speed(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:0.75 + power_base/16 for non-players, plus class, gear and buff bonuses", "xref:cube::World::update"]
+source = "kyubu"
+notes = "1.0 base for players. A +4 monster reaches 1.0 (33% over +0). Warrior and one mage specialization add a share of their combo counter; a kind-12 buff multiplies by 1 + (1 - 1/(0.1*rank + 1)), rank = level/2 + power_base + 1 for non-players. Scales hold-mode charging"
+
+[[function]]
+name = "creature_power_delay_ms"
+address = 0x4455F0
+convention = "fastcall"
+subsystem = "combat"
+status = "guess"
+evidence = ["manual:1500 for players, 3000 - 375*power_base for other creatures"]
+source = "kyubu"
+notes = "what the delay is for is unknown (probably an attack or ability pacing timer); +4 monsters get 1500 ms like players"
+
+# Creature stats (read statically on 2026-09-30). Each takes the cube::Creature in ECX and returns in st0 (power in
+# EAX). The character sheet (0x435620) prints Power, HP, ARMOR, RESI, TEMPO and REG right after calling
+# creature_power, cube::Creature::maxHp, armor, resistance, creature_attack_speed and creature_regeneration. The item
+# getters they call are on the items page. Located with the help of ToufouMaster's CubicExpansion mod (07-20 build);
+# see kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+
+[[function]]
+name = "creature_power"
+address = 0x446510
+convention = "fastcall"
+prototype = "int32_t __fastcall creature_power(cube::Creature* creature)"
+subsystem = "combat"
+status = "verified"
+evidence = ["string:\"Power\"", "manual:int(level_curve(data.level) * 100 + 1), inline", "xref:item_tooltip", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "a creature's power from its level (+0x190), the same formula as item_power. The Power line of the character sheet, and the player's power in the item info box. can_equip_item computes the same value inline instead of calling it"
+
+[[function]]
+name = "creature_damage"
+address = 0x43E4F0
+convention = "fastcall"
+prototype = "float __fastcall creature_damage(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "xref:item_damage", "manual:called just after the melee damage site 0x612E81", "probe:level-terms"]
+source = "kyubu"
+notes = "the attacker's damage stat: from level (+0x190), the damage multiplier (+0x180) and item_damage of the held weapons. The melee damage is cube::Creature::modeDamageFactor times this times an mp term. Six call sites, all in cube::World::update"
+
+[[function]]
+name = "creature_projectile_damage"
+address = 0x4474D0
+convention = "fastcall"
+prototype = "float __fastcall creature_projectile_damage(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:item_damage", "manual:three of its calls lead up to cube::World::projectileSpawnSite", "probe:level-terms"]
+source = "kyubu"
+notes = "the projectiles' damage stat, built like creature_damage (level, damage multiplier, item_damage). 12 call sites: mode blocks in cube::World::update, some of them not projectile modes, and 0x5940A0. CubicExpansion also treats it as projectile damage"
+
+[[function]]
+name = "creature_crit"
+address = 0x43F2E0
+convention = "fastcall"
+prototype = "float __fastcall creature_crit(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:item_crit", "manual:a level_curve term plus item_crit of the nine worn items", "probe:level-terms"]
+source = "kyubu"
+notes = "a creature's crit chance from level and gear. Callers: 0x444A90, and 0x43F280, the character sheet's crit, which returns 1.0 while a buff of kind 11 is on (list at +0x1178) and otherwise adds Creature+0x1190 * 0.15"
+
+[[function]]
+name = "creature_tempo"
+address = 0x447F00
+convention = "fastcall"
+prototype = "float __fastcall creature_tempo(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_attack_speed", "xref:item_tempo", "probe:level-terms"]
+source = "kyubu"
+notes = "a creature's tempo from level (a level_curve term) plus item_tempo of the nine worn items. Its only caller is creature_attack_speed, which is what the character sheet's TEMPO line shows"
+
+[[function]]
+name = "creature_regeneration"
+address = 0x4467A0
+convention = "fastcall"
+prototype = "float __fastcall creature_regeneration(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["string:\"REG\"", "xref:item_regeneration"]
+source = "kyubu"
+notes = "the REG value of the character sheet, its only caller: item_regeneration of the nine worn items. Where regeneration is applied in play is not traced"
+
+# Level terms of the creature strength functions (task 3.3 of add-level-rework, M3; read statically on 2026-10-01, and the
+# sites that the replay level-terms reached are marked by its evidence). Every term is the level curve f inlined as
+# 1 - 1/(0.05 (level - 1) + 1), never a call of level_curve. The maxHp, armor and resistance functions also have a second
+# pow term, 2^(0.25 * byte at +0x1A8), which is not a level term; creature_damage and creature_projectile_damage have
+# 2^(0.25 * 0) = 1. A site is the instruction after the cvtdq2ps: a mid hook there edits XMM2 through KyubuCpuContext.xmm (Kyubu 1.1), which is how the mod gives the curve old(N).
+
+[[function]]
+name = "cube::Creature::maxHpLevelSite"
+address = 0x4453CF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::maxHp", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In cube::Creature::maxHp: movd xmm2,[esi+0x190] (0x4453C4) loads the level, cvtdq2ps (0x4453CC) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Term 2^(3f)."
+
+[[function]]
+name = "cube::Creature::armorLevelSite"
+address = 0x43D89F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::armor", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In cube::Creature::armor: movd xmm2,[esi+0x190] (0x43D894) loads the level, cvtdq2ps (0x43D89C) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Term 2^(3f)."
+
+[[function]]
+name = "cube::Creature::resistanceLevelSite"
+address = 0x446E0F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::resistance", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In cube::Creature::resistance: movd xmm2,[esi+0x190] (0x446E04) loads the level, cvtdq2ps (0x446E0C) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Term 2^(3f)."
+
+[[function]]
+name = "creature_damage_level_site"
+address = 0x43E52D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x43E51A) loads the level, cvtdq2ps (0x43E52A) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). The base term 2^(3f); a movss lies between."
+
+[[function]]
+name = "creature_damage_level_site_flag8"
+address = 0x43E5E9
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "manual:inline curve after the level load"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x43E5D6) loads the level, cvtdq2ps (0x43E5E6) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Bit 0x08 of +0x7E, empty list from 0x43E7F0."
+
+[[function]]
+name = "creature_damage_level_site_flag10"
+address = 0x43E694
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "manual:inline curve after the level load"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x43E681) loads the level, cvtdq2ps (0x43E691) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Bit 0x10 of +0x7E, empty list from 0x43E7F0."
+
+# The same shape in the other creature stats, which the hooks of 4.2 and 5.x need too.
+
+[[function]]
+name = "creature_projectile_damage_level_site"
+address = 0x44750D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x4474FA) loads the level, cvtdq2ps (0x44750A) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). The base term; a movss lies between."
+
+[[function]]
+name = "creature_projectile_damage_level_site_flag8"
+address = 0x4475CA
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "manual:inline curve after the level load"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x4475B7) loads the level, cvtdq2ps (0x4475C7) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Bit 0x08 of +0x7E."
+
+[[function]]
+name = "creature_projectile_damage_level_site_flag10"
+address = 0x447672
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "manual:inline curve after the level load"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x44765F) loads the level, cvtdq2ps (0x44766F) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a). Bit 0x10 of +0x7E."
+
+[[function]]
+name = "creature_crit_level_site"
+address = 0x43F2FF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_crit", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In creature_crit: movd xmm2,[esi+0x190] (0x43F2F4) loads the level, cvtdq2ps (0x43F2FC) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a)."
+
+[[function]]
+name = "creature_tempo_level_site"
+address = 0x447F1F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_tempo", "manual:inline curve after the level load", "probe:level-terms"]
+source = "kyubu"
+notes = "In creature_tempo: movd xmm2,[esi+0x190] (0x447F14) loads the level, cvtdq2ps (0x447F1C) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a)."
+
+[[function]]
+name = "creature_damage_alt_level_site"
+address = 0x43EA4F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage_alt", "manual:inline curve after the level load"]
+source = "kyubu"
+notes = "In creature_damage_alt: movd xmm2,[esi+0x190] (0x43EA44) loads the level, cvtdq2ps (0x43EA4C) converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there (design D2a)."
+
+[[function]]
+name = "creature_damage_alt"
+address = 0x43EA30
+convention = "fastcall"
+prototype = "float __fastcall creature_damage_alt(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "xref:cube::World::hitCreature", "manual:inline curve, then item_damage"]
+source = "kyubu"
+notes = "a damage-like stat built like creature_damage (level term inline, item_damage of the held weapons); not identified further. Callers: cube::GameController::update (0x4901A8) and hitCreature (0x59589B, only when the target +0x174 is above 0). Not reached in the replay"
+
+[[function]]
+name = "creature_xp_to_next"
+address = 0x445360
+convention = "fastcall"
+prototype = "int32_t __fastcall creature_xp_to_next(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:int(1000 f + 50), inline", "probe:level-terms", "probe:level-up-replacement"]
+source = "kyubu"
+notes = "the XP to the next level as the HUD draws it: 50 at level 1. Six callers, all in the HUD of cube::GameController::update (0x490CBE to 0x49193C). creature_level_up has its own copy, so the XP bar needs this function replaced too (task 4.1)"
+
+[[function]]
+name = "cube::World::hitLevelDifferenceSite"
+address = 0x596D04
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "manual:f(attacker level) - f(target level) as a chance"]
+source = "kyubu"
+notes = "In hitCreature, two level_curve calls: 0x596D04 (attacker, [EAX+0x190]) and 0x596D1D (target, [EDI+0x190]). 2^((fa - ft) * k), capped at 1.0, is compared with a random number (0x596DB0). Not reached in the replay. A call cannot be hooked: use hitAttackerLevelSite and hitTargetLevelSite"
+
+[[function]]
+name = "cube::World::hitAttackerLevelSite"
+address = 0x596CFE
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "manual:inline level load before a level_curve call"]
+source = "kyubu"
+notes = "In hitCreature: movd xmm0,[eax+0x190] (0x596CF3) loads the attacker's level, cvtdq2ps converts it, and the next instruction stores XMM0 as the argument of a level_curve call. A mid hook at this site writes old_float(N) there, with no call to hook"
+
+[[function]]
+name = "cube::World::hitTargetLevelSite"
+address = 0x596D18
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "manual:inline level load before a level_curve call"]
+source = "kyubu"
+notes = "In hitCreature: movd xmm0,[edi+0x190] (0x596D0D) loads the target's level, cvtdq2ps converts it, and the next instruction stores XMM0 as the argument of a level_curve call. A mid hook at this site writes old_float(N) there, with no call to hook"
+
+# The 22 callers of level_curve (all direct calls; no other reference to it): kill XP 0x594B50 and the zone-completion item
+# quantity 0x59516C in applyHit; the effect sums 0x595FF1, 0x596057, 0x596098, 0x59610A in hitCreature (the level is a field of
+# a record in a list at [ESI+8], not a creature's +0x190; unidentified); the hit chance above; item_power 0x4C75E5;
+# item_tooltip 0x4A39C2 (f * 1000); 0x4C7D20 (an item level re-roll, 0x4C7D43 and 0x4C7DA9); 0x4C9490 (an item against the
+# player's level, 0x4CAA93 to 0x4CAB12); the target colours in cube::GameController::update (a creature's f against the
+# player's f, 0x49AD5E to 0x49AE8F). The replay level-terms saw 0x4C7D43, 0x594B50 and 0x4C75E5 only.
+
+# The rank of a monster's abilities (task 3.4 of add-level-rework, M4), read statically on 2026-10-01. ability_power
+# and creature_attack_speed hold the same rule: a creature whose skill level for the ability's track is 0 and whose
+# hostile_type is not 0 (not the player) gets rank = floor(level / 2) + power_base + 1, the level halved by integer
+# arithmetic (cdq, sub, sar). Both copies load the level (+0x190) and power_base (+0x1A8) into EAX and ECX just before.
+# The image holds no other copy of the rule: the only loads of power_base (+0x1A8) followed by a halving are these two.
+
+[[function]]
+name = "ability_power_rank_site"
+address = 0x43F643
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:ability_power", "manual:EAX = level, ECX = power_base here; cdq, sub, sar, inc, add follow", "probe:rank-and-equip-gate", "probe:ability-rank-replacement"]
+source = "kyubu"
+notes = "the monster rule of ability_power, after both loads: EAX = level, ECX = power_base. A mid hook writes EAX = floor(old(N)); the displaced instructions halve it and add power_base + 1. The 8 displaced bytes end at 0x43F64B, so no jump enters them. Reached only for hostile_type != 0 and skill level 0"
+
+[[function]]
+name = "ability_power_rank_join"
+address = 0x43F64B
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:ability_power", "manual:EAX = the rank on every path, ESI = the creature", "probe:rank-and-equip-gate", "probe:ability-rank-replacement"]
+source = "kyubu"
+notes = "where the player's rank (a skill level) and the monster's rank (the rule above) meet: EAX is the rank, then movd xmm1,eax and the curve follow. An observation point for a probe; the mod hooks ability_power_rank_site instead"
+
+[[function]]
+name = "creature_attack_speed_rank_site"
+address = 0x447EB5
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_attack_speed", "manual:same rank rule as ability_power_rank_site"]
+source = "kyubu"
+notes = "in creature_attack_speed (0x447D50), when skills slot 8 (Creature+0x1158) is 0 and hostile_type is not 0: EAX = level, ECX = power_base, as at ability_power_rank_site, and the same hook applies. Not reached in any replay Static only"
+
+# The skill bar build (task 2.5 of add-ability-api). Each frame cube::GameController::update clears the player's bar
+# (IntVector::clear on GameController+0x80080C, 0x48BB0B), pushes M1 and M2 by weapon and specialization, then three
+# class ids by class_type and specialization (IntVector::push_back), and applies the learned gate to the slots 2 up.
+
+[[function]]
+name = "cube::GameController::abilityBarBuiltSite"
+address = 0x48BFDC
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:right after the learned gate loop; the bar is complete", "probe:ability-slot4", "probe:ability-bar-soak"]
+source = "kyubu"
+notes = "in cube::GameController::update, after the learned gate: the bar is complete. [esp+0x10] is the game controller, [esp+0x34] the bar vector. A mid hook here may append ids with IntVector::push_back; the input loop and the HUD read them in the same call. slot4_proto uses it"
+
+[[function]]
+name = "step_output_push_hit"
+address = 0x486760
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["manual:cube::World::hitCreature calls it with its cube::Hit before applyHit"]
+source = "kyubu"
+notes = "(step output*, const cube::Hit*): push_back on the output's hit list, where the damage numbers are read from. hitCreature calls it only on special paths (hit types 3 and 5); the normal path inserts inline (hitListSite). A hit given with applyHit alone shows no number"
+
+[[function]]
+name = "cube::World::bowShotSite"
+address = 0x615E03
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::abilityDispatchSite", "manual:the new arrow is complete on the stack, just before its push", "probe:bow-modes"]
+source = "kyubu"
+notes = "in the dispatch block 0x61596A (modes 22 and 23, a bow's and a crossbow's shot; 26, the boomerang): the new projectile is at EBP-0x578 (kind, skill flag and velocity may be changed here) and XMM1 holds its damage; the creature is at [EBP-0x2B14]"
+
+[[function]]
+name = "cube::World::chargedShotSite"
+address = 0x6162D6
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::abilityDispatchSite", "manual:the new arrow is complete on the stack, just before its push", "probe:bow-modes"]
+source = "kyubu"
+notes = "in the dispatch block 0x615F16 (modes 50, 55 and 96): the new projectile is at EBP-0xDE0 and XMM1 holds its damage. Mode 55, the bow's held M2 (25) after its release, shoots four arrows here, one in each quarter of the mode"
+
+[[function]]
+name = "cube::GameController::bowReleaseSite"
+address = 0x49C069
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:the held M2 id 25 has just been replaced by mode 55", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in the input loop of cube::GameController::update, in the release case of the bow's charge (id 25): the creature in EAX has just got mode 55; another id written to its mode here replaces the volley (23 is one arrow). The mode time is zeroed by the next instruction"
+[[function]]
+name = "cube::World::chargeSoundSite"
+address = 0x614555
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::abilityDispatchSite", "manual:sound 0x37, pitch 1 + 0.5 * charged_mp, just before its push"]
+source = "kyubu"
+notes = "in the dispatch block 0x6144BC (hold modes 24, 25, 27, 36, 59, 63, 64), once in each 200 ms of mode time: ESI is the creature, the sound action at EBP-0x758 (id +0xC, pitch +0x10, volume +0x14, 1 by default). A volume of 0 written here silences that one sound"
+
+[[function]]
+name = "cube::World::projectileStopSite"
+address = 0x62076E
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::projectileUpdateSite", "manual:right after the hit set the stop flag of kinds 0, 1 and 4", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in the projectile update, after a creature was hit: EDI is the projectile and the byte at [EBP-0x2B64] is the flag that ends its flight (set for kinds 0, 1 and 4). A mod that writes 0 there lets the projectile go on to the next creature"
+
+[[function]]
+name = "cube::World::projectileSurfaceSite"
+address = 0x62094E
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::projectileUpdateSite", "manual:the projectile is in a solid block; kind 0 now gets the arrow's puff", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in the projectile update, when the projectile is inside a solid block: EDI is the projectile. A kind 0 projectile gets the puff of particles and ends here; a kind 1 one goes on to explode. Writing kind 0 here ends a kind 1 projectile as an arrow"
+
+[[function]]
+name = "cube::GameController::projectileDrawKindSite"
+address = 0x4B81A2
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:the render loop over World.projectiles jumps on the kind here", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in cube::GameController::render, the loop over World.projectiles: ESI is the projectile and the next instructions jump on its kind (0 an arrow, turned along its velocity, model slot 840; 1 a spell, unturned). Writing the kind for one draw changes what is drawn"
+
+[[function]]
+name = "cube::GameController::projectileDrawEndSite"
+address = 0x4B8B5C
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::render", "manual:every path of the projectile draw loop ends here", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in cube::GameController::render, the end of one projectile's draw (all the paths of the loop come here, and so do the skips): where a kind written at projectileDrawKindSite is put back"
+
+[[function]]
+name = "cube::GameController::projectileArrowModelSite"
+address = 0x4B83CD
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::GameController::render", "manual:the kind 0 case, just after its ModelLoader::get of slot 840", "probe:projectile-pierce"]
+source = "kyubu"
+notes = "in cube::GameController::render, the draw of one arrow (kind 0): EAX is the Model* that ModelLoader::get returned for slot 840 and ESI the projectile. Writing EAX gives this one arrow another model; no other draw reads it"

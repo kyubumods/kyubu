@@ -1,0 +1,68 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay, setup menu with clicks as input steps (the automatic `existing-world` setup
+# clicks the wrong card on a list of four characters), with no mods but the probe. The sandbox's
+# Save/ held a copy of the four characters, the world "testopia" (seed 0x221) and its map file from kyubu-play/game/Save, put there by
+# hand before the run (RECIPES.md, "To test with a save"). Task 7.1 of add-level-rework (M11): the character list's load of a chosen
+# slot and the per-world position map. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "character-slot-load"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Read the controller's constructor, the return-to-menu branch of onMouseUp and the click handler 0x484340: load_character has three callers",
+    "Built a Wine sandbox, copied characters.db, worlds.db, world_testopia.db and map_testopia.db from kyubu-play/game/Save into its Save/ (copies; the originals were not touched)",
+    "Replay with setup menu and input steps: Start, a hover on the first character card (testi, slot 0, one map entry) and SELECT, then the same on the first world",
+    "The script traced load_character, the map's operator[] and the click handler from the start menu, waited for the world, and read the player's map before the 60 s autosave",
+]
+observations = [
+    "run 4: one click on SELECT called character_select_click once (from 0x651B48, the widget callback dispatch) and it called load_character once, returning to 0x4843B0, with slot 0",
+    "character_deserialize called character_world_map_index once, returning to 0x44CECA, with ECX = the map (the player's style object + 0x1C)",
+    "after the load the map held one node: count 1 at map+4, seed 545 at node+0x10, the name 'test' (the start of testopia) at node+0x14, and the first 4 bytes of the saved position at node+0x30, as in characters.db",
+    "runs 1 to 3 failed for set-up reasons only: the sandbox was deleted after run 1, and the automatic existing-world clicks do not fit a list of four characters (screenshot of run 3)",
+]
+
+[[confirms]]
+entry = "character_select_click"
+observed = "called once when SELECT is clicked on a character"
+
+[[confirms]]
+entry = "load_character"
+observed = "called by character_select_click with the selected slot as first argument"
+
+[[confirms]]
+entry = "character_world_map_index"
+observed = "called by character_deserialize once for the character's one map entry"
+
+[[confirms]]
+entry = "character_deserialize"
+observed = "after the load, the player's map at (Creature+0x1D28)+0x1C holds one node: seed 545, name testopia, the saved position at +0x30"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+input = [
+    "click 511 457", "wait 8", "move 512 119", "wait 3", "shot 01-list", "click 691 175", "wait 12",
+    "move 512 119", "wait 3", "click 691 175", "wait 30", "shot 02-world",
+]
+script = """
+log character-slot-load (task 7.1 of add-level-rework, M11): the list's load of a chosen slot, the per-world position map
+trace args 2
+trace add character_select_click
+trace add load_character
+trace add character_world_map_index
+trace start
+wait 70
+trace stop
+trace report
+expect character_select_click calls character_select_click >= 1
+expect load_character calls load_character >= 1
+expect load_character arg load_character 1 == 0
+expect load_character from load_character 0x4843B0
+expect character_world_map_index from character_world_map_index 0x44CECA
+expect character_deserialize value u32 == 1 [[[@0x7691C8] + 0x8006C8] + 0x1D28] + 0x20
+expect character_deserialize value u32 == 545 [[[[[@0x7691C8] + 0x8006C8] + 0x1D28] + 0x1C] + 0] + 0x10
+expect character_deserialize value u32 == 1953719668 [[[[[@0x7691C8] + 0x8006C8] + 0x1D28] + 0x1C] + 0] + 0x14
+expect character_deserialize value u32 == 970617325 [[[[[@0x7691C8] + 0x8006C8] + 0x1D28] + 0x1C] + 0] + 0x30
+expect - hooks == 0
+"""

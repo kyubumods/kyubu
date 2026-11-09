@@ -1,0 +1,62 @@
+# Written 2026-10-17 for task 9.2b of add-skills-unleashed (the Scout's snare); reworked 2026-10-18 after the user's play-test (a stunned
+# creature lies in the stun pose with the stun's stars: not wanted). Question: can a creature be frozen in place, animation stopped,
+# with no stun and only a whitish look? mods-dev/snare_proto sends a zombie at the player and snares it 1.2 s after placing it: it is held
+# still (velocity and knockback zeroed each step), its behaviour pointer (Creature+0x13E4) is taken off so it has no AI, the draw record is saved at
+# the join site and written back at every draw, and its draw colour is scaled by 3 (phase A, 8 s); then freeze and white are off (phase B,
+# 8 s); then everything is off (phase C).
+id = "snare-freeze"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-17"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there; the body yaw is set to 0; the player's hp is raised to 20000",
+    "`spawner ZOMBIE 1 monster` puts one zombie near the player; it is the creature (the newest)",
+    "`snare_proto:run`: the zombie is put 8 blocks north and 7 east and runs to the player; 1.2 s later phase A (velocity and knockback zeroed each step, stun timer held at 1000, the stun timer written to -4000 at the mark's gate, the draw record's words +0x10 to +0x4EC saved at the first draw and written back at every draw), 8 s later phase B (freeze and hidemark off), 8 s later phase C (all off)",
+    "shots in phase A at 1, 2, 4, 5 and 7 s, in phase B and in phase C; runs 1 to 3 saved only +0x10 to +0xEC of the record, and run 1 put the zombie 20 blocks away",
+]
+observations = [
+    "held still: with the velocity and knockback written to 0 each step and the stun timer held at 1000 the zombie stood where it was (the distance to the player stayed 2.2 to 2.4 blocks), its record showed pose 0 and mode time 0, and the player's hp did not change for the 16 s of phases A and B (19888 or 19883); in phase C the timer ran down in about 1 s, the zombie walked at once and the player's hp fell again",
+    "frozen pose: with the record's words +0x10 to +0x4EC written back at every draw the zombie is drawn in the same pose in every shot from 2 s to 7 s of phase A (run 4 shots 04 to 07, equal to the eye), although the game computed a different record each draw (104 words different before the write)",
+    "saving only +0x10 to +0xEC (runs 2 and 3) was not enough: the zombie's arms kept moving for about 1.5 s and settled into a lying pose, so some of the eased pose lives past +0xEC (the part matrices and what the join site's later code reads); the whole record fixes it",
+    "the pose frozen is the one drawn at the first draw after the write: a zombie caught while running was caught in a leaning, arms-forward pose; the same creature stunned and not frozen (phase B, run 4 shot 08) stands upright with its head tilted (stun mark over its head)",
+    "the stun's mark model: with the stun timer written to -4000 at stun_mark_gate_site the mark model is not fetched (the model site, 0x4B5EF9, had 0 hits for the creature during phase A and 3 to 58 in phase B and C)",
+    "not solved: yellow star shapes like the stun's stars still hang over the frozen zombie in the shots of phase A from the second second on, although the model site is not reached; they are not the mark's model, so a second source draws them (a particle from the stun, a guess); a snare done with the stun timer shows them",
+    "hook chain: the join site (0x41F135) took a second mid hook beside the loader's own animation hook; the three of snare_proto and the fourth (the model site) installed without error",
+    "replay 4 passed; the shots were made at about 7 frames a second under Wine, so a 'frozen' frame means equal over 5 s of draws, not over every frame",
+]
+
+[[confirms]]
+entry = "draw_creature_join_site"
+observed = "the draw record's words +0x10 to +0x4EC saved at the first draw and written back at each later draw: the creature's pose stays the same for 7 s"
+
+[[confirms]]
+entry = "stun_mark_gate_site"
+observed = "the stun timer written to -4000 at the gate: the mark is not drawn for a stunned creature"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 260
+mods = ["mods-dev/snare_proto", "mods-examples/entity_spawner"]
+input = [
+    "until sp: A", "console entity_spawner:spawner ZOMBIE 1 monster", "wait 3", "shot 01-spawned",
+    "until sp: B", "console snare_proto:run",
+    "until phase approach", "wait 2", "shot 02-walking",
+    "until phase A", "wait 1", "shot 03-A-1s", "wait 1.5", "shot 04-A-2s", "wait 1.5", "shot 05-A-4s", "wait 1.5", "shot 06-A-5s", "wait 1.5", "shot 07-A-7s",
+    "until phase B", "wait 2", "shot 08-B-stunned",
+    "until phase C", "wait 4", "shot 09-C-released",
+]
+script = """
+log snare-freeze: snare_proto, a creature frozen in place
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log sp: A
+wait 30
+log sp: B
+wait 100
+expect draw_creature_join_site hooks == 0
+"""

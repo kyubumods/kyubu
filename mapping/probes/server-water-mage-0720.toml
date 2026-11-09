@@ -1,0 +1,78 @@
+# Task 8.2 of add-skills-unleashed-multiplayer: the Water Mage's Chain of the Deep on Server.exe with a joined client (kmap probe
+# replay, client = "join"). The client, made a Water Mage by su_rank, holds key 4; its cast marker sends a pulse from its feet. The
+# server casts the same pulse at cast_ms from the server's copy of the player, grows the ring by the same clock and snares each
+# monster it reaches (lib/snare on the server: held, no AI). The client logs what it did (log_effects), so log_expect compares them.
+# Task 10.7: the snare roots (KY_CREATURE_ROOTED) and the server logs how far the monster moved while held; the feet come from the
+# loader's creature_state box; the server tells both clients of the snare and its end (skills_unleashed:world, design D14), and the
+# caster and the watcher chain the monster from those events.
+id = "server-water-mage-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Water Mage at rank 3 (su_rank options), log_effects on; the client held key 4 for 0.8 s",
+]
+observations = [
+    "10.7 run 3, 2026-11-08 (evidence/water-mage-snare-2026-11-08/server-water-mage-0720-run3), passed: the server's pulse left the feet the loader reads (creature_state box, z 83.0, the same as the client's), snared creature 550301081601 at 3.0 blocks for 2.3 s through KY_CREATURE_ROOTED and freed it on time after 2343 ms having moved 0.00 blocks across and 0.00 up; the caster and the watcher both chained it from the server's snare_on (skills_unleashed:world) about 20 ms after the server's snare and logged its snare_off at the server's end. Limit: su_dummy holds its own monster until it is hit and the snare deals no damage, so the 0.00 is not by itself proof of the hold; creature-root-server (10.3) is",
+    "10.7 run 1 failed: creature_state was unavailable on both exes, because cube::AppearanceData is a candidate struct (its scale is verified); the loader now judges a field entry by the field's own status. Run 2 passed but one until step had the wrong text (the 'server:' of the log line), so its last steps were skipped",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-water-mage-0720), passed in 20 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "run 1 2026-11-08 (evidence/water-mage-mp-2026-11-08/server-water-mage-0720-run1): the server cast the pulse 1 (rank 3, snare 2.3 s) and snared creature 550301081601 at 3.0 blocks for 2.3 s, the ring ended 'done' after 48 steps and 1006 ms; the client cast its pulse too. The record's own expectation had the wrong specialization number (0, it is 1): fixed, not a game failure",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Water Mage casts its pulse"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization water_mage",
+    "console config su_rank ability skills_unleashed:water_mage",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "shot 02-client-cast",
+    "until server: water_mage: pulse",
+    "until server: water_mage: creature",
+    "shot 03-client-ring",
+    "until watcher water_mage: creature",
+    "shot watcher 02-chained",
+    "until skills_unleashed: snare: creature",
+    "until watcher snare: the server freed creature",
+]
+# What each game must have done. The server: the cast and the ring, and at least one monster snared. The client: its own cast.
+log_expect = { latest = [
+    "skills_unleashed: server: water_mage: pulse",
+    "skills_unleashed: server: water_mage: creature",
+    "skills_unleashed: snare: creature",
+], client = [
+    "su_rank: the character is class 3, specialization 1 (water_mage)",
+    "skills_unleashed: water_mage: pulse",
+    "snared by the server: chained",
+    "skills_unleashed: snare: the server freed creature",
+], watcher = [
+    "snared by the server: chained",
+    "skills_unleashed: snare: the server freed creature",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs end on the server's snare line.
+script = """
+log server-water-mage-0720: task 8.2 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-water-mage-0720: done
+"""

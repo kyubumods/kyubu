@@ -1,0 +1,55 @@
+# Written 2026-10-12 for task 7.2c and 7.2d of add-skills-unleashed (the tint and the mark of the Guardian's taunt). The counters of
+# taunt-target (run 5: tint hook applied 949 times, mark hooks 979, no hook error) show the sites run; this record is for the eye:
+# five green slimes with the `still` behaviour stand 4 to 12 blocks in front of the player (they neither fight nor move) and
+# mods-dev/taunt_proto taunts them, then switches the tint off, on, the mark off and on while the shots are taken.
+id = "taunt-visual"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there; the body yaw is set to 0",
+    "`spawner GREEN_SLIME 5 still` puts five slimes in a line in front of the player",
+    "`taunt_proto:run visual`: taunted at once (tint and mark on), tint off at +20 s, tint on and mark off at +40 s, both on at +60 s, released at +80 s",
+    "a shot about every 9 s",
+]
+observations = [
+    "replay 1 passed (evidence/guardian-taunt-2026-10-12/visual1): hooks counted 30 to 385 passes in the first 11 s",
+    "01-slimes: the slime in front is green with no mark; 03 (tint and mark on): the slime is dark red-green and a red stack of cubes (the model of slot 0x9F8) floats over its head",
+    "04 (tint off): the slime is green again, the red mark stays; 06 (mark off, tint on): the dark slime and no mark",
+    "the colour factor (1, 0.35, 0.35) on a green slime is mostly a darkening: a monster with red in its colours would show red",
+    "the mark's model and size come from the game's code for the stun's star (Creature scale x 0.1, turning): the slot's model drawn at that size is small",
+]
+
+[[confirms]]
+entry = "creature_draw_site"
+observed = "the colour vec4 at [ESP+0x14] scaled: the taunted slime is darker in 03 and 06, plain in 04 and 01"
+
+[[confirms]]
+entry = "stun_mark_gate_site"
+observed = "the mark shows over the head of a taunted slime that is not stunned (03, 04), and not with the mark off (06)"
+
+[[confirms]]
+entry = "stun_mark_model_site"
+observed = "the model over the head is the one of slot 0x9F8 (a red stack), not the stun's star"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/taunt_proto", "mods-examples/entity_spawner"]
+input = [
+    "until tv: A", "console entity_spawner:spawner GREEN_SLIME 5 still", "wait 5", "shot 01-slimes",
+    "console taunt_proto:run visual",
+    "wait 4", "shot 02-taunted", "wait 9", "shot 03", "wait 9", "shot 04-tint-off", "wait 9", "shot 05", "wait 9", "shot 06-mark-off",
+    "wait 9", "shot 07", "wait 9", "shot 08-all-on", "wait 9", "shot 09-released",
+]
+script = """
+log taunt-visual: taunt_proto, the tint and the mark of a taunted creature
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.body_yaw 0
+log tv: A
+wait 150
+expect creature_draw_site hooks == 0
+"""

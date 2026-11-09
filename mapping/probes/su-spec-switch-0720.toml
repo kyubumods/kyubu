@@ -1,0 +1,85 @@
+# Skill button 9 (the fourth ability) after a change of specialization (2026-11-09). The skill panel took button 9's icon
+# from the player's own specialization and wrote it into skill_icons[9] only while that held null, so after a switch the
+# first specialization's icon stayed, and while the panel previewed the other specialization button 9 kept the old one.
+# Now the loader follows the SkillWidget's working specialization (+0x18C) and replaces its own earlier value. The player is
+# set to a level-30 warrior, Guardian; the panel opens on the Guardian, a click on the first specialization button previews the
+# Berserker, the panel is closed (no LEARN: the working copy is put back), the player's specialization is set to Berserker as
+# LEARN would set it, and the panel is opened again.
+id = "su-spec-switch-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.0.1"
+date = "2026-11-09"
+steps = [
+    "auto_enter entered the saved world; the script made the player a level-30 warrior, Guardian (specialization 1)",
+    "key X opened the skill panel; screenshot (01-guardian)",
+    "clicked the first specialization button (Berserker); screenshot (02-preview-berserker)",
+    "key X closed the panel; the script set the player's specialization to 0 (Berserker); key X opened it again; screenshot (03-berserker)",
+]
+observations = [
+    "native replay passed (run 2; run 1 passed too, but its screenshots 2 and 3 had the specialization tooltip over the ability row: the cursor stayed on the button)",
+    "on opening, the panel showed the Guardian and button 9 the Guardian's icon (ability 118, guardian.png, 01-guardian.png)",
+    "the click on the first specialization button set SkillWidget+0x18C from 1 to 0 within 1.5 s; buttons 6 to 8 took the Berserker's icons and, in the same frame, the loader logged that button 9 shows ability 116 (berserker.png): 02-preview-berserker.png shows the Berserker's icon on button 9",
+    "with the player's specialization set to 0 and the panel opened again, +0x18C read 0 and button 9 kept the Berserker's icon (03-berserker.png); no further icon line: the node already held it",
+]
+
+[[confirms]]
+entry = "cube::GameController.skill_widget"
+observed = "SkillWidget+0x18C read 1 when the panel opened on a Guardian, 0 after a click on the first specialization button, and 0 when the panel was reopened after the player's specialization was set to 0"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed"]
+input = [
+    "until spec guardian ready",
+    "key x",
+    "until skill button 9 shows the icon of ability",
+    "until spec panel open",
+    "move 700 600",
+    "shot 01-guardian",
+    "click 86 225",
+    "hold mouse1 1",
+    "move 700 600",
+    "until spec preview berserker",
+    "shot 02-preview-berserker",
+    "key x",
+    "until spec panel closed",
+    "until spec berserker set",
+    "key x",
+    "until spec panel reopened",
+    "move 700 600",
+    "shot 03-berserker",
+    "key x",
+]
+log_expect = { latest = [
+    "skill button 9 shows the icon of ability",
+    "spec preview berserker",
+    "spec berserker set",
+] }
+script = """
+log su-spec-switch-0720: skill button 9 after a change of specialization
+wait world
+inspect player [@0x76B1C8]
+inspect set data.level 30
+inspect set data.class_type 1
+inspect set data.specialization 1
+log spec guardian ready
+wait 30 until value u8 == 1 [@0x76B1C8] + 0x8008F1
+# the panel makes key 9's node on its first frame and Kyubu fills it on the next: give the icon a moment to be drawn
+wait 1
+log spec panel open
+wait 30 until value u32 == 0 [[@0x76B1C8] + 0x80090C] + 0x18C
+expect - value u32 == 0 [[@0x76B1C8] + 0x80090C] + 0x18C
+wait 1
+log spec preview berserker
+wait 30 until value u8 == 0 [@0x76B1C8] + 0x8008F1
+log spec panel closed
+inspect set data.specialization 0
+log spec berserker set
+wait 30 until value u8 == 1 [@0x76B1C8] + 0x8008F1
+wait 1
+log spec panel reopened
+expect - value u32 == 0 [[@0x76B1C8] + 0x80090C] + 0x18C
+log su-spec-switch-0720: done
+"""

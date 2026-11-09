@@ -1,0 +1,57 @@
+# Recorded with kyubu_probe and the Kyubu loader, unattended, native on Windows (kmap probe replay, client = "join"), as server-ability-slot-0720 but with
+# srefuse: the same slot-4 ability on both sides, with the client's cooldown 1 s and the server's 30 s. Task 3.3 of
+# add-skills-unleashed-multiplayer: Server.exe accepts the first start of a joined player (0.5 mp, mp_fill keeps the client's at 1)
+# and refuses the second, 4 s later, for its own cooldown; the client is not corrected.
+id = "server-ability-refusal-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-11-07"
+steps = [
+    "Wine replay: Server.exe with srefuse (client and server sides) and mp_fill, then a client that joins with a new warrior",
+    "the client mod sets its rank to 3, then the client held key 4 twice, 4 s apart",
+]
+observations = [
+    "signal waits, 2026-11-08 (evidence/fast-join-2026-11-08/waits-run1/server-ability-refusal-0720), passed in 24 s: the script waits for Net::acceptJoinSite (the join, held after 7 to 8.5 s) instead of 140 s, and for the dispatch site instead of a fixed 40 to 90 s; the dispatch wait holds at once (monsters call it too), so the trace no longer spans the presses: log_expect checks them",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-ability-refusal-0720), passed in 236 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 2026-11-07 (evidence/server-refusal-2026-11-07): the client joined, set srefuse rank 3 and held key 4 twice, 4 s apart",
+    "press 1 (15:22:58): srefuse:hit started on the client and on Server.exe (on_start side server), both ended `done` after about 805 ms",
+    "press 2 (15:23:02): the client started it again (its cooldown is 1 s) and ran 801 ms; Server.exe logged `refuses srefuse:hit (number 112) ... cooldown (rank 3; mp 1.000 sent, 0.995 before; cost 0.500; cooldown 25094 ms left)` and ran no on_start",
+    "the client was not corrected (T6 of design.md: the client applies no update to its own player)",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site ran 158977 times on Server.exe; the second slot-4 start of a joined player reached it and was refused there (mode taken back to 0, no server on_start)"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 420
+mods = ["mods-dev/srefuse", "mods-dev/mp_fill"]
+input = [
+    "shot 01-joined",
+    "until slot: press",
+    "click 820 384",
+    "wait 2",
+    "hold 4 0.9",
+    "wait 4",
+    "hold 4 0.9",
+    "wait 3",
+    "shot 02-after",
+]
+script = """
+log server-ability-refusal-0720: task 3.3 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace add @0x4257BC
+trace start
+wait 140 until calls @0x4257BC >= 1
+log slot: press
+wait 90 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-ability-refusal-0720: done
+"""

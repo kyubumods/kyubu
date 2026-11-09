@@ -1,0 +1,49 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with level_rework (mods-gameplay) and the developer mod give_item. Task 6.3 of add-level-rework: the item's information box
+# for an item whose stored level is 1981. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "item-box-level"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with level_rework and give_item installed; waited 15 s there",
+    "give_item:give put two weapons (type 3, sub_type 17, rarity 2) into the bags: one of stored level 1981, one of stored level 21",
+    "the input opened the inventory (i), moved the cursor over the two given weapons (the step `move`, a hover) and took a screenshot of each information box",
+]
+observations = [
+    "Wine replay 2 passed (1 of 1 expectation, no fault). The information box of the weapon of stored level 1981 reads \"GREATMACE +100\" and \"POWER 100\" (03-hover-slot3); the one of stored level 21 reads \"GREATMACE +51\" and \"POWER 51\" (04-hover-slot4). The stored level is not printed. Vanilla already shows the power, with the mod too, so no hook is needed",
+    "run 1 hovered the first slots first (the starting weapons' boxes). The click on the bag tab did not switch the tab in run 1 (a plain click) or in run 2 (a held button), and the given weapons showed in the equipment grid anyway: the boxes above are theirs",
+    "static: every item text that prints a level calls item_power (0x4C75D0): the box's name and Power line (0x4A2C86, 0x4A304D), the inventory slot (0x431577), the received-item message (0x48184F), the update loop's name (0x48B805), 0x497F18. The only raw read of the level word is the pet's LVL line (0x4A2FF7, handled in 4.5); the \" X\" count of stackable types is a quantity. The strings with a level format are only LVL (0x701868), \" +\" (0x70082C, wide at 0x6FC424) and Power (0x701860); HP + at 0x701938 prints an item stat",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-gameplay/level_rework", "mods-dev/give_item"]
+input = [
+    "until ib: start",
+    "console give_item:give 3 17 1981 2", "wait 3",
+    "console give_item:give 3 17 21 2", "wait 3",
+    "key i", "wait 8", "shot 01-equipment",
+    "move 375 102", "hold mouse1 0.5", "wait 4", "shot 02-bag",
+    "move 483 172", "wait 4", "shot 03-hover-slot3",
+    "move 529 172", "wait 4", "shot 04-hover-slot4",
+    "until ib: done",
+]
+script = """
+log item box level of level_rework (task 6.3 of add-level-rework)
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log ib: start
+wait 70
+log ib: done
+wait 5
+"""

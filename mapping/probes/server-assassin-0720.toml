@@ -1,0 +1,75 @@
+# Task 8.5 of add-skills-unleashed-multiplayer: the Assassin's Shadow Strike on Server.exe with a joined client (kmap probe replay,
+# client = "join"). The client, made an Assassin by su_rank, holds key 4; at its clip's `smoke` marker it sends
+# `strike { target, from }` on skills_unleashed:ability (design D13). The server checks it against its own copy of the player, sets the
+# clones off at the `clone` markers on its own clock and hits what they touch (su_dummy's monster, 3 blocks in front of the player).
+# The client draws the clones and hits nothing. The server tells every client the strike it took (`strike` on skills_unleashed:world,
+# design D14); the watcher draws those clones on the caster's model, and the caster knows it drew them already.
+id = "server-assassin-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-09"
+steps = [
+    "native replay: Server.exe, a joined client and (from run 2) a watcher, all with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself an Assassin with rank 3 (su_rank options), log_effects on; the client held key 4 for 0.8 s",
+]
+observations = [
+    "run 1, 2026-11-09 (evidence/assassin-mp-2026-11-09/server-assassin-0720-run1), passed: the client fixed its target on the aim (su_dummy's monster, 8396928.1, 8396924.8, 85.1) and sent its strike; the server took it 48 ms later, 513 ms into its run (no refusal logged), at the same target; its four clones struck the monster once each for 30 (hp 151.6 to 44.9, the same on the client's copy), 125 to 150 ms apart; the strike over 0.94 s after it was taken",
+    "run 2, 2026-11-09 (evidence/assassin-mp-2026-11-09/server-assassin-0720-run2), with a watcher, passed: the server took the strike 512 ms into its run and told both clients (`strike` on skills_unleashed:world); the caster logged it as its own run 1 and drew nothing more; the watcher drew the strike at the same target (8396928.1, 8396924.8, 85.1, clip fists) 3 ms after the server took it, its screenshot 02-clones shows the black clones and afterimages on the caster's model; four server hits of 30 (hp 151.6 to 44.9 on all three games); the last clone faded on the client at 32.332 and on the watcher at 32.339",
+    "limits: one client, one watcher, one target; the X's corners and the clones' sweep are compared in test_parity_assassin.cpp, not here",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Shadow Strike runs"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization assassin",
+    "console config su_rank ability skills_unleashed:assassin",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "shot 02-client-cast",
+    "until server: assassin: strike of player",
+    "until watcher assassin: watched strike of player",
+    "shot watcher 02-clones",
+    "until server: assassin: the strike of player",
+    "until watcher assassin: the last watched clone of player",
+    "shot 03-client-after",
+]
+# What each game must have done. The server: the strike taken, a clone's hit, the end. The client: its own target, and the server's
+# strike known as its own. The watcher: the strike drawn and faded.
+log_expect = { latest = [
+    "skills_unleashed: server: assassin: strike of player",
+    "skills_unleashed: server: assassin: clone",
+    "skills_unleashed: server: assassin: the strike of player",
+], client = [
+    "su_rank: the character is class 4, specialization 0 (assassin)",
+    "skills_unleashed: assassin: target",
+    "skills_unleashed: assassin: the server took the strike of run 1",
+], watcher = [
+    "skills_unleashed: assassin: watched strike of player",
+    "skills_unleashed: assassin: the last watched clone of player",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs end on the server's end line.
+script = """
+log server-assassin-0720: task 8.5 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-assassin-0720: done
+"""

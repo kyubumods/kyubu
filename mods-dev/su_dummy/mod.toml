@@ -1,0 +1,10 @@
+id = "su_dummy"
+name = "Server target dummy (dev)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["server"]
+trust = "full"
+description = "Development only (probe server-berserker-0720): while a joined player is in a mod mode, Server.exe puts one living monster 3 blocks in front of that player and logs its hp, so that the server's Uppercut has a target to hit. Server side only, so the join gate is not changed."
+
+[scripts]
+server = "scripts/server.lua"

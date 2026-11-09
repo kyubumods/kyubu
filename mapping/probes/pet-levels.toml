@@ -1,0 +1,158 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 4.5 of add-level-rework (M13, pets): the mod level_rework gates a pet item in can_equip_item on the pet's own level and
+# clamps and compares that level in the item box (the box hooks were not reached in this replay). The summon needs no hook: runs 1 to 7 of
+# this record, with a clamp at the two stores of cube::World::update (0x60CFA1, 0x60D1FE) that copy the pet item's level into the pet,
+# showed that the companion setup (0x5ED1D0) caps the pet at its owner's level right after. The probe mod equip_gate_probe calls
+# can_equip_item with pet items on stand-in creatures; the entity_spawner mod makes a nameless troll companion (id -1) that the script registers as the pet, as
+# creature-level-up does, with a pet item of stored level 600 (a pet from a vanilla world). P is the player's cube::Creature,
+# [[@0x7691C8] + 0x8006C8].
+id = "pet-levels"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with level_rework, equip_gate_probe and entity_spawner installed; waited 15 s there",
+    "The console command equip_gate_probe:pets called can_equip_item with pet items (type 0x13) on stand-in creatures",
+    "The input spawned a nameless troll companion (id -1); the script put it 40 blocks from the player, wrote a pet item of stored level 600 into the player's Creature+0x1020 and registered the troll as the pet (+0x11C8, hostile type 5), with the owner at level 1; then set the owner to level 100 and wrote the item level 600 again",
+    "Kill: the top-id creature made hostile, level 10, hp 1, stunned and put half a block from the player; a forced cyclone (mode 86) killed it, so kill_record_apply ran for the player and the pet",
+]
+observations = [
+    "Wine replay 8 passed, all expectations held; no fault. Runs 1 and 2 failed (a missing confirm; the pet stayed level 1), runs 3 to 7 were debug builds that found why (see the third observation)",
+    "equip_gate_probe:pets, 10 cases on stand-in warrior creatures: can_equip_item agreed with the mod's rule (the pet's stored level clamped to 1-100, at most the creature's level, and the game's class rule) in all 10. In 4 the vanilla power rule says otherwise, and the game followed the mod: creature 50 with pet 51 refused (vanilla accepts: both power 72), creature 99 with pet 100 refused (both power 84), creature 100 with pet 600 accepted (vanilla refuses), creature 100 with pet 1981 accepted",
+    "pet summon: the item's level is copied into the pet at 0x60CFA1 (an existing pet) or 0x60D1FE (a new one), and the companion setup 0x5ED1D0, called from both blocks, then lowers the pet to its owner's level (`mov eax,[owner+0x190]; cmp [pet+0x190],eax; jle; mov [pet+0x190],eax`, 0x5ED3E1). With the owner at level 1 and the item at stored level 600 the pet ended at level 1 (a clamp at the store gave 100 and the setup brought it back to 1: debug-run6-cap-by-owner.txt); with the owner at level 100 it ended at 100",
+    "pet item written back: cube::World::update copies the pet's level and XP into the item every pass (0x60D424), so the item held 1 after the first summon (not 600) and 100 after the kill",
+    "pet at the cap: the owner and the pet at level 100, one kill: the pet stayed level 100 with XP 0 and the item holds 100 (the player's and the pet's creature_level_up both ran through the mod's replacement)",
+    "not reached: the item box hooks (0x4A2FFB the level number, 0x4A3052 the red tint) - they were installed without error but the box was not opened; a pet from the game's own summon (a real pet item, species byte); a joined client; Server.exe",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "the pet troll: 1 with the owner at level 1 (the item held 600), 100 with the owner at level 100, 100 after a kill"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "0 for the level-100 pet after a kill"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-examples/entity_spawner", "mods-dev/equip_gate_probe", "mods-gameplay/level_rework"]
+input = [
+    "until pl: gate", "console equip_gate_probe:pets",
+    "until pl: spawn", "console entity_spawner:spawner TROLL companion unnamed",
+]
+script = """
+log pets of level_rework (task 4.5 of add-level-rework, M13): the gate, the summon clamp, the pet at the cap
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log pl: gate
+wait 40
+# the input spawns a nameless troll companion (id -1, the lowest id of the map) after this line
+log pl: spawn
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect - value i32 == -1 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 8
+# the pet: level 1, no XP, stunned, put 40 blocks away from the cyclone
+inspect set data.level 1
+inspect set data.current_xp 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+# the pet item: type byte 0x13 at Creature+0x1020, XP at +0x1024 (0), the stored level at +0x1030 (600, a pet from a vanilla world),
+# then the pet's id at +0x11C8 and hostile type 5 (the creature-level-up recipe)
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x100C
+inspect set critical 19
+inspect set stun_duration 0
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+inspect set stun_duration 600
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x11C8
+inspect set entity_id from [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 8
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+inspect set data.hostile_type 5
+log pl: tick 1
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: tick 2
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: tick 3
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: tick 4
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: tick 5
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: tick 6
+inspect cube::Hit [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x178
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+wait 1
+log pl: after the first summon, the owner at level 1
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the companion setup (0x5ED1D0) caps a pet at its owner's level: stored 600, owner level 1, so the pet is level 1
+expect cube::CreatureData.level value i32 == 1 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x190
+# the owner at level 100, the item written again as stored level 600 (a pet from a vanilla world): the next refresh gives level 100
+inspect player [@0x7691C8]
+inspect set data.level 100
+inspect cube::Hit [[@0x7691C8] + 0x8006C8] + 0x1018
+inspect set stun_duration 600
+wait 4
+log pl: after the second summon, the owner at level 100
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::CreatureData.level value i32 == 100 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x190
+# the victim: the creature with the top id, level 10, hp 1, stunned, half a block from the player
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+wait 2
+log pl: before the kill
+inspect creatures [@0x7691C8] + 0x2DC
+log pl: kill, the pet at level 100
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+log pl: cyclone 1 s
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+log pl: after the kill
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::CreatureData.level value i32 == 100 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x194
+# kill_record_apply copies the pet's level into the player's pet item (+0x1030): the 600 is now 100
+expect - value u16 == 100 [[@0x7691C8] + 0x8006C8] + 0x1030
+wait 5
+"""

@@ -1,0 +1,41 @@
+# Task 5.3 of add-mod-manager. ModManager's console command mod_manager:texttest hooks the title menu's end site and draws, in the game's
+# font, a long name cut to 200 px by text::fit, the whole name with a bar at the width measureText gives, and a short name with its bar.
+id = "mod-text"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Read plasma::ScalableFont::drawText with REA (Ghidra): it calls the function at 0x65C8E0 to find a line's width; mapped that as measureText",
+    "Replayed the menu under Wine with mod_manager, ran mod_manager:texttest and took a screenshot of the title screen",
+]
+observations = [
+    "replay 1 passed under Wine at 1024 x 768 (evidence/mod-text-2026-10-24): the game's font draws the test text; each red bar drawn at the width measureText gives sits on the edge of its text",
+    "at size 18 the 41-character name measures 599 px, SHORT 80 px; text::fit cut the name to 15 characters (190 px) so that the text and its dots end before the 200 px mark",
+]
+
+[[confirms]]
+entry = "plasma::ScalableFont::measureText"
+observed = "called by a mod with the six stack arguments of the entry; the bar drawn at out_max.x * size / font+0xE0 ends the text"
+
+[[confirms]]
+entry = "plasma::ScalableFont::drawText"
+observed = "called by a mod at flags 0 (left aligned) for the test text"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-gameplay/mod_manager"]
+input = [
+    "until modtext ready",
+    "console mod_manager:texttest", "wait 4", "shot 01-text",
+]
+script = """
+log modtext: task 5.3 of add-mod-manager
+wait 40
+log modtext ready
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+wait 25
+log modtext done
+wait 10
+"""

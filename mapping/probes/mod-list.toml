@@ -1,0 +1,55 @@
+# Task 6.1 of add-mod-manager. The My mods tab of ModManager's page: the list (switch, name, version), the filter picker, the search box,
+# the selection and the details (authors, mark, state, reason, description, Needs and Needed by). The replay installs four fixture
+# mods beside ModManager: a loaded one with two authors and a long description, one that needs it, one that asks for a loader API
+# that does not exist (failed), and one that the replay's config.toml turns off (disabled).
+id = "mod-list"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built the list and the details in ModManager (src/list.h decides the rows, filter, search, selection and the details lines; main.cpp reads mods_get when the page opens and draws them from the title menu's draw)",
+    "Replayed at the start menu under Wine at 1024 x 768 with the four mm_fixture mods and a config.toml that disables mm_fixture_off: opened the page, selected rows, stepped the filter and typed in the search box",
+]
+observations = [
+    "replay 5 passed under Wine at 1024 x 768 (evidence/mod-list-2026-10-24/run5): opening the page logs `list read: 6 package(s), 6 shown`: kyubu_probe, mm_fixture_base, mm_fixture_user and mod_manager loaded, mm_fixture_bad failed (requires loader API ^9.0), mm_fixture_off disabled by the replay's config.toml; 01-list shows them in the loader's order with [ON ], [ ! ] and [OFF] switches, the version at the right, the count `6 MODS, 4 ON`, and the first mod selected",
+    "a click on a row selects it: the details of mm_fixture_off (02-select in run 1) show its authors, `Not checked - Disabled`, the loader's reason `disabled in kyubu/config.toml` and its description; the failed mod's details show `Failed` and the reason `requires loader API ^9.0 but this loader implements 1.2.0` in the error colour (06-search)",
+    "the filter picker's arrows step ALL, ENABLED, DISABLED, PROBLEMS (05-problems: `1 OF 6 MODS`, only the failed mod) and back; typing `fix` in the search box (input.char) leaves the four fixtures (`4 OF 6 MODS`, 06-search); Escape ends the typing and the page stays open (page_open 1 in the state after it)",
+    "03-user: Fixture User shows `NEEDS:` with `mm_fixture_absent (optional)` (not installed, so not clickable) and `Fixture Base ^1.0`; a click on Fixture Base (chip_clicks 1) selects it and its details show `NEEDED BY:` `Fixture User` (08-chip)",
+    "the replay click lands about 26 px below and 5 px right of the coordinates given (the cursor hand in the screenshots), so the rows and chips are clicked above their drawn place",
+    "not replayed: the mouse wheel over the list and over the details, a list longer than the window (the scroll is unit-tested), 1024 x 600 and 1920 x 1080, and the mark (Verified or Unverified), which stays `Not checked` until the catalog exists (section 7)",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook here reads mods_get when the page opens and keeps the list's selection, scroll and search while the page is open"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 700
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_base", "mods-dev/mm_fixture_user", "mods-dev/mm_fixture_bad", "mods-dev/mm_fixture_off"]
+input = [
+    "until modlist open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 01-list",
+    "console mod_manager:state",
+    "click 150 433", "wait 4", "shot 02-select", "console mod_manager:state",
+    "click 150 465", "wait 3", "shot 03-user",
+    "click 386 276", "wait 3", "shot 04-enabled", "click 386 276", "wait 3", "click 386 276", "wait 3", "shot 05-problems",
+    "click 62 276", "wait 2", "click 62 276", "wait 2", "click 62 276", "wait 3",
+    "click 190 225", "wait 2", "type fix", "wait 4", "shot 06-search", "console mod_manager:state",
+    "key Escape", "wait 3", "console mod_manager:state", "shot 07-after-escape",
+    "click 150 433", "wait 3", "click 560 488", "wait 3", "shot 08-chip", "console mod_manager:state",
+    "until modlist done",
+]
+script = """
+log modlist: task 6.1 of add-mod-manager
+wait 15
+log modlist open
+wait 40
+expect - value i32 == 0 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+wait 150
+log modlist done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 20
+"""

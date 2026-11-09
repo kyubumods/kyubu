@@ -1,0 +1,9 @@
+id = "death_burst_proto"
+name = "Death burst prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe death-burst-call): after a delay it sets the hp of one creature drawn (not the player) to 0, and at creature_death_burst_site it bursts the quiver model (0x347, tinted red) with cube::GameController::createParticles and clears the creature's draw flag so the game's own burst is skipped."
+
+[native]
+common = "bin/death_burst_proto.dll"

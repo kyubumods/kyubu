@@ -1,0 +1,7 @@
+id = "fx_hot"
+name = "Fixture: hot reload"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+[scripts]
+client = "scripts/client.lua"

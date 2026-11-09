@@ -1,0 +1,9 @@
+id = "icon_proto"
+name = "Icon prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe ability-icon-slot): icon_proto:smasher claims the warrior's slot 4 and names the vanilla ability cubeworld:smash as its icon; icon_proto:blank claims the ranger's and has no icon."
+
+[scripts]
+client = "scripts/client.lua"

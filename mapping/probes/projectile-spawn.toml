@@ -1,0 +1,173 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Projectile spawning for one projectile ability, the fireball (37), forced on the player as in ability-force
+# (task 9.6). The projectile block of the dispatch shoots along the shooter's data.ray_hit (its aim: where its
+# crosshair ray meets the world, in blocks from its pos) at 50 blocks a second. cube::GameController::update rewrites
+# the player's ray_hit every frame from the camera: (0, 30, 1.58) for gamepilot's new character, so the fireball
+# flies along +y and explodes on the ground 30 blocks ahead about 0.55 s after its spawn. W is the World, [@0x7691C8] + 0x2DC; its projectile list is
+# W + 0x14 (the head node pointer at [@0x7691C8] + 0x2F0, the size at + 0x2F4), so the first projectile is
+# [[[@0x7691C8] + 0x2F0]] + 8. T is the creature with the top id, as in hit-damage.
+id = "projectile-spawn"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced the spawn, update and removal sites, the projectile list push 0x486670 and hitCreature (3 args each)",
+    "Idle control: traced 5 s with nothing forced",
+    "Phase 1: P forced into the fireball (37) with the camera's aim; the projectile read 1.6 s after the force",
+    "Phase 1: waited 6 s more",
+    "Phase 2: T made hostile, stunned, max hp raised, hp 1000, put 3 blocks along +y (the aim); 3 fireballs",
+]
+observations = [
+    "Wine replay 4 passed, 22 of 22 checks held; screenshots 01-fireball-up, 02-fireball-at-t",
+    "idle 5 s: no spawn, no hit",
+    "phase 1: one spawn 1.4 s after the force (ECX the World); 0x486670 twice, returning to 0x616A35 and 0x616B3D",
+    "phase 1 at 1.6 s: list size 1; entity_id 1, kind 1, velocity.y 49.93 (the aim (0, 30, 1.58) normalised), age 450",
+    "phase 1: 32 update passes, one removal at 2.1 s (it exploded on the ground 30 blocks ahead); list 0 -> 1 -> 0",
+    "phase 2: 3 spawns, each fireball met T at once (1-3 update passes) and was removed in the same step",
+    "phase 2: hitCreature 3 times, all from the explosion (0x62130A), damage 14.5, 21.5, 15.9; T's hp 10000 -> 9951",
+    "the player's ray_hit read (0, 30, 1.58) after each script write: the game rewrites it every frame",
+    "replay 1 (15 of 21) and 2 (15 of 22): the script's ray_hit was undone, so T off the aim was never hit",
+    "replays 1 and 2 read the list at 2 s and 1.45 s, after the flight had ended; replay 3 (20 of 21) expected 1500",
+]
+
+[[confirms]]
+entry = "cube::World::projectileSpawnSite"
+observed = "passes once per forced fireball, never idle"
+
+[[confirms]]
+entry = "cube::World::projectileUpdateSite"
+observed = "passes each step while a projectile flies"
+
+[[confirms]]
+entry = "cube::World::projectileRemoveSite"
+observed = "passes when a projectile's flight ends: once per fireball, about 0.55 s after its spawn"
+
+[[confirms]]
+entry = "cube::World.projectiles"
+observed = "holds the fireball while it flies (size 0 -> 1 -> 0)"
+
+[[confirms]]
+entry = "cube::Projectile"
+observed = "the flying fireball: the shooter's id, kind 1, velocity 50 along the aim (+y), a growing age"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "a fireball's hits come from its explosion in the projectile update (return to 0x62130A)"
+
+[[confirms]]
+entry = "cube::CreatureData.hp"
+observed = "the creature's falls when the fireball explodes next to it"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 330
+input = [
+    "until 9.6: fireball up",
+    "wait 2",
+    "shot 01-fireball-up",
+    "until 9.6: fireball at T",
+    "wait 2",
+    "shot 02-fireball-at-t",
+]
+script = """
+log projectile spawning (task 9.6): the player's forced fireball (37), shot up, then at the creature with the top id
+wait world
+wait 15
+inspect player [@0x7691C8]
+trace args 3
+trace add @0x616A26
+trace add @0x61F31D
+trace add @0x61F5B8
+trace add @0x486670
+trace add @0x595580
+# idle control: nothing forced
+trace start
+wait 5
+trace stop
+trace report
+expect cube::World::projectileSpawnSite calls @0x616A26 == 0
+expect cube::World::hitCreature calls @0x595580 == 0
+# phase 1: a fireball along the camera's aim. The script's own ray_hit writes (replays 1 and 2) were undone by the
+# next frame. The spawn came 1.1 to 1.5 s after the force (0x43D330's release time; the frames under Wine are
+# uneven) and each fireball's flight ended about 0.55 s later, so the projectile is read at 1.6 s. The list size is
+# watched
+watch plist u32 [@0x7691C8] + 0x2F4
+trace start
+log 9.6: fireball up
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 1.6
+# the fireball in flight: entity_id is the player's id (1), kind 1, velocity.y about 50 (the aim is normalised),
+# age above 0
+expect cube::World.projectiles value u32 == 1 [@0x7691C8] + 0x2F4
+expect cube::Projectile value u32 == 1 [[[@0x7691C8] + 0x2F0]] + 8
+expect cube::Projectile value u32 == 1 [[[@0x7691C8] + 0x2F0]] + 8 + 0x60
+expect cube::Projectile value f32 > 49 [[[@0x7691C8] + 0x2F0]] + 8 + 0x40
+expect cube::Projectile value f32 < 50.1 [[[@0x7691C8] + 0x2F0]] + 8 + 0x40
+expect cube::Projectile value u32 > 0 [[[@0x7691C8] + 0x2F0]] + 8 + 0x68
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 6
+trace stop
+trace report
+watch
+expect cube::World::projectileSpawnSite calls @0x616A26 == 1
+expect - calls @0x486670 >= 2
+expect cube::World::projectileUpdateSite calls @0x61F31D > 0
+expect cube::World::projectileRemoveSite calls @0x61F5B8 > 0
+expect cube::World::hitCreature calls @0x595580 == 0
+expect cube::World.projectiles watch plist changed
+expect cube::World.projectiles value u32 == 0 [@0x7691C8] + 0x2F4
+watch clear
+# phase 2: a fireball hits nothing directly (kinds 1 and 4 with the skill flag only stop at a creature); it explodes
+# where it stops and hits every creature in its box from 0x621305. Replays 1 and 2 put T along +x, off the aim, and
+# it was never hit. T is put 3 blocks (0x30000) along +y, stunned so it neither moves nor attacks, hostile so the
+# player can hit it, with hp 1000 (max hp raised first: the step clamps hp)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x30000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch thp f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+trace start
+log 9.6: fireball at T
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+watch
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect cube::World::projectileSpawnSite calls @0x616A26 > 0
+expect cube::World::hitCreature calls @0x595580 > 0
+expect cube::World::hitCreature caller @0x595580 0x62130A
+expect cube::CreatureData.hp watch thp decreased
+expect cube::World::projectileRemoveSite calls @0x61F5B8 > 0
+expect cube::World.projectiles value u32 == 0 [@0x7691C8] + 0x2F4
+watch clear
+wait 5
+expect - hooks == 0
+"""

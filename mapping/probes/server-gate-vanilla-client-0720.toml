@@ -1,0 +1,50 @@
+# Task 4.3 of add-skills-unleashed-multiplayer. 07-20 twin of server-protocol-vanilla-client: Server.exe has skills_unleashed
+# (gate = true, plus its dependency emtweaks), a Kyubu-loaded Cube.exe WITHOUT the mods tries to join 127.0.0.1 with a new
+# character (client = "join"). The loader derives the protocol value from the gate mods on the server; the vanilla client sends 3;
+# the game's own compare refuses it. The join branch and the refusal branch of server_accept_loop are traced.
+id = "server-gate-vanilla-client-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-11-07"
+steps = [
+    "native replay: Server.exe with skills_unleashed and emtweaks, then a client without mods that tries to join with a new character",
+    "traced the join branch and the wrong-version reply of server_accept_loop",
+]
+observations = [
+    "recorded 2026-11-07, replay results follow",
+]
+
+[[confirms]]
+entry = "Net::acceptJoinSite"
+observed = "0 calls: a client without the gate mod does not get past the version compare"
+
+[[confirms]]
+entry = "Net::acceptWrongVersionReplySite"
+observed = "at least 1 call: the refusal of the vanilla client"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed"]
+mods_on = ["Server.exe"]
+seconds = 300
+input = [
+    "until 4.3: vanilla client done",
+    "wait 5",
+    "shot 01-refused",
+]
+script = """
+log skills_unleashed is a gate mod: a client without it is refused (task 4.3 of add-skills-unleashed-multiplayer)
+trace add @0x4257BC
+trace add @0x42577E
+trace start
+wait 120
+trace stop
+trace report
+expect Net::acceptJoinSite calls @0x4257BC == 0
+expect Net::acceptWrongVersionReplySite calls @0x42577E >= 1
+log 4.3: vanilla client done
+wait 10
+expect - hooks == 0
+"""

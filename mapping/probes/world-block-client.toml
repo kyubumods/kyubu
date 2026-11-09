@@ -1,0 +1,69 @@
+# Task 10.1 of add-skills-unleashed-multiplayer (design D9): kyubu.game.world_block on Cube.exe. Replay it with
+# kyubu-mapping/tmp/fast_replay.sh world-block-client <out> (KEEP=1, the save of character Tester and world testworld).
+# The dev mod mods-dev/world_block_proto reads 81 columns round the player on each side of the single-player game with world_block
+# and compares every block with cube::World::getBlock.
+id = "world-block-client"
+build = "cube-0x51EA955E"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "world_block_proto, on the client and the server side, reads 9 by 9 columns 4 blocks apart, z 255 down to -16, with world_block and getBlock",
+    "each side logs the blocks compared, how many differ, the unknown columns and the top of each column",
+]
+observations = [
+    "native run 2, 2026-11-08 (evidence/world-block-2026-11-08/world-block-client-run2), passed, 13 s: both sides of the single-player game read 81 columns at grid point 8396928, 8396928 (the player at z 215), z 255 down to -16: 22032 blocks each, 0 differ from cube::World::getBlock, 0 columns unknown; the tops are equal on both sides (212 to 238, sum 17373) and the player's column top is 214 under feet at 215",
+    "before the world was entered world_block was refused (no world is loaded) and the first 3 tries, a second apart, found all 81 columns unknown (no region loaded yet): unknown, not air",
+    "run 1 (world-block-client-run1): the same with z 24 above the player to 40 below, 5265 blocks each, 0 differ, tops sum 17372",
+    "not covered: a zone edge while the zone thread removes zones, a block change by a player",
+]
+
+[[confirms]]
+entry = "cube::World.regions"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Region.zones"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Zone.fields"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Field.base_z"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Field.blocks"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Field.size"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[[confirms]]
+entry = "cube::Block.type"
+observed = "world_block, walking these offsets, gave the same type byte as the game's getBlock for 22032 blocks on each side; no zone yet answered unknown"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/world_block_proto"]
+input = [
+    "until world_block_proto: client: done", "until world_block_proto: server: done",
+]
+log_expect = { latest = [
+    "world_block_proto: client: terrain true",
+    "world_block_proto: server: terrain true",
+    ": 0 columns unknown",
+    "compared, 0 differ",
+    "world_block_proto: client: done",
+    "world_block_proto: server: done",
+] }
+script = """
+log world-block-client: task 10.1 of add-skills-unleashed-multiplayer
+wait world
+expect - hooks == 0
+"""

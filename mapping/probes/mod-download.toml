@@ -1,0 +1,54 @@
+# Task 7.3 of add-mod-manager. Download from the signed test catalog: Download on cat_beta then DISCARD drops it; Download on cat_alpha
+# plans cat_lib too, both are fetched, checked and staged in kyubu\staging, APPLY & RESTART queues the installs, and after the restart
+# both load and read Verified.
+id = "mod-download"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-25"
+steps = [
+    "Added src/zipcheck.h and src/download.h (the worker, the hash and zip checks, staging) and the Download / Update rows to the page (actions.h, main.cpp)",
+    "Replayed at the start menu under Wine at 1024 x 768: open the page, fetch the good test catalog, download cat_beta and discard it, download cat_alpha, Apply and restart, fetch the catalog again and look at My mods",
+]
+observations = [
+    "run 3 passed (evidence/mod-download-2026-10-25/run3; run 2 is beside it): Download on cat_beta shows it QUEUED with 1 CHANGE, and DISCARD takes it back to GET with NO CHANGES and its staged zip deleted",
+    "Download 1.1.0 on cat_alpha plans cat_lib too: both are fetched from the file:/// catalog, pass the size, SHA-256 and zip checks and show QUEUED, the bar says 2 CHANGES and APPLY & RESTART",
+    "after APPLY & RESTART the loader logs pending.toml: installed cat_alpha 1.1.0, installed cat_lib 1.0.0, both enabled, 4 applied, 0 failed; both load (cat_lib first) and My mods marks both Verified (verified=2)",
+    "run 2 found the test catalog's config.toml files in a format the loader refuses ([strength] instead of [options.strength]): the sources were fixed and the catalog rebuilt with kcat, which changed every zip hash",
+    "the restarted game window came up at about 792 x 592 under Xvfb, so the last screenshot is cut off on the right",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook starts the downloads and polls them each frame"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 700
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog"]
+input = [
+    "until moddl open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 4",
+    "click 300 362", "wait 3", "click 731 228", "wait 3", "click 700 290", "wait 8", "shot 01-beta-queued", "console mod_manager:state",
+    "click 580 695", "wait 4", "shot 02-discarded", "console mod_manager:state",
+    "click 300 330", "wait 3", "click 731 228", "wait 3", "shot 03-menu", "click 700 290", "wait 10", "shot 04-alpha-queued", "console mod_manager:state",
+    "click 107 142", "wait 3", "shot 05-my-mods-before",
+    "click 860 695", "wait 3",
+    "until Restarted by game_restart",
+    "wait 30", "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "shot 06-after-restart", "console mod_manager:state",
+    "wait 5",
+]
+script = """
+log moddl: task 7.3 of add-mod-manager
+wait 15
+log moddl open
+wait 320
+log moddl done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

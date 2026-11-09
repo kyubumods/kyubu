@@ -1,0 +1,98 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (task 2.4 of add-ability-api, M3): the stat functions of an ability. P is the player's cube::Creature.
+# Part A hovers the skill panel's smash icon (key X) before and after `slot4_proto:mark 54 77777`, a function hook on
+# ability_cooldown that returns 77777 ms for id 54 only. Part B removes the mark and traces ability_cost, modeDuration,
+# canUseAbility and ability_cooldown by detours (trace detour <n>: n = the stack arguments the function pops) while key 1
+# (smash, id 54) and key 4 (the mod's id 115) are held with mp at 1.
+id = "ability-stats"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the level-1 warrior Tester and a new world; slot4_proto pushed 115 as slot 4",
+    "Part A: panel (key X) with the cursor on smash and no mark; `slot4_proto:mark 54 77777` through the console; the same hover again; each with a screenshot",
+    "Part B: `mark 0 0`; trace detour on ability_cost (2), modeDuration (0), canUseAbility (1) and ability_cooldown (2); mp 1; key 1 held 2 s (smash), then mode 0, mp 1 and key 4 held 2 s (115); 28 s of trace",
+]
+observations = [
+    "Wine replay 2 passed: 6 expectations held, 0 failed (replay 1 failed on a wrong name in an expect and missed the icon by about 30 px)",
+    "the smash tooltip read 'LVL 1: the cooldown lasts 18.73 seconds' and 'NEXT LEVEL: 17.67 seconds' without the mark, and 77.78 for both with `ability_cooldown` hooked to return 77777 for id 54: the tooltip takes its cooldown from ability_cooldown(54, rank) / 1000 (01-vanilla-tooltip, 02-marked-tooltip); the hook answered 176 times with the panel open",
+    "the function hook (kyubu.hook, int(__thiscall*)(void*, int, int), next called for other ids) installed and removed with no fault; the game ran on and the mark's removal left the tooltip path untouched",
+    "all four detours installed with the argument counts 2, 0, 1 and 2 (the stack arguments the epilogues pop: `ret 8`, plain `ret`, `ret 4`, `ret 8`) and ran 28 s without a fault; hooks owned by kyubu_probe were 0 after trace stop",
+    "ability_cooldown: 289 calls, args [id, 0xFFFFFFFF] (level -1) from the HUD at 0x48C080, 0x48C107 and 0x48C17B (92 each) and from World::update 0x616E13 (13); result in EAX (ms), since the tooltip and the cooldown map use it as an int",
+    "ability_cost: 839 calls, args [id, 0xFFFFFFFF], 829 from inside canUseAbility (0x43EE6B), 9 from the input loop (0x49BF32), 1 from World::update (0x611E5A); the result is a float in st0",
+    "canUseAbility: 829 calls with one argument (59, 54, 86 and 102 are the last four, the bar's ids) from the HUD (0x48C273, 675), the input loop (0x49B848, 19) and the mod's own calls (135)",
+    "modeDuration: 4131 calls with no argument, ECX a creature (the player and three others), callers 0x6196FD and 0x61E632 (1145 each), 0x616E3F, 0x611DA8, 0x498578 / 0x4B9A6C, and modeInterruptible 0x43EC02; it reads current_mode, not an argument",
+    "key 1 started mode 54 and key 4 mode 115; both modes ended by themselves about 10 s later (10175 ms and 10045 ms) with mp at 0.42 and 0.38 of the 1 it was set to",
+]
+
+[[confirms]]
+entry = "cube::Creature::canUseAbility"
+observed = "829 calls in 28 s with one stack argument (`ret 4`) from the HUD, the input loop and the mod; the detour with 1 argument ran without a fault"
+
+[[confirms]]
+entry = "ability_cost"
+observed = "839 calls with two stack arguments (id, -1), mostly inside canUseAbility; the detour with 2 arguments ran without a fault; float in st0"
+
+[[confirms]]
+entry = "cube::Creature::modeDuration"
+observed = "4131 calls with no stack argument (plain `ret`, ms in EAX); the detour with 0 arguments ran without a fault"
+
+[[confirms]]
+entry = "ability_cooldown"
+observed = "hooked to return 77777 for id 54, the skill tooltip showed 77.78 s for the level and the next level instead of 18.73 and 17.67; 289 calls traced with (id, -1) from the HUD and World::update"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/slot4_proto"]
+input = [
+    "until stats A open", "console slot4_proto:markstatus", "key x", "wait 8", "move 70 267", "wait 4", "shot 01-vanilla-tooltip", "wait 4", "shot 01b-vanilla-later", "key x", "wait 3",
+    "console slot4_proto:markstatus",
+    "console slot4_proto:mark 54 77777",
+    "until stats B open", "key x", "wait 8", "move 70 267", "wait 4", "shot 02-marked-tooltip", "wait 4", "shot 02b-marked-later", "key x", "wait 3",
+    "console slot4_proto:markstatus",
+    "console slot4_proto:mark 0 0",
+    "until stats C1 press", "hold 1 2", "shot 03-smash",
+    "until stats C2 press", "hold 4 2", "shot 04-slot4",
+]
+script = """
+log stats: task 2.4 of add-ability-api, the stat functions of an ability
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 8
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log stats A open
+wait 50
+log stats A done
+wait 40
+log stats B open
+wait 50
+log stats B done
+wait 40
+trace args 2
+trace detour 2 ability_cost
+trace detour 0 cube::Creature::modeDuration
+trace detour 1 cube::Creature::canUseAbility
+trace detour 2 ability_cooldown
+trace start
+inspect set data.mp 1
+log stats C1 press
+wait 14
+inspect set data.current_mode 0
+inspect set data.mp 1
+log stats C2 press
+wait 14
+trace stop
+trace report
+expect cube::Creature::canUseAbility calls cube::Creature::canUseAbility >= 1
+expect ability_cost calls ability_cost >= 1
+expect cube::Creature::modeDuration calls cube::Creature::modeDuration >= 1
+expect ability_cooldown calls ability_cooldown >= 1
+expect - hooks == 0
+watch
+watch clear
+log stats done
+"""

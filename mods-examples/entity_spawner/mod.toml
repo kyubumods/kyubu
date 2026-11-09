@@ -1,0 +1,12 @@
+id = "entity_spawner"
+name = "Entity spawner"
+version = "0.3.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+trust = "full"
+description = "A window (F7) that lists every kind of creature the game API offers; a click spawns one in front of the player. The console command entity_spawner:spawner does the same for scripts. Spawns through kyubu.game.creature_spawn on the server side; the option behavior chooses how they act (monster, friendly, companion, guard, still)."
+
+[scripts]
+common = "scripts/common.lua"
+client = "scripts/client.lua"
+server = "scripts/server.lua"

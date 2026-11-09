@@ -1,0 +1,11 @@
+id = "behavior_proto"
+name = "Behaviour prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+trust = "full"
+description = "Development only (probe spawn-behavior): spawns slimes with kyubu.game.creature_spawn, then gives them the zone's default behaviour through the game's own constructors, called by raw address. Replaced by KY_SPAWN_MONSTER in 6.2."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

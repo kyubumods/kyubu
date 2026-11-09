@@ -1,0 +1,20 @@
+clip: pops.anim.toml
+duration: 800 ms against the ability's 900 ms: the last pose is held for 100 ms
+end: hold
+blend: in 0 ms, out 0 ms
+borrow: mode 12, speed 1.5, offset 100 ms
+tracks: 2
+  body rot (add): x 0..0, y -20..20, z 0..0 deg
+    fastest: none (no continuous motion)
+    jump: 40 deg at 0.5 (400 ms)
+  root pos (set): x 0..0, y 0..0, z 0.5..2 vox
+    fastest: none (no continuous motion)
+    jump: 1.5 vox at 1 (800 ms)
+pops:
+  start: body rot (add) begins 20 deg off the base pose and blend_in is 0
+  end: body rot (add) holds 20 deg off the base pose when the run ends and blend_out is 0
+  start: root pos (set) replaces the vector at once: it pops unless the base pose equals the first key
+  end: root pos (set) replaces the vector until the run ends: it pops back to the game's pose
+hide: none
+markers:
+  end "of" clip at 1 (800 ms)

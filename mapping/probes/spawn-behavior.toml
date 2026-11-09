@@ -1,0 +1,134 @@
+# Recorded with kyubu_probe, the behavior_proto development mod and the Kyubu 1.1 loader in development, unattended under
+# Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world (seed 1234). Task 6.1 of add-entity-spawner: the zone's default
+# behaviour built by hand for spawned slimes.
+id = "spawn-behavior"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Detoured the four behaviour constructors (stack arguments 0, 1, 0, 0), traced std::list::push_back and the two removal sites and the deleting destructor 0x43D0B0; watched the creature count and the player's hp",
+    "Phase 1: `console behavior_proto:slimes 5` (the development mod: three green slimes with kyubu.game.creature_spawn, then the zone's default behaviour built by raw calls): a hostile one without behaviour 6 blocks west and 5 north of the player (the control), a friendly one (hostile type 2) with it 6 blocks east, a hostile one with it (spawned last, so the lowest id) straight north; 200 s",
+    "Phase 2: hp 0 written into the creature with the lowest id (the hostile slime with a behaviour); phase 3: walking (W) for 85 s away from the other two",
+    "Runs: 1 crashed in xaudio2_7.dll at startup (Wine, before the mod ran); 2 stopped by me (the mod's tick called the client-only creature_player); 3 passed except that the push_back detour found no free slot (4 at most) and the hostile slime, spawned 10 blocks away, had not reached the player in 200 s; 4 (below) spawns them 5 blocks away and traces push_back with the plain tracer",
+]
+observations = [
+    "each constructor ran without a fault as a thiscall detour: cube::SequentialBehavior::SequentialBehavior 39 calls, cube::CombatBehavior::CombatBehavior 39 (one stack argument, 20.0f), cube::LookAtPlayerBehavior::LookAtPlayerBehavior 39, cube::RandomWalkBehavior::RandomWalkBehavior 37, all from the zone generators' creature builds and the mod's spawns; the mod logged the objects it built (sizes 12, 20, 4 and 8 from operator_new)",
+    "std::list::push_back: 11,483 calls in 200 s (the game uses the folded code for other lists constantly); the mod's calls with the sequence's list (sequence + 4) and the address of the child pointer left each sequence with three children, since the creatures walked and fought",
+    "cube::Creature.behavior: the creature with the lowest id (the mod's hostile slime) held a non-zero pointer at +0x13E4 (the value 0x15F9AA50 was the sequence the mod logged); the creature constructor had zeroed it (the mod checked it was null before writing)",
+    "the hostile slime with the behaviour left the north side and came to the player: 4.4 blocks north at the spawn, 2.1 at 4 s, then it wandered between 1.4 and 4.6 blocks (the walk child), and the player's hp fell from 265 to 262.8, 261.8, 258.5 and 256.9 (8 changes in the watch): it was hit at close range; 02-approach.png shows two slimes next to the player and the hp bar at 258/265",
+    "the friendly slime with the behaviour (hostile type 2) wandered near the player without any hp change of its own; the control (hostile, no behaviour) never moved: -6.0 east, 5.0 north of the player until the player walked",
+    "phase 2: the probe's `inspect set hp 0` on the lowest id: creatureDeathRemoveSite once, the deleting destructor 0x43D0B0 twice (the slime and a temporary creature, as in creature-spawn), the mod logged the monster as gone; no fault; the sequence's block is freed by operator_delete in the destructor (static read: the destructor and reset do not call the behaviour's own destructor)",
+    "phase 3: walking away, the other two spawned slimes (one with a behaviour, one without) were despawned (creatureDespawnSite 13 calls); the game kept running to the end of the script (hooks == 0)",
+    "the player's hp fell to 0 during the walk (not from the slimes: the monster was gone and the others were 40 to 130 blocks away); the game went on and the probe finished, so nothing in the behaviour objects broke the run",
+]
+
+[[confirms]]
+entry = "cube::Creature.behavior"
+observed = "a non-zero sequence pointer at +0x13E4 of the spawned monster after the mod wrote it, the World step drove it (it approached, hit the player, wandered), and the destructor freed it at the death site"
+
+[[confirms]]
+entry = "cube::SequentialBehavior::SequentialBehavior"
+observed = "detoured with no stack argument (39 calls incl. the mod's), returned the block the mod appended to; the game stepped the sequence: its slime approached and attacked"
+
+[[confirms]]
+entry = "cube::CombatBehavior::CombatBehavior"
+observed = "detoured with one stack argument, 20.0f (39 calls incl. the mod's); the slime it drove hit the player: hp 265 to 256.9 in 8 steps"
+
+[[confirms]]
+entry = "cube::LookAtPlayerBehavior::LookAtPlayerBehavior"
+observed = "detoured with no stack argument (39 calls incl. the mod's), no fault"
+
+[[confirms]]
+entry = "cube::RandomWalkBehavior::RandomWalkBehavior"
+observed = "detoured with no stack argument (37 calls incl. the mod's); the friendly slime and the monster wandered around the player"
+
+[[confirms]]
+entry = "std::list::push_back"
+observed = "11,483 calls in 200 s; called by the mod with (sequence + 4, &child) three times per behaviour, thiscall with one stack argument, no fault"
+
+[[confirms]]
+entry = "cube::World::creatureDeathRemoveSite"
+observed = "one call after hp 0 was written into the monster with a behaviour"
+
+[[confirms]]
+entry = "cube::World::creatureDespawnSite"
+observed = "13 calls while walking away; the two other spawned slimes (one with a behaviour) were removed"
+
+[[confirms]]
+entry = "cube::Creature::~Creature"
+observed = "the deleting destructor 0x43D0B0 ran twice after the kill: the slime with its behaviour and a temporary creature; no fault"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the count went from 17 to 21 while the three spawns were made (one zone creature came in as well)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/behavior_proto"]
+input = [
+    "until 6.1: spawn", "console behavior_proto:slimes 5", "wait 40", "shot 01-spawned", "wait 60", "shot 02-approach",
+    "until 6.1: kill", "wait 30", "shot 03-later",
+    "until 6.1: walk", "hold w 40", "shot 04-walk-40", "hold w 40", "shot 05-walk-80",
+]
+script = """
+log spawn behaviour (task 6.1 of add-entity-spawner): the zone's default behaviour for spawned slimes
+wait world
+wait 15
+trace args 3
+trace detour 0 cube::SequentialBehavior::SequentialBehavior
+trace detour 1 cube::CombatBehavior::CombatBehavior
+trace detour 0 cube::LookAtPlayerBehavior::LookAtPlayerBehavior
+trace detour 0 cube::RandomWalkBehavior::RandomWalkBehavior
+trace add std::list::push_back
+trace add @0x43D0B0
+trace add @0x60CD5B
+trace add @0x60E04B
+inspect creatures [@0x7691C8] + 0x2DC
+watch count u32 [@0x7691C8] + 0x2E4
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+trace start
+log 6.1: spawn
+wait 200
+trace stop
+trace report
+inspect creatures
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::SequentialBehavior::SequentialBehavior calls cube::SequentialBehavior::SequentialBehavior >= 2
+expect cube::CombatBehavior::CombatBehavior calls cube::CombatBehavior::CombatBehavior >= 2
+expect cube::LookAtPlayerBehavior::LookAtPlayerBehavior calls cube::LookAtPlayerBehavior::LookAtPlayerBehavior >= 2
+expect cube::RandomWalkBehavior::RandomWalkBehavior calls cube::RandomWalkBehavior::RandomWalkBehavior >= 2
+expect std::list::push_back calls std::list::push_back >= 6
+expect cube::World.creatures watch count increased
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the hostile slime with a behaviour
+expect cube::Creature.behavior value u32 != 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x13E4
+expect cube::CombatBehavior::CombatBehavior watch php decreased
+watch clear
+# phase 2, the monster killed: hp 0 makes the dead-creature loop delete it (the destructor frees its behaviour)
+watch count u32 [@0x7691C8] + 0x2E0
+trace start
+log 6.1: kill
+wait 20
+inspect cube::CreatureData [[[[@0x7691C8] + 0x2E0]] + 0x18] + 0x10
+inspect set hp 0
+wait 40
+trace stop
+watch
+trace report
+expect cube::World::creatureDeathRemoveSite calls @0x60E04B >= 1
+expect cube::Creature::~Creature calls @0x43D0B0 >= 1
+watch clear
+# phase 3: walking away from the rest; the game runs on
+trace start
+log 6.1: walk
+wait 85
+trace stop
+trace report
+expect cube::World::creatureDespawnSite calls @0x60CD5B > 3
+log 6.1: end
+wait 10
+expect - hooks == 0
+"""

@@ -1,0 +1,10 @@
+id = "mm_fixture_catalog"
+name = "Fixture Catalog"
+version = "1.0.0"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Kyubu tests"]
+description = "Holds copies of the test catalog for the catalog fetch replay: good, bad (one changed byte after signing) and nosig."
+
+[scripts]
+common = "scripts/common.lua"

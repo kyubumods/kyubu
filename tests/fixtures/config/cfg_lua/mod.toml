@@ -1,0 +1,10 @@
+id = "cfg_lua"
+name = "Config: restricted Lua"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+trust = "restricted"
+description = "Fixture: a restricted-trust script reads and sets its own option."
+
+[scripts]
+client = "scripts/client.lua"

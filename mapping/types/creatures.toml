@@ -1,0 +1,677 @@
+# The entity types of cube::CreatureData.entity_type, from Cube.exe (task 3.3 of add-entity-spawner). The names and values
+# were imported from cuwo (cuwo/strings.py: 154 names for 0 to 155); creature_appearance_for_type (0x43FDB0) switches on
+# every value from 0 to 155, so cuwo lacks two names, 95 and 129, which the game draws. Moved here from
+# cuwo-constants.toml, which `kmap import-cuwo` now leaves it out of (like cube::AbilityId in combat.toml). The status
+# stays candidate until the user has seen the table of probe entity-types.
+
+[[enum]]
+name = "cube::EntityType"
+size = 4
+status = "verified"
+evidence = ["cuwo:cuwo/strings.py", "probe:entity-types"]
+subsystem = "creatures"
+source = "cuwo"
+notes = "0 to 155 (creature_appearance_for_type at 0x43FDB0 has a case for each of the 156 values and does nothing for larger ones); cuwo names 154 of them, the two it lacks (95, 129) are drawn too; probe entity-types spawned every value and the game drew each one"
+
+[[enum.value]]
+name = "ELF_MALE"
+value = 0
+
+[[enum.value]]
+name = "ELF_FEMALE"
+value = 1
+
+[[enum.value]]
+name = "HUMAN_MALE"
+value = 2
+
+[[enum.value]]
+name = "HUMAN_FEMALE"
+value = 3
+
+[[enum.value]]
+name = "GOBLIN_MALE"
+value = 4
+
+[[enum.value]]
+name = "GOBLIN_FEMALE"
+value = 5
+
+[[enum.value]]
+name = "BULLTERRIER"
+value = 6
+
+[[enum.value]]
+name = "LIZARDMAN_MALE"
+value = 7
+
+[[enum.value]]
+name = "LIZARDMAN_FEMALE"
+value = 8
+
+[[enum.value]]
+name = "DWARF_MALE"
+value = 9
+
+[[enum.value]]
+name = "DWARF_FEMALE"
+value = 10
+
+[[enum.value]]
+name = "ORC_MALE"
+value = 11
+
+[[enum.value]]
+name = "ORC_FEMALE"
+value = 12
+
+[[enum.value]]
+name = "FROGMAN_MALE"
+value = 13
+
+[[enum.value]]
+name = "FROGMAN_FEMALE"
+value = 14
+
+[[enum.value]]
+name = "UNDEAD_MALE"
+value = 15
+
+[[enum.value]]
+name = "UNDEAD_FEMALE"
+value = 16
+
+[[enum.value]]
+name = "SKELETON"
+value = 17
+
+[[enum.value]]
+name = "OLD_MAN"
+value = 18
+
+[[enum.value]]
+name = "COLLIE"
+value = 19
+
+[[enum.value]]
+name = "SHEPHERD_DOG"
+value = 20
+
+[[enum.value]]
+name = "SKULL_BULL"
+value = 21
+
+[[enum.value]]
+name = "ALPACA"
+value = 22
+
+[[enum.value]]
+name = "BROWN_ALPACA"
+value = 23
+
+[[enum.value]]
+name = "EGG"
+value = 24
+
+[[enum.value]]
+name = "TURTLE"
+value = 25
+
+[[enum.value]]
+name = "TERRIER"
+value = 26
+
+[[enum.value]]
+name = "SCOTTISH_TERRIER"
+value = 27
+
+[[enum.value]]
+name = "WOLF"
+value = 28
+
+[[enum.value]]
+name = "PANTHER"
+value = 29
+
+[[enum.value]]
+name = "CAT"
+value = 30
+
+[[enum.value]]
+name = "BROWN_CAT"
+value = 31
+
+[[enum.value]]
+name = "WHITE_CAT"
+value = 32
+
+[[enum.value]]
+name = "PIG"
+value = 33
+
+[[enum.value]]
+name = "SHEEP"
+value = 34
+
+[[enum.value]]
+name = "BUNNY"
+value = 35
+
+[[enum.value]]
+name = "PORCUPINE"
+value = 36
+
+[[enum.value]]
+name = "GREEN_SLIME"
+value = 37
+
+[[enum.value]]
+name = "PINK_SLIME"
+value = 38
+
+[[enum.value]]
+name = "YELLOW_SLIME"
+value = 39
+
+[[enum.value]]
+name = "BLUE_SLIME"
+value = 40
+
+[[enum.value]]
+name = "FRIGHTENER"
+value = 41
+
+[[enum.value]]
+name = "SAND_HORROR"
+value = 42
+
+[[enum.value]]
+name = "WIZARD"
+value = 43
+
+[[enum.value]]
+name = "BANDIT"
+value = 44
+
+[[enum.value]]
+name = "WITCH"
+value = 45
+
+[[enum.value]]
+name = "OGRE"
+value = 46
+
+[[enum.value]]
+name = "ROCKLING"
+value = 47
+
+[[enum.value]]
+name = "GNOLL"
+value = 48
+
+[[enum.value]]
+name = "POLAR_GNOLL"
+value = 49
+
+[[enum.value]]
+name = "MONKEY"
+value = 50
+
+[[enum.value]]
+name = "GNOBOLD"
+value = 51
+
+[[enum.value]]
+name = "INSECTOID"
+value = 52
+
+[[enum.value]]
+name = "HORNET"
+value = 53
+
+[[enum.value]]
+name = "INSECT_GUARD"
+value = 54
+
+[[enum.value]]
+name = "CROW"
+value = 55
+
+[[enum.value]]
+name = "CHICKEN"
+value = 56
+
+[[enum.value]]
+name = "SEAGULL"
+value = 57
+
+[[enum.value]]
+name = "PARROT"
+value = 58
+
+[[enum.value]]
+name = "BAT"
+value = 59
+
+[[enum.value]]
+name = "FLY"
+value = 60
+
+[[enum.value]]
+name = "MIDGE"
+value = 61
+
+[[enum.value]]
+name = "MOSQUITO"
+value = 62
+
+[[enum.value]]
+name = "PLAIN_RUNNER"
+value = 63
+
+[[enum.value]]
+name = "LEAF_RUNNER"
+value = 64
+
+[[enum.value]]
+name = "SNOW_RUNNER"
+value = 65
+
+[[enum.value]]
+name = "DESERT_RUNNER"
+value = 66
+
+[[enum.value]]
+name = "PEACOCK"
+value = 67
+
+[[enum.value]]
+name = "FROG"
+value = 68
+
+[[enum.value]]
+name = "PLANT_CREATURE"
+value = 69
+
+[[enum.value]]
+name = "RADISH_CREATURE"
+value = 70
+
+[[enum.value]]
+name = "ONIONLING"
+value = 71
+
+[[enum.value]]
+name = "DESERT_ONIONLING"
+value = 72
+
+[[enum.value]]
+name = "DEVOURER"
+value = 73
+
+[[enum.value]]
+name = "DUCKBILL"
+value = 74
+
+[[enum.value]]
+name = "CROCODILE"
+value = 75
+
+[[enum.value]]
+name = "SPIKE_CREATURE"
+value = 76
+
+[[enum.value]]
+name = "ANUBIS"
+value = 77
+
+[[enum.value]]
+name = "HORUS"
+value = 78
+
+[[enum.value]]
+name = "JESTER"
+value = 79
+
+[[enum.value]]
+name = "SPECTRINO"
+value = 80
+
+[[enum.value]]
+name = "DJINN"
+value = 81
+
+[[enum.value]]
+name = "MINOTAUR"
+value = 82
+
+[[enum.value]]
+name = "NOMAD_MALE"
+value = 83
+
+[[enum.value]]
+name = "NOMAD_FEMALE"
+value = 84
+
+[[enum.value]]
+name = "IMP"
+value = 85
+
+[[enum.value]]
+name = "SPITTER"
+value = 86
+
+[[enum.value]]
+name = "MOLE"
+value = 87
+
+[[enum.value]]
+name = "BITER"
+value = 88
+
+[[enum.value]]
+name = "KOALA"
+value = 89
+
+[[enum.value]]
+name = "SQUIRREL"
+value = 90
+
+[[enum.value]]
+name = "RACCOON"
+value = 91
+
+[[enum.value]]
+name = "OWL"
+value = 92
+
+[[enum.value]]
+name = "PENGUIN"
+value = 93
+
+[[enum.value]]
+name = "WEREWOLF"
+value = 94
+
+[[enum.value]]
+name = "SANTA"
+value = 95
+notes = "no name in cuwo; the game has a case for it (0x440E0E) and draws a Santa Claus: red hat, white beard, red and white coat (probe entity-types, batch 5); the name is read off the screenshot"
+
+[[enum.value]]
+name = "ZOMBIE"
+value = 96
+
+[[enum.value]]
+name = "VAMPIRE"
+value = 97
+
+[[enum.value]]
+name = "HORSE"
+value = 98
+
+[[enum.value]]
+name = "CAMEL"
+value = 99
+
+[[enum.value]]
+name = "COW"
+value = 100
+
+[[enum.value]]
+name = "DRAGON"
+value = 101
+
+[[enum.value]]
+name = "BARK_BEETLE"
+value = 102
+
+[[enum.value]]
+name = "FIRE_BEETLE"
+value = 103
+
+[[enum.value]]
+name = "SNOUT_BEETLE"
+value = 104
+
+[[enum.value]]
+name = "LEMON_BEETLE"
+value = 105
+
+[[enum.value]]
+name = "CRAB"
+value = 106
+
+[[enum.value]]
+name = "SEA_CRAB"
+value = 107
+
+[[enum.value]]
+name = "TROLL"
+value = 108
+
+[[enum.value]]
+name = "DARK_TROLL"
+value = 109
+
+[[enum.value]]
+name = "HELL_DEMON"
+value = 110
+
+[[enum.value]]
+name = "GOLEM"
+value = 111
+
+[[enum.value]]
+name = "EMBER_GOLEM"
+value = 112
+
+[[enum.value]]
+name = "SNOW_GOLEM"
+value = 113
+
+[[enum.value]]
+name = "YETI"
+value = 114
+
+[[enum.value]]
+name = "CYCLOPS"
+value = 115
+
+[[enum.value]]
+name = "MAMMOTH"
+value = 116
+
+[[enum.value]]
+name = "LICH"
+value = 117
+
+[[enum.value]]
+name = "RUNE_GIANT"
+value = 118
+
+[[enum.value]]
+name = "SAURIAN"
+value = 119
+
+[[enum.value]]
+name = "BUSH"
+value = 120
+
+[[enum.value]]
+name = "SNOW_BUSH"
+value = 121
+
+[[enum.value]]
+name = "SNOW_BERRY_BUSH"
+value = 122
+
+[[enum.value]]
+name = "COTTON_PLANT"
+value = 123
+
+[[enum.value]]
+name = "SCRUB"
+value = 124
+
+[[enum.value]]
+name = "COBWEB_SCRUB"
+value = 125
+
+[[enum.value]]
+name = "FIRE_SCRUB"
+value = 126
+
+[[enum.value]]
+name = "GINSENG"
+value = 127
+
+[[enum.value]]
+name = "CACTUS"
+value = 128
+
+[[enum.value]]
+name = "ENTITY_129"
+value = 129
+notes = "no name in cuwo; the game has a case for it (0x443E38, model 0x832) and it is drawn (probe entity-types, batch 7): most likely the orange, flower-like plant at the far right of the row, half hidden by a scrub; placeholder name until a close-up shows it"
+
+[[enum.value]]
+name = "THORN_TREE"
+value = 130
+
+[[enum.value]]
+name = "GOLD_DEPOSIT"
+value = 131
+
+[[enum.value]]
+name = "IRON_DEPOSIT"
+value = 132
+
+[[enum.value]]
+name = "SILVER_DEPOSIT"
+value = 133
+
+[[enum.value]]
+name = "SANDSTONE_DEPOSIT"
+value = 134
+
+[[enum.value]]
+name = "EMERALD_DEPOSIT"
+value = 135
+
+[[enum.value]]
+name = "SAPPHIRE_DEPOSIT"
+value = 136
+
+[[enum.value]]
+name = "RUBY_DEPOSIT"
+value = 137
+
+[[enum.value]]
+name = "DIAMOND_DEPOSIT"
+value = 138
+
+[[enum.value]]
+name = "ICE_CRYSTAL_DEPOSIT"
+value = 139
+
+[[enum.value]]
+name = "SCARECROW"
+value = 140
+
+[[enum.value]]
+name = "AIM"
+value = 141
+
+[[enum.value]]
+name = "DUMMY"
+value = 142
+
+[[enum.value]]
+name = "VASE"
+value = 143
+
+[[enum.value]]
+name = "BOMB"
+value = 144
+
+[[enum.value]]
+name = "SAPPHIRE_FISH"
+value = 145
+
+[[enum.value]]
+name = "LEMON_FISH"
+value = 146
+
+[[enum.value]]
+name = "SEAHORSE"
+value = 147
+
+[[enum.value]]
+name = "MERMAID"
+value = 148
+
+[[enum.value]]
+name = "MERMAN"
+value = 149
+
+[[enum.value]]
+name = "SHARK"
+value = 150
+
+[[enum.value]]
+name = "BUMBLEBEE"
+value = 151
+
+[[enum.value]]
+name = "LANTERN_FISH"
+value = 152
+
+[[enum.value]]
+name = "MAW_FISH"
+value = 153
+
+[[enum.value]]
+name = "PIRANHA"
+value = 154
+
+[[enum.value]]
+name = "BLOWFISH"
+value = 155
+
+# The hostile types of cube::CreatureData.hostile_type, from cuwo (cuwo/constants.py: 0, 1, 2, 3 and 6). Moved here from
+# cuwo-constants.toml (task 3.4 of add-entity-spawner), which `kmap import-cuwo` now leaves it out of, like
+# cube::EntityType above. The status stays candidate until the user has seen the table of probe hostile-types.
+
+[[enum]]
+name = "cube::HostileType"
+size = 1
+status = "verified"
+evidence = ["cuwo:cuwo/constants.py", "probe:hostile-types"]
+subsystem = "creatures"
+source = "cuwo"
+notes = "probe hostile-types: a player can hit 1 and 6 but not 2 and 3 (slimes, level 1); tags: 1 red hp bar, 2 and 3 blue, 6 grey; 3 gets game-made names and a talk prompt; cuwo's names kept; PET (5) is not in cuwo but is what the game's pet spawn writes, beside the owner's id (atlas ai)"
+
+[[enum.value]]
+name = "FRIENDLY_PLAYER"
+value = 0
+
+[[enum.value]]
+name = "HOSTILE"
+value = 1
+
+[[enum.value]]
+name = "FRIENDLY"
+value = 2
+
+[[enum.value]]
+name = "NAMED_FRIENDLY"
+value = 3
+
+[[enum.value]]
+name = "PET"
+value = 5
+
+[[enum.value]]
+name = "TARGET"
+value = 6

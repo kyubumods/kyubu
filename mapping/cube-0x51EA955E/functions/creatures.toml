@@ -1,0 +1,368 @@
+# Cube.exe: creatures and their appearance.
+
+# Task 8.4: how a creature's appearance and equipment become the models it is drawn with.
+
+[[function]]
+name = "draw_creature"
+address = 0x4128F0
+convention = "thiscall"
+prototype = "void __thiscall draw_creature(void* this, void* arg1, void* arg2, void* arg3, ModelLoader* models, uint32_t frame_ms, void* arg6, void* arg7, void* arg8, uint32_t hide_mask, void* arg10)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:reads appearance *_model ids at Creature+0x8C..+0x9A as model slots", "manual:ten stack arguments, ret 0x28 at 0x423D46", "correlated:cube-0x51D2CE9C:draw_creature"]
+source = "kyubu"
+notes = "this: the draw record, inside the creature at Creature + 0x1498 (+0 creature, +4 mode time, +8 pose id: atlas); arg 4 the ModelLoader, arg 5 the frame ms (0 in trail calls), arg 9 hides parts. Picks each part from the equipped item or the appearance id (bounds-checked), then poses and draws it."
+
+[[function]]
+name = "draw_creature_join_site"
+address = 0x41F065
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:draw_creature", "correlated:cube-0x51D2CE9C:draw_creature_join_site"]
+source = "kyubu"
+notes = "Inside draw_creature, after the pose switch and its smoothing, before the hand-vector adds. EDI the draw record (Creature+0x1498), once per drawn creature. A float write at its pose offsets is drawn that frame; writing back words +0x10 to +0x4EC saved earlier freezes the pose (snare-freeze)."
+
+[[function]]
+name = "creature_two_hand_stance"
+address = 0x444230
+convention = "thiscall"
+prototype = "bool __thiscall creature_two_hand_stance(cube::Creature* this)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["manual:reads the right weapon's type and subtype bytes", "correlated:cube-0x51D2CE9C:creature_two_hand_stance"]
+source = "kyubu"
+notes = "True when the right weapon slot holds a weapon (type 3) of subtype 5, 6, 7, 8, 10, 11, 15, 16, 17 or 18; draw_creature uses it in four pose cases to choose between separate hands and both hands on one grip. Name is a guess; not run."
+
+[[function]]
+name = "cube::Creature::Creature"
+address = 0x43B690
+convention = "thiscall"
+prototype = "cube::Creature* __thiscall cube::Creature::Creature(cube::Creature* this, const uint64_t* id)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "manual:stores the vtable; not called from a vtable slot", "correlated:cube-0x51D2CE9C:cube::Creature::Creature"]
+source = "kyubu"
+notes = "sizeof 7776 (operator new); copies the id to +8, zeroes the behaviour pointer (+0x13E4), returns this. Callers: the GameController constructor (the player, id 1), cube::World::update (zone records, pets, bombs, summons), client_connect, 0x4821A0 and 0x487520 (a temporary creature on a worker thread)"
+
+[[function]]
+name = "cube::Creature::maxHp"
+address = 0x444DB0
+convention = "thiscall"
+prototype = "float __thiscall cube::Creature::maxHp(cube::Creature* this)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::World::creatureCreateSite", "manual:sets hp in the zone, pet and summon paths", "correlated:cube-0x51D2CE9C:cube::Creature::maxHp"]
+source = "kyubu"
+notes = "returns in st0 (ret 0) the creature's max hp from level (+0x190), hostile type, multipliers at +0x178 and +0x140/+0x141, and the equipment slots' bonuses. 39 callers; the spawn paths store it in data.hp (+0x16C). The summon path calls it on the owner, the zone and pet paths on the new creature"
+
+[[function]]
+name = "creature_appearance_for_type"
+address = 0x43F7C0
+convention = "cdecl"
+prototype = "void __cdecl creature_appearance_for_type(uint32_t* entity_type, cube::AppearanceData* appearance, const void* style)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::World::creatureCreateSite", "manual:switch on entity_type 0..155 fills the appearance", "correlated:cube-0x51D2CE9C:creature_appearance_for_type"]
+source = "kyubu"
+notes = "arg 1 is data.entity_type (+0x64), arg 2 data.appearance (+0x78). style NULL: random variation (calls rand), entity_type kept; else a character style (the player's, Creature+0x1D28): entity_type is written from its race (0..7). A switch of 156 cases, 0..155; a larger type falls through. 11 callers"
+
+[[function]]
+name = "creature_map_slot"
+address = 0x468AD0
+convention = "thiscall"
+prototype = "cube::Creature** __thiscall creature_map_slot(std::map* this, const uint64_t* id)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:std::map operator[] of the World's map; 27 callers", "correlated:cube-0x51D2CE9C:creature_map_slot"]
+source = "kyubu"
+notes = "finds or inserts id in the map (this = World+4) and returns the address of the mapped cube::Creature* (node+0x18); the caller stores the creature there. Keys compare as signed 64-bit. Callers include the four creature paths of cube::World::update and client_connect"
+
+# Read statically on 2026-10-19 (add-skills-unleashed, the Ninja's true stealth): a monster's threat map (Creature +0x13A4)
+# has the same node layout as the World's creature map, so this erase removes one entry from it as well.
+
+[[function]]
+name = "creature_map_erase"
+address = 0x43EDE0
+convention = "thiscall"
+prototype = "void* __thiscall creature_map_erase(std::map* this, void** out_next, void* node)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:cube::World::creatureDespawnSite", "manual:std::map erase(iterator) of the World's map, ret 8; 16 callers", "correlated:cube-0x51D2CE9C:creature_map_erase"]
+source = "kyubu"
+notes = "erases one node of a map with 8-byte keys and a 4-byte value (World+4, or a creature's threat map +0x13A4): rebalances, frees the node, lowers the size at this+4, stores the next node in *out_next. World::update's despawn and death paths use it. The node must belong to this map"
+
+[[function]]
+name = "cube::Creature::reset"
+address = 0x446330
+convention = "thiscall"
+prototype = "void __thiscall cube::Creature::reset(cube::Creature* this)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:frees +0x13E4, zeroes it, clears lists and timers", "correlated:cube-0x51D2CE9C:cube::Creature::reset"]
+source = "kyubu"
+notes = "puts a creature back to its freshly built state: frees the behaviour at +0x13E4 and zeroes it, empties five lists, zeroes counters and timers. Called by the pet path right after the insert, by 60CF7F and 60D46F in the World step, and by 0x44BE7F and 0x483F73. The spawn recipe does not need it"
+
+[[function]]
+name = "cube::Creature::~Creature"
+address = 0x43C410
+convention = "thiscall"
+prototype = "void __thiscall cube::Creature::~Creature(cube::Creature* this)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:cube-0x51D2CE9C:cube::Creature::~Creature"]
+source = "kyubu"
+notes = "the deleting destructor 0x43C840 is called virtually: by cube::World::update's two removal loops, and by 0x487520 for its temporary creature (on a worker thread, outside any World)"
+
+[[function]]
+name = "cube::Spawn::Spawn"
+address = 0x5ADB20
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "manual:stores the vtable; not called from a vtable slot", "correlated:cube-0x51D2CE9C:cube::Spawn::Spawn"]
+source = "kyubu"
+notes = "sizeof 4336 (operator new); called by cube::World::generateZone and the region generators it calls (0x5AF170, 0x5CC510, 0x5D9460, 0x5DC6E0, 0x5F0CE0), which also build a CombatBehavior"
+
+[[function]]
+name = "cube::Spawn::~Spawn"
+address = 0x5ADCA0
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:cube-0x51D2CE9C:cube::Spawn::~Spawn"]
+source = "kyubu"
+
+# Creature levels and the creature-data copy (read statically on 2026-09-30).
+
+[[function]]
+name = "creature_level_range"
+address = 0x444020
+convention = "cdecl"
+prototype = "void __cdecl creature_level_range(uint32_t entity_type, int32_t* min_level, int32_t* max_level)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["correlated:server-0x51EA94D5:creature_level_range", "manual:the same 68-entry type table, compared case by case", "correlated:cube-0x51D2CE9C:creature_level_range"]
+source = "kyubu"
+notes = "Cube.exe's twin of the Server.exe level table (single-player world generation); see the Server.exe entry and the creatures atlas page for the ranges"
+
+[[function]]
+name = "creature_data_copy"
+address = 0x44B040
+convention = "thiscall"
+prototype = "cube::CreatureData* __thiscall creature_data_copy(cube::CreatureData* this, cube::CreatureData* other)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["manual:copies every cube::CreatureData field, field by field; returns this", "xref:client_send_loop", "correlated:cube-0x51D2CE9C:creature_data_copy"]
+source = "kyubu"
+notes = "the struct's copy assignment. Used by save_character, create_character, client_send_loop (the last-sent copy) and the loaders"
+
+[[function]]
+name = "creature_draw_site"
+address = 0x4B5DAC
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:draw_creature", "xref:cube::GameController::render", "correlated:cube-0x51D2CE9C:creature_draw_site"]
+source = "kyubu"
+notes = "In render, before the draw_creature call for a creature in a world. ESI the creature; the stack holds the call's arguments: arg 6 the colour vec4 at [ESP+0x14] (alpha only darkens), arg 9 the hide mask at [ESP+0x20] (0xFFFFFFFF hides the creature, probe trap-body)."
+
+[[function]]
+name = "creature_draw_site_b"
+address = 0x4BA8F8
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "xref:cube::GameController::render", "manual:read from the code; not reached in probe:taunt-target", "correlated:cube-0x51D2CE9C:creature_draw_site_b"]
+source = "kyubu"
+notes = "In render's later pass (a creature with Creature+0x1190 above 0), the add before the first draw_creature call (0x4BA8FE). ECX is the creature, the colour vec4 the pointer at [ESP+0x14], as at creature_draw_site"
+
+[[function]]
+name = "creature_draw_site_c"
+address = 0x4BA99F
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "xref:cube::GameController::render", "manual:read from the code; not reached in probe:taunt-target", "correlated:cube-0x51D2CE9C:creature_draw_site_c"]
+source = "kyubu"
+notes = "In render's later pass, the add before the second draw_creature call (0x4BA9A5, arg 5 is 0). ECX is the creature, the colour vec4 the pointer at [ESP+0x14], as at creature_draw_site"
+
+[[function]]
+name = "stun_mark_gate_site"
+address = 0x4B5EF8
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "correlated:cube-0x51D2CE9C:stun_mark_gate_site"]
+source = "kyubu"
+notes = "In render, the cmp for the stun's mark: ESI the creature; the mark is drawn when the int at Creature+0x12C is above -3000. Writing 1 there for the draw (put back at stun_mark_model_site) draws it on any creature; writing -4000 keeps the model from being fetched (snare-freeze)."
+
+[[function]]
+name = "stun_mark_model_site"
+address = 0x4B5F19
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "xref:ModelLoader::get", "correlated:cube-0x51D2CE9C:stun_mark_model_site"]
+source = "kyubu"
+notes = "In render, just after the stun mark's ModelLoader::get(0x9F5): EAX is the Model*, ESI the creature, and [ESP + 0x10C] the ModelLoader. Another Model* in EAX is drawn in the mark's place, at its spot, size (Creature scale x 0.1) and turn"
+
+[[function]]
+name = "draw_creature_quiver_left_site"
+address = 0x4210C3
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly and the decompiled draw_creature", "correlated:cube-0x51D2CE9C:draw_creature_quiver_left_site"]
+source = "kyubu"
+notes = "In draw_creature, after the quiver's ModelLoader::get(0x347) for the left weapon slot: EAX the Model*, EDI the draw record. Zero in EAX skips the quiver. Read statically, not run."
+
+[[function]]
+name = "draw_creature_quiver_right_site"
+address = 0x421296
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly and the decompiled draw_creature", "correlated:cube-0x51D2CE9C:draw_creature_quiver_right_site"]
+source = "kyubu"
+notes = "In draw_creature, after the quiver's ModelLoader::get(0x347) for the right weapon slot: EAX the Model*, EDI the draw record. Zero in EAX skips the quiver. Read statically, not run."
+
+[[function]]
+name = "draw_creature_lamp_model_site"
+address = 0x42323C
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly and the decompiled draw_creature", "correlated:cube-0x51D2CE9C:draw_creature_lamp_model_site"]
+source = "kyubu"
+notes = "In draw_creature, after itemModel of the lit lamp (slot 10): EAX the Model*, EDI the draw record. Zero in EAX skips the lantern in the hand; the light (0x4AF794) stays. Read statically, not run."
+
+[[function]]
+name = "lamp_light_test_site"
+address = 0x4AF7A1
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:lamp_light_test_site"]
+source = "kyubu"
+notes = "In the creature draw's light code (0x4AF794 on), at the test that slot 10 holds a lamp: EAX is the Creature. Another pointer in EAX whose byte at +0xDF0 is 0x18 passes it. Read statically, not run."
+
+[[function]]
+name = "lamp_light_radius_site"
+address = 0x4AF872
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:lamp_light_radius_site"]
+source = "kyubu"
+notes = "In the same light code, after the lamp's rarity byte (Creature+0xDFC) is read: EAX is that rarity; the radius is rarity * 8 + 10, ESI points at the Creature. Read statically, not run."
+
+[[function]]
+name = "lamp_light_power_site"
+address = 0x4AF8C5
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:lamp_light_power_site"]
+source = "kyubu"
+notes = "In the same light code, after the rarity byte is read a second time (it scales the light's strength): EAX is the rarity, ESI points at the Creature. Read statically, not run."
+
+[[function]]
+name = "lamp_flag_clear_site"
+address = 0x61F034
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:lamp_flag_clear_site"]
+source = "kyubu"
+notes = "In cube::World::update, the clearing of flag 0x200 of a creature with no lamp in slot 10: EDI is the Creature, EAX the mask 0xFDFF. Setting EAX to 0xFFFF keeps the flag. Read statically, not run."
+
+[[function]]
+name = "light_push_site"
+address = 0x4AF92B
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:light_push_site"]
+source = "kyubu"
+notes = "In the creature draw's light code, at the instruction before the call that pushes the lamp's 0x30-byte light record into the frame's light vector (push_back 0x4C11F0): [ESP] points to the record and ESP+0xCC is the vector (the call itself is an unsafe site). Read statically, not run."
+
+[[function]]
+name = "light_push_b_site"
+address = 0x4AFA80
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:draw_creature", "manual:read from the disassembly", "correlated:cube-0x51D2CE9C:light_push_b_site"]
+source = "kyubu"
+notes = "The same push_back as light_push_site, in the block after the lamp's (an item test on slot 9), at the same kind of instruction: [ESP] points to a second kind of light record, ESP+0xCC is the vector. Read statically, not run."
+
+[[function]]
+name = "light_collect_site"
+address = 0x4B12E3
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["manual:read from the disassembly", "manual:record layout read from a dump logged in the game on 2026-10-18", "correlated:cube-0x51D2CE9C:light_collect_site"]
+source = "kyubu"
+notes = "In the render, after the light vector (ESP+0xC8) is sorted and handed to the terrain, before its size is taken for the models (16 at most). Record: 3 int64 units, radius, 3 colour floats, squared camera distance, padding. A light added here lights models only (probe light-place)."
+
+[[function]]
+name = "light_sort_site"
+address = 0x4B0E54
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:pushed by the Fire Mage in play, lit models and ground (2026-10-18)", "correlated:cube-0x51D2CE9C:light_sort_site"]
+source = "kyubu"
+notes = "In the render, after every light push and before the vector (ESP+0xC8) is sorted by squared camera distance (+0x28, ascending) and handed to the terrain regions (16 each), then to the models. A light pushed here lights the terrain too. A 7-byte lea."
+
+[[function]]
+name = "cube::CreatureData::setFlag"
+address = 0x42F160
+convention = "thiscall"
+prototype = "void __thiscall cube::CreatureData::setFlag(cube::CreatureData* this, uint32_t mask, bool on)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["manual:or or and-not of the mask into data.flags (CreatureData+0x114)", "xref:cube::GameController::update", "correlated:cube-0x51D2CE9C:cube::CreatureData::setFlag"]
+source = "kyubu"
+notes = "sets (on) or clears the mask's bits of data.flags; only the low 16 bits matter; 27 calls. ECX is the CreatureData (Creature+0x10). The player's bit 0x40 (full walk speed) and bit 4 (lock-on) are set through it after the input each frame (walkLockSite)"
+
+[[function]]
+name = "draw_creature_end_site"
+address = 0x423D33
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:draw_creature", "manual:disassembly 2026-11-05"]
+source = "kyubu"
+notes = "Common exit of draw_creature, once per drawn creature. EDI the draw record; frame EBP: shader [EBP+8], view +0xC, projection +0x10, colour vec4 +0x1C, hide mask +0x28. Draw mod pieces here. Probe model-part-draw, replayed 2026-11-05."
+
+[[function]]
+name = "creature_death_burst_site"
+address = 0x4B3A31
+convention = "cdecl"
+kind = "site"
+subsystem = "creatures"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:disassembly 2026-11-06"]
+source = "kyubu"
+notes = "In render's creature loop, on a creature with hp <= 0, at the test of the draw flag [ESI+0x1D10]. ESI the creature, EDI the GameController. Writing 0 there skips the game's own burst of the creature's parts; call createParticles from here for a mod body. Probe death-burst-call, replayed 2026-11-06."

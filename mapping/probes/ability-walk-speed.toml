@@ -1,0 +1,86 @@
+# add-skills-unleashed, Water Mage (2026-10-19): the user wants no slow while the chains are cast. The mod's code applies none, so this asks
+# whether the game itself scales the player's walk while a mod ability's mode runs. mods-dev/charge_proto defines a mod ability on the
+# warrior's slot 4 that stays in mode 112 while key 4 is held. The probe holds W alone (the baseline) and then W with 4, and logs the
+# player's walk velocity (Creature + 0x34, x and y, blocks a second) and the mode, so the speeds can be compared. From run 7,
+# mods-dev/velwrite_probe rides along: each run's version is described at its top (the last one checks the fix by the mapped sites).
+id = "ability-walk-speed"
+build = "cube-0x51D2CE9C"
+kyubu = "1.1"
+date = "2026-10-19"
+steps = [
+    "Start in dev mode with charge_proto; make a character and a world; set the rank of charge_proto:circle to 3 on the console",
+    "Hold W for 3 s with no ability: the velocity the walk reaches (the baseline)",
+    "Hold W and 4 together for 3 s: the velocity while the mode is 112; is it lower than the baseline",
+]
+observations = [
+    "run 6 (2026-10-19), W held 4 s with no ability, then W and key 4 together 4 s (charge_proto, mode 112): the walk velocity peaks at (9.84, -6.44) blocks/s on foot and (7.11, -4.65) in the mode, 0.72 on both axes, so the game scales a mod ability's walk to about 0.72. The input is not scaled: accel (Creature + 0x40, 0x44) peaks at (66.94, -43.81) in both",
+    "the creature's fields differ between the two phases only in the mode, flags (64 on foot, 4 in the mode), timers and mp; no field holds a speed factor, so the 0.72 is in code that reads the mode",
+    "not found: the instruction that applies it. It is not in FUN_004A6D10 (the player's input, it writes accel), and not in the AI at 0x42d2e0; mode 112 is above the dispatch table of 0x610745 (modes 1 to 110), so it takes the default path",
+    "runs 7 to 11 (mods-dev/velwrite_probe): no float or dword store to [reg + 0x34] or [reg + 0x24] (709 sites hooked) writes the player's velocity during the walk; 33 sites were left out, their patch would cover a jump target (runs 9 and 10 crashed at two of them)",
+    "run 12: sampled around the frame's parts, the velocity changes only inside the 20 ms cube::World::update steps; runs 14 and 15 (samples every 0x400, then every 0x40 bytes of the step): the cap's write-back (0x619352 to 0x619392) cuts it, a mean 0.924 a step on foot and 0.696 in mode 112",
+    "run 17: the cap ([EBP-0x2B58] in the step) is 12 on foot and 6 in phase B (3 at times, x0.5 for the timer at Creature + 0x134); it is 6.0 doubled while bit 0x40 of data.flags is set. cube::GameController clears that bit and sets lock-on (bit 4) while the mode time is below cube::Creature::modeDuration + 200 ms (0x4985C6 to 0x4985DF)",
+    "run 13: forcing the bit only in mode 112 at the cap's check changed nothing (7.109): most phase-B samples are mode 0 with the bit still clear. Run 16: the lock-on factor (0.5 * cos + 1, 0x6192C7) was never reached; the walk did not point away from the facing",
+    "run 18: bit 0x40 set again after the rule in mode 112: phase B peaked at 9.55 (9.85 on foot). Run 19, the fix's way by the mapped names walkLockSite, walkLockEndSite, lockOnWalkPenaltySite: 9.57 against 9.84",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the new level-1 warrior: key 4 is the probe mod's ability"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/charge_proto", "mods-dev/velwrite_probe"]
+input = [
+    "until walkspeed ready",
+    "console ability rank charge_proto:circle 3",
+    "wait 3",
+    "click 820 384",
+    "wait 1",
+    "until walkspeed phase A",
+    "hold w 4",
+    "until walkspeed phase B",
+    "hold w+4 4",
+    "wait 3",
+]
+script = """
+log walkspeed: Water Mage cast slow, the walk velocity with and without a mod ability's mode
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+log walkspeed ready
+wait 25
+watch ax f32 [[@0x7691C8] + 0x8006C8] + 0x34
+watch ay f32 [[@0x7691C8] + 0x8006C8] + 0x38
+watch cx f32 [[@0x7691C8] + 0x8006C8] + 0x40
+watch cy f32 [[@0x7691C8] + 0x8006C8] + 0x44
+log walkspeed phase A
+wait 2
+log dumpA
+inspect player [@0x7691C8]
+wait 18
+expect - watch ax reached 999
+expect - watch ay reached 999
+expect - watch cx reached 999
+expect - watch cy reached 999
+watch clear
+watch bx f32 [[@0x7691C8] + 0x8006C8] + 0x34
+watch by f32 [[@0x7691C8] + 0x8006C8] + 0x38
+watch dx f32 [[@0x7691C8] + 0x8006C8] + 0x40
+watch dy f32 [[@0x7691C8] + 0x8006C8] + 0x44
+watch bmode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+log walkspeed phase B
+wait 2
+log dumpB
+inspect player [@0x7691C8]
+wait 23
+expect - watch bx reached 999
+expect - watch by reached 999
+expect - watch dx reached 999
+expect - watch dy reached 999
+expect - watch bmode reached 112
+watch clear
+log walkspeed done
+"""

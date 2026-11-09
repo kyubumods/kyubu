@@ -1,0 +1,79 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (task 2.2 of add-ability-api): where a mode returns to 0. P below is the player's cube::Creature,
+# [[@0x7691C8] + 0x8006C8]; its current_mode is the byte at +0x68, mode_start_time the dword at +0x6C and
+# data.stun_time the dword at +0x12C. The static scan of the byte stores of 0 to +0x68 is in the evidence README.
+id = "ability-mode-end"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the level-1 warrior Tester and a new world; slot4_proto pushed 115 as slot 4",
+    "Phase 1: a short press of key 4 (0.3 s), then nothing: is 115 still there 8 s after the press, and gone at 12 s?",
+    "Phase 2: forced mode 57 through the inspector, no button: does the game end it, and when?",
+    "Phase 3: forced mode 115, then data.stun_time set above 0: does that end it?",
+]
+observations = [
+    "Wine replay 3 passed (replay 1 stopped at once: empty observations; replay 2 wrote a field that does not exist, data._unk_0x12C instead of data.stun_time)",
+    "phase 1: after a 0.3 s tap of key 4, current_mode was 115 at 3 s and 8 s and 0 at 12 s, with mode_start_time 11176: mode 115 has no per-frame code, and only the player rule in cube::GameController::update (0x49C4A8: time above 10000 ms, key byte GameController+5 = 0, mode not in a short list) ended it; mode time kept counting",
+    "phase 2: a written 57 with no button was still 57 at 6 s and 0 at 12 s, the same rule (the melee block did not end it sooner)",
+    "phase 3: data.stun_time (+0x12C) written 2000 during 115: current_mode was 0 within 0.5 s (cube::World::update 0x616DBD clears mode and mode time while the timer is above 0 after the step)",
+]
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/slot4_proto"]
+input = ["until modeend press", "hold 4 0.3"]
+script = """
+log modeend: task 2.2 of add-ability-api, where a mode returns to 0
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch time u32 [[@0x7691C8] + 0x8006C8] + 0x6C
+wait 12
+inspect set data.mp 1
+log modeend press
+wait 3
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 5
+log modeend phase1 8 s after the press
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 4
+log modeend phase1 12 s after the press
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+expect - value u32 >= 10000 [[@0x7691C8] + 0x8006C8] + 0x6C
+# phase 2: a mode with a duration, started by writing it, no button held
+inspect set data.mode_start_time 0
+inspect set data.current_mode 57
+log modeend phase2 mode 57 written
+wait 0.2
+expect - value u8 == 57 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 6
+log modeend phase2 6 s after
+expect - value u8 == 57 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 6
+log modeend phase2 12 s after
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# phase 3: 115 again, then the stun timer
+inspect set data.mode_start_time 0
+inspect set data.current_mode 115
+wait 1
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+inspect set data.stun_time 2000
+log modeend phase3 stun written
+wait 0.5
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+watch
+watch clear
+log modeend done
+"""
+
+[[confirms]]
+entry = "cube::CreatureData.current_mode"
+observed = "written 57 and 115 with the inspector and no button held; the game cleared both to 0 (the 10 s rule at 0x49C4A8, and a stun)"
+
+[[confirms]]
+entry = "cube::CreatureData.stun_time"
+observed = "written 2000 while the mode was 115: current_mode was 0 within 0.5 s (cube::World::update 0x616DBD)"

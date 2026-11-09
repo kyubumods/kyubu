@@ -1,0 +1,9 @@
+id = "auto_enter"
+name = "Auto enter"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Developer mod: skips the title menus. Once the title screen is up it picks a saved character and a saved single-player world (options character and world) and enters the world through the game's own Select handlers, as two clicks would. With the option join it joins that server instead of a world. With no saved character or world it stays at the menu. The console command auto_enter:go [character] [world] does the same from the title screen."
+
+[native]
+common = "bin/auto_enter.dll"

@@ -1,0 +1,86 @@
+# Recorded with kyubu_probe and the Kyubu loader, unattended under Wine 9.0 (WSL): kmap probe replay starts Server.exe with the probe,
+# then a Kyubu-loaded Cube.exe (new warrior, client = "join") with mods-examples/fourth_ability_demo and mods-dev/mp_fill. Task 2.2 of
+# add-skills-unleashed-multiplayer: do the Server.exe twins of the ability cost, charge, cooldown and hit-list sites run, and for whom
+# (a joined player or only the server's own creatures)? The World comes from the cube::Server tick (0x428230).
+id = "server-ability-twins-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-10-27"
+steps = [
+    "Wine replay: Server.exe, then a client that joins with a new warrior; the script waits 110 s for it",
+    "traced the dispatch, cost, charged-mp, mp-charge, cooldown-start and hit-list sites",
+    "run 2: the rank is set on the console, then the client held key 4 (the demo's slot-4 ability, number 112) and then mouse 1 (the melee mode)",
+]
+observations = [
+    "signal waits, 2026-11-08 (evidence/fast-join-2026-11-08/waits-run1/server-ability-twins-0720), passed in 30 s: the script waits for Net::acceptJoinSite (the join, held after 7 to 8.5 s) instead of 140 s, and for the dispatch site instead of a fixed 40 to 90 s; the dispatch wait holds at once (monsters call it too), so the trace no longer spans the presses: log_expect checks them",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-ability-twins-0720), passed in 186 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "replay 1 (2026-10-27) was inconclusive: no ability started (the rank was not set on the console); replay 2 passed. Evidence: evidence/server-ability-twins-2026-10-27/",
+    "replay 2: the client joined (new warrior, mp_fill and fourth_ability_demo), set the rank on the console, held key 4 for 1.5 s: client.log has on_start number 112 rank 3 and the end after 806 ms. The server (traced 180 s) skipped both mods (no server side) and ran no ability code",
+    "counts on Server.exe over the 180 s: the dispatch site 100136 (every creature, every step), the cube::Server tick 8857, abilityCostSite 0, chargedMpSpendSite 0, mpChargeSite 0, hitListSite 0, cooldownStartSite 10 (all at 63.0 to 65 s, while the world was built; none at the key press). So the joined player's mode 112 did not reach the cooldown store on the server, as Infinite-Cubes' WorldUpdate.cpp says (a remote player's blocks are skipped)",
+    "limits: mode 112 takes the default dispatch case and has no cost, so the cost sites 0 means 'not reached by this mode', not proof for the melee and hold modes; hitListSite needs a monster hit, none happened in the window. These stay candidate",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "100136 calls in 180 s, from 63.0 s (every creature each step)"
+
+[[confirms]]
+entry = "cube::World::abilityCostSite"
+observed = "0 calls: the joined player's slot-4 mode (112, no cost) did not reach it, and no monster paid mp"
+
+[[confirms]]
+entry = "cube::World::chargedMpSpendSite"
+observed = "0 calls: no hold or melee mode ran on a player or a monster in the window"
+
+[[confirms]]
+entry = "cube::World::mpChargeSite"
+observed = "0 calls: no hold mode ran"
+
+[[confirms]]
+entry = "cube::World::cooldownStartSite"
+observed = "10 calls, all at 63.0 to 65 s while the world was built; none when the joined player used mode 112 (the server does not store a cooldown for a remote player)"
+
+[[confirms]]
+entry = "cube::World::hitListSite"
+observed = "0 calls: no monster hit anything in the window"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 420
+mods = ["mods-examples/fourth_ability_demo", "mods-dev/mp_fill"]
+input = [
+    "shot 01-joined",
+    "until twins: press",
+    "console ability rank fourth_ability_demo:burst 3",
+    "wait 3",
+    "click 820 384",
+    "wait 2",
+    "hold 4 1.5",
+    "wait 3",
+    "hold mouse1 1.5",
+    "wait 3",
+    "shot 02-after",
+]
+script = """
+log server-ability-twins-0720: task 2.2 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x428230
+trace add @0x537BC4
+trace add @0x539319
+trace add @0x53936F
+trace add @0x540588
+trace add @0x53E2C7
+trace add @0x4D1699
+trace add @0x4257BC
+trace start
+wait 140 until calls @0x4257BC >= 1
+log twins: press
+wait 90 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-ability-twins-0720: done
+"""

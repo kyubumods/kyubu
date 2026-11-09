@@ -1,0 +1,269 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with the mod level_rework installed beside kyubu_probe. Task 5.3 of add-level-rework (M4): the mod writes the vanilla level
+# floor(old(N)) into EAX at ability_power_rank_site (0x43F643), so the rank of a monster's ability is floor(old(N))/2 + power_base + 1.
+# The tracer cannot trace the hooked site, so each part reads the rank at 0x43F64B, where the mod's and the player's ranks meet.
+# Same parts as rank-and-equip-gate (part R), run on the mod's scale.
+id = "ability-rank-replacement"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 15 s there",
+    "Eight parts on the creature with the top id (a plant), made hostile and put in mode 79 for 6 s, as in rank-and-equip-gate: levels 51, 51, 21, 100, 1 and 30000 with power_base 0, 3, 3, 4, 0, 0; hostile_type 0; a skill level of 5 in slot 7. The rank is read at 0x43F64B",
+]
+observations = [
+    "Wine replay 1 passed: 4 of 4 expectations held; no fault, and the probe's hooks were all removed at the end. The mod's log shows `level_rework: monster ability ranks computed from the vanilla level floor(old(N))`",
+    "the rank at 0x43F64B (32 of the last 32 calls each): level 51 power_base 0: 11 (vanilla level 21: 10 + 0 + 1, the spec scenario); level 51 power_base 3: 14; level 21 power_base 3: 7 (rank-and-equip-gate saw 14 without the mod); level 100 power_base 4: 995 (it saw 55); level 1 power_base 0: 1; level 30000 power_base 0: 991 (clamped to 100); hostile_type 0: 0; skill level 5: 5",
+    "ability_power_rank_site is the mod's hook, so the tracer could not count it: the replacement shows in the rank. The second copy of the rule, creature_attack_speed_rank_site (0x447EB5), is hooked the same way and was not reached: the bytes were read (the same 8 displaced instructions), no attack-speed call was made",
+    "the rank is an integer to ability_power, whose result is rank/(rank+10); a rank of 995 gives 0.99. The float result was not read",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "ability_power"
+observed = "entered with the stack arguments 79 and -1 from World::update, ECX = the creature in mode 79"
+
+[[confirms]]
+entry = "ability_power_rank_join"
+observed = "EAX = the rank on every path: with the mod, floor(old(N))/2 + power_base + 1 for a hostile creature with skill level 0, 0 for hostile_type 0, 5 for a skill level of 5"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1500
+mods = ["mods-gameplay/level_rework"]
+input = []
+script = """
+log ability rank replacement of level_rework (task 5.3 of add-level-rework, M4)
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+# the top-id creature (a plant) is made hostile and put in mode 79 (sneak: World::update calls ability_power(79, -1) for it at 0x617E86);
+# the mod's hook on 0x43F643 writes floor(old(N)) into EAX, so the rank reaches 0x43F64B as floor(old(N))/2 + power_base + 1
+trace args 2
+trace add ability_power
+trace add @0x43F64B
+# R1 level 51 power_base 0: vanilla level 21 gives 10 + 0 + 1 (the spec's scenario)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 51
+inspect set data.power_base 0
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R1 level 51 power_base 0: vanilla level 21 gives 10 + 0 + 1 (the spec's scenario)
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 11
+# R2 level 51 power_base 3: 10 + 3 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 51
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R2 level 51 power_base 3: 10 + 3 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 14
+# R3 level 21 power_base 3: vanilla level 6 gives 3 + 3 + 1 (vanilla rule alone gave 14)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 21
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R3 level 21 power_base 3: vanilla level 6 gives 3 + 3 + 1 (vanilla rule alone gave 14)
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 7
+# R4 level 100 power_base 4: vanilla level 1981 gives 990 + 4 + 1 (vanilla rule alone gave 55)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 100
+inspect set data.power_base 4
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R4 level 100 power_base 4: vanilla level 1981 gives 990 + 4 + 1 (vanilla rule alone gave 55)
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 995
+# R5 level 1 power_base 0: 0 + 0 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R5 level 1 power_base 0: 0 + 0 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 1
+# R6 level 30000 (a vanilla-world creature) power_base 0: clamped to 100, 990 + 0 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 30000
+inspect set data.power_base 0
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R6 level 30000 (a vanilla-world creature) power_base 0: clamped to 100, 990 + 0 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 991
+# R7 hostile_type 0 (the rule is off): rank 0
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 0
+inspect set data.show_patch_time -1
+inspect set data.level 51
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R7 hostile_type 0 (the rule is off): rank 0
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B
+expect ability_power_rank_join reg @0x43F64B eax == 0
+# R8 skills[7] = 5 (ability 79 reads track 7): rank 5, the hook is not reached
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 51
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 5
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R8 skills[7] = 5 (ability 79 reads track 7): rank 5, the hook is not reached
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_join reg @0x43F64B eax == 5
+wait 3
+expect - hooks == 0
+"""

@@ -1,0 +1,64 @@
+# Task 10.2 of add-skills-unleashed-multiplayer (design D11): sim.world_step and kyubu.game.hit on Cube.exe. Replay it with
+# kyubu-mapping/tmp/fast_replay.sh world-step-hit-client <out> (KEEP=1, the save of character Tester and world testworld).
+# The dev mod mods-dev/world_step_proto, on the server side of the single-player game, counts the World steps, then three times puts
+# a monster in front of the player and hits it with kyubu.game.hit, a stun of 300, 400 and 500 ms, and reads the stun timer back.
+id = "world-step-hit-client"
+build = "cube-0x51EA955E"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "world_step_proto counts sim.world_step and checks dt and the two pointers of each",
+    "from the 500th step, three hits 150 steps apart on one monster put 3 blocks in front of the player: damage 1, stun 300, 400, 500 ms, knock up 4",
+    "after the first hit, a kyubu.game.hit from sim.tick (outside a step)",
+]
+observations = [
+    "native run 1, 2026-11-08 (evidence/world-step-2026-11-08/world-step-hit-client-run1), passed in a fast replay: the server side of single-player got sim.world_step from its 10th script line on, 1000 steps logged with dt 10 ms each (2499 ms per 250 steps) and no step with a zero output, zero zone set or dt out of 1 to 1000",
+    "three kyubu.game.hit calls 150 steps apart on monster 550301081857, put 3 blocks in front of the player: each landed true, and the stun timer read right after was 300, 400 and 500, the asked values",
+    "the monster's hp stayed 413.42: damage 1 is less than its armor, which hitCreature takes off, so the hit carried no damage (as a weak attacker's own hits)",
+    "the call from sim.tick, after the step, was refused: nil, not inside a World step",
+    "the loader logged world step: installed at cube::World::worldStepSite and cube::World::hitListSite; no warning from the hooks",
+    "not covered: the damage number, the knockback from the direction, a dodge or a block, more than one creature",
+]
+
+[[confirms]]
+entry = "cube::World::worldStepSite"
+observed = "sim.world_step came once per World step with the World, a non-zero output and zone set and dt 10 ms (1000 steps)"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "three calls through it landed true on a monster in front of the player"
+
+[[confirms]]
+entry = "cube::World::hitListSite"
+observed = "the stun timer after each hit equalled the asked 300, 400, 500 ms, where hitCreature itself passes no stun"
+
+[[confirms]]
+entry = "cube::Hit.stun_duration"
+observed = "the stun timer after each hit equalled the asked 300, 400, 500 ms, where hitCreature itself passes no stun"
+
+[[confirms]]
+entry = "cube::Hit.hit_dir"
+observed = "written with the stun at the list site; its effect, the knockback, was not measured"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/world_step_proto"]
+input = [
+    "until world_step_proto: server: done",
+]
+log_expect = { latest = [
+    "world_step_proto: server: sim.world_step ",
+    "world_step_proto: server: steps 500, dt total ",
+    "landed true (nil), stun 300 asked 300",
+    "world_step_proto: server: outside a step: nil, ",
+    "not inside a World step",
+    "world_step_proto: server: done: 3 of 3 hits with the exact stun",
+] }
+script = """
+log world-step-hit-client: task 10.2 of add-skills-unleashed-multiplayer
+wait world
+expect - hooks == 0
+"""

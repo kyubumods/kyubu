@@ -1,0 +1,34 @@
+# Task 4.4 of add-ability-animation (the fallbacks of the pose provider). The mods anim_borrow_proto (four mod abilities, three with a bound borrow clip) and anim_clips_proto (clips, one of them bad) are loaded; the character screens must look as they do without them.
+# Recorded with kyubu_probe, unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay, setup menu, gamepilot clicks.
+id = "anim-fallback-preview"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Start in the menu; click Start game, click CREATE in the first character slot, type the name Tester: screenshot of the creation screen's preview (the character is drawn in mode 0)",
+]
+observations = [
+    "Wine replay 2 passed (run 1 only differed in a probe trace on draw_creature, which the loader's own hook blocks: removed). Evidence: evidence/ability-animation-2026-10-07/anim-fallback-preview/with/ (01-creation.png, latest.log, report.md). The provider is installed ('animation: the pose provider is installed'), the five clips of the two mods load, and the bad file anim_clips_proto broken.anim.toml gives one ERROR line with the file, the line and the field path ('broken.anim.toml:4: track[0].part: unknown part \"elbow\"; the parts are root, body, head, hand_r, hand_l, tail'); the other clips load. The log has no other WARN or ERROR line from the provider",
+    "01-creation.png: the character-creation screen draws the human male warrior in the game's idle pose with the club on the shoulder. anim-fallback-preview-off (the same input, no clip mod) draws the same figure and pose: the club's pixels are 40,995 against 40,949 and 40,948 of them overlap (the screens differ only in the random background world). The creation screen's preview draws in mode 0 and the record is not at Creature + 0x1498 or the creature is not the local player, so plan_draw is never asked: nothing to compare below that"
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a character-creation preview drawn with the pose provider installed and clip mods loaded is the same picture as without them (the club pixels agree to 1 in 1,000)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 260
+mods = ["mods-dev/anim_borrow_proto", "mods-dev/anim_clips_proto"]
+input = [
+    "wait 8", "click 511 457", "wait 8", "click 691 439", "wait 8", "click 512 737", "wait 2", "type Tester", "wait 3", "key Return", "wait 4",
+    "shot 01-creation",
+    "wait 3",
+]
+script = """
+log anim-fallback-preview: task 4.4 of add-ability-animation
+wait 45
+expect - hooks == 0
+log anim-fallback-preview: done
+"""

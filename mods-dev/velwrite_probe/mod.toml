@@ -1,0 +1,10 @@
+id = "velwrite_probe"
+name = "Velocity write probe"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-walk-speed): hooks every float write to Creature + 0x34 (the walk velocity) that is not through the stack and logs, per site and per mode, how often it writes the player's velocity and what. Names the instruction that slows the walk while a mod ability's mode (112) runs."
+
+[scripts]
+client = "scripts/client.lua"

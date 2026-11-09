@@ -1,0 +1,6 @@
+id = "cfg_bad_default"
+name = "Config: bad default"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Fixture: a declaration whose default has the wrong type; the mod must not load."

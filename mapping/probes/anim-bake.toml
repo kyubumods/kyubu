@@ -1,0 +1,62 @@
+# A loader and mod check, not a game observation: the capture mod's console commands `anim rig` and `anim bake <pose id> [duration_ms]`
+# (add-ability-animation task 7.4). `anim rig` writes one frame of the local player at rest (the vectors, the 17 part matrices, the model
+# table index of each slot and the appearance ids). `anim bake` plays a vanilla pose on the preview clock through a generated `[borrow]` clip,
+# keeps every draw of the player, thins them to 30 keys a second, plays them back as a clip of `set` tracks, and compares the two runs.
+# Recorded with kyubu_probe and mods-dev/anim_capture, unattended under Wine 9.0 (WSL, Xvfb).
+id = "anim-bake"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; 20 s after the world loaded: screenshot 00-idle, then the wheel twelve notches down (the camera comes out of the first person view), screenshot 00b-zoomed-out",
+    "anim rig, then 8 s; anim bake 18 1500, then 20 s; anim bake 3 (the default 2000 ms), then 25 s; anim bake 61 1500, then 20 s",
+    "the wrong input: pose 99, a word for a pose id, a duration that is too short, and an argument for anim rig; then screenshot 01-after",
+]
+observations = [
+    "Wine replay 2 passed, 1 of 1 expectations held (run 1 passed too: its bake still named the tail's track, which the loader skipped with one WARN; run 2 leaves the tail out for a creature with no tail model). Evidence: evidence/anim-bake-2026-10-11/run1 and run2 (latest.log, report.md, the three screenshots, capture/ with a folder for each command)",
+    "`anim rig` wrote one frame in 2 s: the vectors are all 0 at rest, 17 matrices, `models` head 1246, hair 1252, body 1, hands 430, feet 432, weapon_b 1995 (the same table indexes as probe rig-read) and `appearance` equal to them with -1 for tail, shoulder2 and wings",
+    "`anim bake 18 1500`, `anim bake 3` and `anim bake 61 1500` each wrote pose.json, replay.json, bake.anim.toml and a sheet.png with the game on the top row and the baked vectors played back on the bottom row; 11, 12 and 7 draws (about 5 a second under Wine and Xvfb), 7, 8 and 5 keys per track; the log line gives the largest difference between the runs: 0.0059 voxels and 0.18 degrees, 0.0037 and 0.07, 0.0006 and 0.014, all inside the gate's 0.25 and 1",
+    "the draw record's +4 and +8 read 0 at the join site from the second draw of a borrowed pose on, while the vectors still ease to the pose's values (pose 18: hand B euler 0, 20, 30; pose 3: 0, 90, 0); the frames name the pose and the preview time the mod fed instead. The reason is not known",
+    "a pose id of 99, a word for a pose id, a duration of 10 ms and an argument for `anim rig` each answered with one line and wrote nothing",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "with the preview clock held by the mod, every draw of the local player gave a draw record with the creature at +0, read after the draw returned"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 480
+mods = ["mods-dev/anim_capture"]
+input = [
+    "until anim-bake: ready",
+    "shot 00-idle",
+    "wheel down 12",
+    "wait 3",
+    "shot 00b-zoomed-out",
+    "console anim rig",
+    "wait 8",
+    "console anim bake 18 1500",
+    "wait 20",
+    "console anim bake 3",
+    "wait 25",
+    "console anim bake 61 1500",
+    "wait 20",
+    "console anim bake 99",
+    "console anim bake walk",
+    "console anim bake 5 10",
+    "console anim rig front",
+    "wait 3",
+    "shot 01-after",
+    "until anim-bake: done",
+]
+script = """
+log anim-bake: task 7.4 of add-ability-animation
+wait world
+wait 20
+log anim-bake: ready
+wait 105
+log anim-bake: done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

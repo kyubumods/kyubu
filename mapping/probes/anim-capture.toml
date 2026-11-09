@@ -1,0 +1,56 @@
+# A loader and mod check, not a game observation: the capture mod's console command `anim capture <clip> [times_ms] [views]`
+# (add-ability-animation tasks 7.3 and 7.7). The command poses the local player through animation_preview, turns it to the two fixed views,
+# reads the back buffer in a `render.overlay` handler (before the overlay draws), the join-site vectors and the part matrices of the player's
+# draw, and writes sheet.png and pose.json under kyubu/capture/<clip>-<stamp>/. Recorded with kyubu_probe, mods-dev/anim_capture and
+# mods-dev/anim_preview_proto (two clips and no script), unattended under Wine 9.0 (WSL, Xvfb).
+id = "anim-capture"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; 20 s after the world loaded: screenshot 00-idle, then the wheel twelve notches down (the camera comes out of the first person view), screenshot 00b-zoomed-out",
+    "anim capture anim_preview_proto:arm 0,500,1000 (both views), then anim capture anim_preview_proto:hidden 400 front, then 20 s each",
+    "the wrong input: an unknown clip, a time that is not a number, a view that does not exist; then screenshot 01-after",
+]
+observations = [
+    "Wine replay 2 passed, 1 of 1 expectations held (run 1 passed too, but the camera was in the first person view and the character was not in the picture: the record now zooms out with the wheel first). Evidence: evidence/anim-capture-2026-10-11/ (00-idle.png, 00b-zoomed-out.png, 01-after.png, arm-sheet.png and arm-pose.json, hidden-sheet.png and hidden-pose.json, latest.log)",
+    "`anim capture anim_preview_proto:arm 0,500,1000` wrote a folder with 6 frames in 11 s (three times, two views, 1.5 s held for each): sheet.png is a 530 x 878 picture with a header and a labelled cell for each time and view; the character stands in the middle of every cell and the console and the notices are not in it. The front cells show the face and the left cells the left profile with the club on the back",
+    "pose.json of that capture has 6 frames: the hand B euler x reads 0, 80 and 160 at 0, 500 and 1000 ms (the clip's own keys, read at the join site after the tracks were written), the same in both views; matrix 10 (hand B) moves with the time (y of its translation -0.30 at 500 ms, -0.48 at 1000 ms) and matrices 9 and 10 turn with the view's yaw; pose id 0 and mode time 0 (a tracks-only clip draws pose 0 with the record's own time)",
+    "`anim capture anim_preview_proto:hidden 400 front` wrote 1 frame in 2 s; an unknown clip, a time that is not a number and a view that does not exist each answered with one line and wrote nothing; the player's yaw and the preview were given back (01-after.png shows the idle pose)",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "with the preview held through animation_preview and the player's body_yaw written, the back buffer shows the player in the clip's pose from the front and from the left, and the draw record's vectors and matrices were read after the draw"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/anim_capture", "mods-dev/anim_preview_proto"]
+input = [
+    "until anim-capture: ready",
+    "shot 00-idle",
+    "wheel down 12",
+    "wait 3",
+    "shot 00b-zoomed-out",
+    "console anim capture anim_preview_proto:arm 0,500,1000",
+    "wait 20",
+    "console anim capture anim_preview_proto:hidden 400 front",
+    "wait 8",
+    "console anim capture anim_preview_proto:nope 0",
+    "console anim capture anim_preview_proto:arm abc",
+    "console anim capture anim_preview_proto:arm 0 top",
+    "wait 3",
+    "shot 01-after",
+    "until anim-capture: done",
+]
+script = """
+log anim-capture: task 7.3 of add-ability-animation
+wait world
+wait 20
+log anim-capture: ready
+wait 70
+log anim-capture: done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

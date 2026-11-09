@@ -1,0 +1,210 @@
+# Recorded with a diagnostic build of the title_plus mod on the Windows laptop (Windows 10, real Cube.exe) at the
+# start menu, then written as expectations. The object types are read at run time from MSVC RTTI (an object's
+# vtable pointer is at +0, the vtable's slot -1 points at its complete object locator, whose +0xC points at the
+# type descriptor, whose name starts at +8, so +0xC holds the first four characters after ".?AV").
+id = "title-scene"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-10"
+steps = [
+    "Read plasma::D3D9Drawing::draw (0x6898B0), its vtable's slots 0 and 1 and render_init (0x4C85C0) with kmap decompile",
+    "Started Cube.exe with a mod that logged the controller's node pointers and walked the scene tree from the logo node",
+    "Followed the node pointers at cube::GameController +0x800708 to +0x8009F8 up their parent links to the root node and listed its tree",
+    "Replayed the same reads as expectations at the start menu, with the draw call traced for its this",
+]
+observations = [
+    "the controller keeps 80 named node pointers between +0x800748 and +0x8009F8; the ones recorded here are the unique names",
+    "every node's parent chain ends at one node named root, which plasma::D3D9Engine holds at +0xB4 beside the nodes sources and fonts",
+    "root has 18 children: 7 unnamed groups (the HUD with 64 children, five menu panels with buttons and edit fields, the start scene), then textFX, wait, nameError, a group with one child, four buttons and three small groups",
+    "the start scene group holds cubeworld, picroma, an empty node and a blackwidget panel with nine left/right button pairs and three button2 buttons (probably character creation)",
+    "the logo draws in the order 0 to 30, 32 to 44, 31, 45 to 48 (depth-first numbering): node 31's children go to a second render target of the window's size first",
+    "render_init: Direct3DCreate9, CreateDevice (windowed, 4 samples, D24S8, immediate presentation), then plasma::D3D9Engine (0x2D0 bytes) and cube::CubeShader",
+    "the engine's width and height are the window's client size, not the options.cfg values",
+]
+
+[[confirms]]
+entry = "plasma::Node"
+observed = "the objects at the controller's node pointers have the RTTI type plasma::Node (logo, root, the logo's parent)"
+
+[[confirms]]
+entry = "plasma::Node.name"
+observed = "root (inline, 4 characters) and cubeworld (behind the pointer, 9 characters) read back as written, size at +0x1C"
+
+[[confirms]]
+entry = "plasma::Node.parent"
+observed = "the logo's parent is a plasma::Node whose own parent is the node named root"
+
+[[confirms]]
+entry = "plasma::Node.children"
+observed = "the logo node holds 7 children at +0x30, as the .plx has"
+
+[[confirms]]
+entry = "plasma::Node.display"
+observed = "the object at +0x3C of the logo has the RTTI type plasma::Display"
+
+[[confirms]]
+entry = "plasma::Display"
+observed = "the type of the logo's +0x3C object"
+
+[[confirms]]
+entry = "plasma::Display.colour_index"
+observed = "0 for the logo node"
+
+[[confirms]]
+entry = "plasma::Display.colour_table"
+observed = "a pointer for the logo node"
+
+[[confirms]]
+entry = "plasma::D3D9Drawing"
+observed = "the this of the traced draw calls has the RTTI type plasma::D3D9Drawing"
+
+[[confirms]]
+entry = "plasma::D3D9Drawing.engine"
+observed = "the pointer at +0x124 of the traced draw calls' this is a plasma::D3D9Engine"
+
+[[confirms]]
+entry = "plasma::D3D9Drawing::draw"
+observed = "called over 50 times in 3 s on the title screen, always with a plasma::D3D9Drawing as this"
+
+[[confirms]]
+entry = "plasma::D3D9Engine"
+observed = "the object at cube::GameController.engine has the RTTI type plasma::D3D9Engine"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.root"
+observed = "the pointer at +0xB4 is a plasma::Node named root"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.width"
+observed = "a positive integer (the client width)"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.height"
+observed = "a positive integer (the client height)"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.pixel_shader"
+observed = "a pointer on the title screen"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.device"
+observed = "a pointer"
+
+[[confirms]]
+entry = "cube::GameController.engine"
+observed = "the pointer at +0x800708 is a plasma::D3D9Engine"
+
+[[confirms]]
+entry = "cube::GameController.logo"
+observed = "the pointer at +0x800870 is the plasma::Node named cubeworld"
+
+[[confirms]]
+entry = "cube::GameController.text_fx"
+observed = "a plasma::Node named textFX"
+
+[[confirms]]
+entry = "cube::GameController.minimap"
+observed = "a plasma::Node named minimap"
+
+[[confirms]]
+entry = "cube::GameController.info"
+observed = "a plasma::Node named info"
+
+[[confirms]]
+entry = "cube::GameController.picroma"
+observed = "a plasma::Node named picroma"
+
+[[confirms]]
+entry = "cube::GameController.wait"
+observed = "a plasma::Node named wait"
+
+[[confirms]]
+entry = "cube::GameController.landscape"
+observed = "a plasma::Node named landscape"
+
+[[confirms]]
+entry = "cube::GameController.crosshair"
+observed = "a plasma::Node named crosshair"
+
+[[confirms]]
+entry = "cube::GameController.name_error"
+observed = "a plasma::Node named nameError"
+
+[[confirms]]
+entry = "cube::GameController.connection_error"
+observed = "a plasma::Node named connectionError"
+
+[[confirms]]
+entry = "d3d9"
+observed = "non-null at the title screen"
+
+[[confirms]]
+entry = "d3d9_device"
+observed = "non-null at the title screen"
+
+[[confirms]]
+entry = "game_window"
+observed = "non-null at the title screen"
+
+[[confirms]]
+entry = "cube::cube_shader"
+observed = "the object has the RTTI type cube::CubeShader"
+
+[[confirms]]
+entry = "plasma::d3d9_engine"
+observed = "the object has the RTTI type plasma::D3D9Engine"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+log title scene: the engine, the scene tree and the nodes the controller keeps
+wait 6
+expect d3d9 value u32 != 0 @0x7691b8
+expect d3d9_device value u32 != 0 @0x7691b4
+expect game_window value u32 != 0 @0x7691c0
+expect plasma::d3d9_engine value u32 != 0 @0x7691CC
+expect plasma::d3d9_engine value u32 == 960770884 [[[[@0x7691CC]] - 4] + 0xC] + 0xc
+expect plasma::d3d9_engine value u32 == 1768386117 [[[[@0x7691CC]] - 4] + 0xC] + 0x10
+expect cube::cube_shader value u32 == 1700951363 [[[[@0x7691BC]] - 4] + 0xC] + 0xc
+expect cube::cube_shader value u32 == 1684105299 [[[[@0x7691BC]] - 4] + 0xC] + 0x10
+expect cube::GameController.engine value u32 == 960770884 [[[[[@0x7691C8] + 0x800708]] - 4] + 0xC] + 0xc
+expect plasma::D3D9Engine value u32 == 960770884 [[[[[@0x7691C8] + 0x800708]] - 4] + 0xC] + 0xc
+expect plasma::D3D9Engine.width value u32 > 0 [[@0x7691C8] + 0x800708] + 0x10c
+expect plasma::D3D9Engine.height value u32 > 0 [[@0x7691C8] + 0x800708] + 0x110
+expect plasma::D3D9Engine.device value u32 != 0 [[@0x7691C8] + 0x800708] + 0x2c0
+expect plasma::D3D9Engine.pixel_shader value u32 != 0 [[@0x7691C8] + 0x800708] + 0x198
+expect plasma::D3D9Engine.root value u32 == 1701080910 [[[[[[@0x7691C8] + 0x800708] + 0xb4]] - 4] + 0xC] + 0xc
+expect plasma::Node.name value u32 == 7274610 [[[@0x7691C8] + 0x800708] + 0xb4] + 0xc
+expect plasma::Node.name value u32 == 4 [[[@0x7691C8] + 0x800708] + 0xb4] + 0x1c
+expect cube::GameController.logo value u32 == 1701080910 [[[[[@0x7691C8] + 0x800870]] - 4] + 0xC] + 0xc
+expect plasma::Node value u32 == 1701080910 [[[[[@0x7691C8] + 0x800870]] - 4] + 0xC] + 0xc
+expect plasma::Node.name value u32 == 7667811 [[[@0x7691C8] + 0x800870] + 0xc]
+expect plasma::Node.name value u32 == 9 [[@0x7691C8] + 0x800870] + 0x1c
+expect plasma::Node.children value u32 == 7 [[@0x7691C8] + 0x800870] + 0x30
+expect plasma::Node.parent value u32 == 1701080910 [[[[[[@0x7691C8] + 0x800870] + 0x28]] - 4] + 0xC] + 0xc
+expect plasma::Node.parent value u32 == 7274610 [[[[@0x7691C8] + 0x800870] + 0x28] + 0x28] + 0xc
+expect plasma::Node.display value u32 == 1886611780 [[[[[[@0x7691C8] + 0x800870] + 0x3c]] - 4] + 0xC] + 0xc
+expect plasma::Display value u32 == 1886611780 [[[[[[@0x7691C8] + 0x800870] + 0x3c]] - 4] + 0xC] + 0xc
+expect plasma::Display.colour_table value u32 != 0 [[[@0x7691C8] + 0x800870] + 0x3c] + 0x144
+expect plasma::Display.colour_index value u32 == 0 [[[@0x7691C8] + 0x800870] + 0x3c] + 0x118
+expect cube::GameController.text_fx value u32 == 6619252 [[@0x7691C8] + 0x800748] + 0xc
+expect cube::GameController.minimap value u32 == 6881389 [[@0x7691C8] + 0x80074c] + 0xc
+expect cube::GameController.info value u32 == 7209065 [[@0x7691C8] + 0x800858] + 0xc
+expect cube::GameController.picroma value u32 == 6881392 [[@0x7691C8] + 0x800874] + 0xc
+expect cube::GameController.wait value u32 == 6357111 [[@0x7691C8] + 0x800890] + 0xc
+expect cube::GameController.landscape value u32 == 6357100 [[[@0x7691C8] + 0x800850] + 0xc]
+expect cube::GameController.crosshair value u32 == 7471203 [[[@0x7691C8] + 0x8008a4] + 0xc]
+expect cube::GameController.name_error value u32 == 6357102 [[[@0x7691C8] + 0x8009ec] + 0xc]
+expect cube::GameController.connection_error value u32 == 7274595 [[[@0x7691C8] + 0x8009f0] + 0xc]
+trace add plasma::D3D9Drawing::draw
+trace start
+wait 3
+trace stop
+expect plasma::D3D9Drawing::draw calls plasma::D3D9Drawing::draw > 50
+expect plasma::D3D9Drawing.engine value u32 != 0 [ecx(plasma::D3D9Drawing::draw) + 0x124]
+expect plasma::D3D9Drawing.engine value u32 == 960770884 [[[[ecx(plasma::D3D9Drawing::draw) + 0x124]] - 4] + 0xC] + 0xc
+expect plasma::D3D9Drawing value u32 == 960770884 [[[ecx(plasma::D3D9Drawing::draw)] - 4] + 0xC] + 0xc
+expect - hooks == 0
+"""

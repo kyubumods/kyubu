@@ -1,0 +1,10 @@
+id = "start_menu_row"
+name = "Start menu row"
+version = "0.3.0"
+kyubu = "^1.2"
+manage_mods = true
+sides = ["client"]
+description = "Developer mod, the first version of ModManager's title row: puts a Mods row between Options and Exit on the title screen (Exit moves down one row), with the game's own text calls; quits on a click on Exit. Task 2.5: a click on Mods opens an empty page built from the game's own nodes (a panel, Back and Test buttons) in place of the title; Back returns. Task 3.6: the console command start_menu_row:restart calls game_restart."
+
+[native]
+common = "bin/start_menu_row.dll"

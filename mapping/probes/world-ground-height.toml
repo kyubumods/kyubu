@@ -1,0 +1,44 @@
+# Replay it with KEEP=1 in a sandbox that holds the save of character Tester and world testworld (kyubu-mapping/tmp/fast_replay.sh world-ground-height <out>).
+# Written 2026-11-06 for task 2.5 of add-dragon-boss (M5). Question: does cube::World::getBlock (0x42F860) give the terrain, so that a scan down from above finds the ground top?
+# The dev mod mods-dev/ground_height_proto scans 9 points on a line in +y (2 blocks apart, point 0 under the player), logs the tops and puts a red particle marker on each.
+id = "world-ground-height"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-06"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "ground_height_proto calls getBlock for 9 points in front of the player, scans down to the first solid block and logs the tops",
+    "red markers are placed at the tops; screenshots show them on the terrain",
+]
+observations = [
+    "run 4 (evidence/dragon-ground-height-2026-11-06/run4): with this = [game_controller] + 0x2E4 the player's column reads air (kind 0) down to z-1 and kind 4, 6, 1 below; the scan down from z+12 gives top 214 under the player = feet 214.0 (player z 215.08, size.z 2.16), 214 for the first six points, 215 for the last three (a visible one-block step 12 blocks ahead)",
+    "the red markers in 01-markers.png sit on the terrain top, one on the step edge",
+    "runs 1-3: this = controller + 0x2DC or an unrelocated controller address gave a fault (raw address) and then solid kind 1 at every z, the static default block",
+    "not covered: water, a zone edge, the static blocks' kinds",
+]
+
+[[confirms]]
+entry = "cube::World::getBlock"
+observed = "called with x, y, z in world units (65536 to a block), flag 0 and this = controller + 0x2E4: air above the ground, solid kinds below, a scan down gives the ground top matching the player feet"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/ground_height_proto"]
+input = [
+    "until ghp: A", "wait 3", "shot 01-markers", "until ghp: B",
+]
+script = """
+log world-ground-height: ground_height_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log ghp: A
+wait 8
+log ghp: B
+expect - hooks == 0
+"""

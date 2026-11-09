@@ -1,0 +1,14 @@
+id = "mm_fixture_user"
+name = "Fixture User"
+version = "0.3.0-beta"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Kyubu tests"]
+description = "Needs the base fixture, and could use one that is not installed."
+
+[dependencies]
+mm_fixture_base = "^1.0"
+mm_fixture_absent = { version = "*", optional = true }
+
+[scripts]
+common = "scripts/common.lua"

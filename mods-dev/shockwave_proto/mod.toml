@@ -1,0 +1,13 @@
+id = "shockwave_proto"
+name = "Shockwave prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe shockwave-ring): once the player is in a world it makes a fixed set of shockwaves through emtweaks:shockwave, at known places round the player, and logs a marker before each stage so that a replay can take a picture of it. Does nothing else."
+
+[dependencies]
+emtweaks = "^0.1"
+
+[scripts]
+client = "scripts/client.lua"

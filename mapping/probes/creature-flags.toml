@@ -1,0 +1,78 @@
+# Replay it with KEEP=1 in a sandbox that holds the save of character Tester and world testworld (kyubu-mapping/tmp/fast_replay.sh creature-flags <out>).
+# Written 2026-11-06 for task 3.2 of add-dragon-boss. Question: does creature_set_flags (KY_CREATURE_UNSTOPPABLE | KY_CREATURE_INVULNERABLE)
+# make the loader's hooks neutralise what applyHit does to a flagged creature (push, velocity reset, slow, stun, hp), while an unflagged control is hit the same way?
+# The dev mod mods-dev/creature_flags_proto flags the first of two pink slimes through the server side's handle, forces Hit.stun = Hit.slow = 3000 and a push
+# (0, 4, 6) at hitListSite, and parks each slime in front of the player in turn.
+id = "creature-flags"
+build = "cube-0x51EA955E"
+kyubu = "1.3"
+date = "2026-11-06"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "`spawner hostile 1 PINK_SLIME` puts two pink slimes near the player",
+    "creature_flags_proto flags slime 0 with creature_set_flags(3), parks it 1.5 blocks in front of the player; the script holds mouse1 so the player hits it; the mod logs pos, velocity, extra_vel, stun, slow and hp for 8 frames after the first hit",
+    "then slime 1 (control, no flags) is parked in front and hit the same way",
+]
+observations = [
+    "run 1 (evidence/dragon-creature-flags-2026-11-06/run1): creature_set_flags(id -1, 3) on the first of two hostile pink slimes returned 0 (KY_OK) from the server-side handle; the loader logged 'installed at 7 sites'",
+    "flagged slime, hit with the mod forcing stun 3000, slow 3000 and a push (0, 4, 6): extra_vel stayed 0, the +0x130 slow timer stayed 0, stun_time kept its old negative value (counting down), the velocity was not zeroed, hp stayed 100.0, and the Hit's damage read 0.00 at the list site (the real hit did 6.38 on the control)",
+    "control slime (no flags), same forced hit: extra_vel (0, 4, 6), stun and slow 3000, hp 100 -> 93.6, the slime rose",
+    "not checked: that no damage number appears on screen for the flagged slime (the log shows the Hit's damage 0, not the screen)",
+]
+
+[[confirms]]
+entry = "cube::World::hitPushSite"
+observed = "reached for the flagged slime; extra_vel stayed 0 (control: (0, 4, 6))"
+
+[[confirms]]
+entry = "cube::World::hitVelocityResetSite"
+observed = "reached for the flagged slime; the loader saved its velocity"
+
+[[confirms]]
+entry = "cube::World::hitVelocityResetEndSite"
+observed = "reached after the reset; the loader wrote the saved velocity back (the flagged slime kept falling, the control was zeroed)"
+
+[[confirms]]
+entry = "cube::World::hitSlowSite"
+observed = "ECX set to the target own timer: the flagged slime kept 0, the control got 3000"
+
+[[confirms]]
+entry = "cube::World::hitStunSite"
+observed = "ECX set to the target own stun_time: the flagged slime kept its negative value, the control got 3000"
+
+[[confirms]]
+entry = "cube::World::hitListSite"
+observed = "the loader cut the Hit damage to 0 for the invulnerable slime (the mod read 0.00 after it); the control read 6.38"
+
+[[confirms]]
+entry = "cube::World::hitDamageSite"
+observed = "hp of the invulnerable slime stayed 100.0 after the hit; the control fell to 93.6"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/creature_flags_proto", "mods-examples/entity_spawner"]
+input = [
+    "until cfl: A", "console entity_spawner:spawner hostile 1 PINK_SLIME",
+    "until cfl: B", "hold mouse1 2.0",
+    "until cfl: C", "hold mouse1 2.0",
+    "until cfl: D",
+]
+script = """
+log creature-flags: creature_flags_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log cfl: A
+wait 5
+log cfl: B
+wait 6
+log cfl: C
+wait 6
+log cfl: D
+expect - hooks == 0
+"""

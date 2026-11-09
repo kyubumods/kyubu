@@ -1,0 +1,55 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (MinGW build), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap
+# probe replay, setup menu with clicks as input steps, no mods but the probe. The sandbox's Save/ held the prepared characters.db
+# of record character-vanilla-refusal (slot 0 the level-34 `testi`, slot 1 `Tester`) and the world "testopia", put there by hand
+# (RECIPES.md, "To test with a save"). Task 2.8 of add-ability-api (M8): which character slot is played, seen by save_character's
+# slot argument and by the name in the player. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "character-slot-played-1"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine sandbox with the prepared Save/ (two characters, the world testopia); scripts/ run73.sh of the character-vanilla-refusal evidence builds it",
+    "Replay with setup menu and input steps: Start, SELECT on the second card (slot 1, Tester) and on the world, then the 60 s autosave",
+    "The script traced load_character and save_character with their first two arguments from the start menu, and read the selected index and the player's name",
+]
+observations = [
+    "After SELECT on the second card the selected index (GameController+0x800A04) read 1 and the player's name read Tester",
+    "load_character ran once (21 s) and save_character three times (the 60 s autosave), each with first stack argument 1",
+]
+
+[[confirms]]
+entry = "save_character"
+observed = "slot argument"
+
+[[confirms]]
+entry = "character_select_click"
+observed = "the controller's selected index (+0x800A04) is 1 after SELECT on the second card"
+
+[[confirms]]
+entry = "cube::CreatureData.name"
+observed = "the player's name reads Tester (slot 1)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 260
+input = [
+    "click 511 457", "wait 10", "move 512 400", "wait 3", "click 691 435", "wait 8", "shot 01-marked",
+    "move 512 230", "wait 3", "click 691 322", "wait 20", "shot 02-world",
+]
+script = """
+log character-slot-played-1 (task 2.8 of add-ability-api, M8): the slot played, seen by save_character
+trace args 3
+trace add load_character
+trace add save_character
+trace start
+wait 170
+trace stop
+trace report
+expect save_character calls save_character >= 1
+expect save_character arg save_character 1 == 1
+expect character_select_click value u32 == 1 [@0x7691C8] + 0x800A04
+expect cube::CreatureData.name value u32 == 1953719636 [[@0x7691C8] + 0x8006C8] + 0x1168
+expect cube::CreatureData.name value u16 == 29285 [[@0x7691C8] + 0x8006C8] + 0x116C
+expect - hooks == 0
+"""

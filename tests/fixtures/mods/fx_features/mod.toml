@@ -1,0 +1,11 @@
+id = "fx_features"
+name = "Fixture: Lua feature tour"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+description = "Exercises asset providers, remaps, custom registries, interfaces, Lua function hooks and mid hooks."
+[dependencies]
+hello_native = { version = "^1.0", optional = true }
+[scripts]
+common = "scripts/common.lua"
+client = "scripts/client.lua"

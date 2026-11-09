@@ -1,0 +1,42 @@
+# Written 2026-10-18 for task 9.2b of add-skills-unleashed (the Scout's snare). Question: does the snare hold several creatures at once,
+# and does it end by itself? mods-dev/snare_proto's console command snare_proto:all snares every creature within a radius of the player
+# for a time (here 4 s) and gives them 10 s of immunity after.
+id = "snare-all"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-18"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there; the player's hp is raised to 20000",
+    "`spawner ZOMBIE 3 monster` puts three zombies near the player",
+    "`snare_proto:all 20 4`: every creature within 20 blocks is held, has no behaviour, is tinted and has its pose saved at its first draw; 4 s later they are released",
+    "shots before, 1 s and 3 s into the snare, and 3 s after its end",
+]
+observations = [
+    "not run yet",
+]
+
+[[confirms]]
+entry = "draw_creature_join_site"
+observed = "the draw record's words +0x10 to +0x4EC saved at the first draw of each snared creature and written back at later draws: each keeps one pose"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 120
+mods = ["mods-dev/snare_proto", "mods-examples/entity_spawner"]
+input = [
+    "until sa: A", "console entity_spawner:spawner ZOMBIE 3 monster", "wait 4", "shot 01-before",
+    "console snare_proto:all 20 4", "wait 1", "shot 02-snare-1s", "wait 2", "shot 03-snare-3s",
+    "wait 3", "shot 04-after",
+]
+script = """
+log snare-all: snare_proto:all, several creatures snared
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+log sa: A
+wait 40
+expect draw_creature_join_site hooks == 0
+"""

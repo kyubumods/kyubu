@@ -1,0 +1,12 @@
+# Phase 2: the weapon arm out of its place by a ramp over the clip (0 to 160 degrees on x), so the picture at 500 ms shows 80 degrees.
+duration = 1000
+
+[[track]]
+part = "hand_r"
+channel = "pos"
+keys = [ { t = 0, v = [0, 0, 14] } ]
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+keys = [ { t = 0, v = [0, 0, 0] }, { t = 1, v = [160, 0, 0] } ]

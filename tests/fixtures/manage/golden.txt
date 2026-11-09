@@ -1,0 +1,10 @@
+# Golden vector of the D5 folder hash for the package in canonical/ (id "mm_loaded").
+# `listing` is the canonical listing text (one line per file, LF endings); `folder` is
+# the SHA-256 of that text, the hex of what mods_package_hash must give and of what kcat
+# must hash the same folder into. There is no zip vector: a zip hashes its own file.
+listing:
+assets/alpha.txt 15 eaaae9934738139808dbfc480e5492db9fcf9d7bd1bfa54b291ac6f7997a3ef6
+assets/sub/beta.txt 12 53a33797fba0db1eb036675b0c7420fbb2b4e5fcc3a927572838611c9456a188
+mod.toml 233 7e0103c18032e15fe3024be8dd9e8050212ddd735b6e844757f018b744b10f1d
+folder:
+dd2e9517018e45ccb77ea0a45d1bb9813464959796852289b60654b12e3c4d8f

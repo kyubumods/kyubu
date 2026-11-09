@@ -1,0 +1,9 @@
+id = "rig_read_proto"
+name = "Rig read prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe rig-read): reads what the draw leaves in the local player's draw record: the 17 part matrices (rec + 0xEC to +0x4EC, 0x40 bytes each) after draw_creature returns, the model slots of the record resolved to indexes of the model table, and the creature's appearance ids. A mid hook at the join site (0x41F135) writes one vector of the record per phase (a rest phase between each), so the log shows which matrices a vector reaches. Logs only."
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,7 @@
+id = "fx_script_error"
+name = "Fixture: Lua error every frame"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+[scripts]
+client = "scripts/client.lua"

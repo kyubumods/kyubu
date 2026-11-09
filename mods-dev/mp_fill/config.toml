@@ -1,0 +1,9 @@
+# The options of mp_fill (docs/config.md). A replay sets them with the console command `config mp_fill <key> <value>`.
+
+[options.hp]
+type = "float"
+default = 0.0
+min = 0.0
+max = 1000000.0
+label = "Hold hp"
+description = "Above 0: the local player's hp is set to this every frame, and each hit is logged."

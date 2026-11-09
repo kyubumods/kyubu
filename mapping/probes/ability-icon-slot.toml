@@ -1,0 +1,64 @@
+# Recorded with kyubu_probe, mods-dev/icon_proto and the Kyubu loader of task 4.5 of add-ability-api (the icon fill at
+# cube::GameController::abilityBarBuiltSite), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay with
+# gamepilot, which creates the level-1 human warrior "Tester" and a new world. icon_proto defines icon_proto:smasher (number 113,
+# icon cubeworld:smash) for the warrior's slot 4 and icon_proto:blank (112, no icon) for the ranger's. P below is the player's
+# cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-icon-slot"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "screenshot of the HUD: slot 4 as the warrior (113, icon smash)",
+    "class 2 (the ranger, 112, no icon): screenshot of slot 4",
+    "class 1 again: screenshot, then the game menu and a clean exit",
+]
+observations = [
+    "Wine replay 8 passed (runs 1 to 7 were exploratory); evidence: evidence/ability-icon-slot-2026-10-05/. 4 expectations held, no fault and no error line in the log",
+    "the world starts as the warrior: the log says `abilities: ability 113 shows the icon of ability 54` 98 ms after the first bar; the numbers go by id order, so icon_proto:blank is 112 and icon_proto:smasher is 113",
+    "class_type 2 (the ranger, 112, no icon): slot 4 drew the empty grey square after 20 s (01-ranger-first.png); class_type 1: slot 4 drew smash's blue hammer icon, the same as the slot of a vanilla smash (02-warrior.png); class_type 2 again: empty (03-ranger-again.png). Node 113 keeps the copied pointer meanwhile",
+    "the game menu (Esc, the O icon, `Exit game`, 04-menu.png to 06-after-exit.png) ended the game: `world left: testworld`, `phase: shutdown`, `Kyubu shut down cleanly`: a clean exit with the copied icon pointer in the map, no fault (the destructor frees nodes, not values)",
+    "a `shot` after `until X` is taken about 1.5 s after the script's `log X`: the script waits 8 s after logs A and B so that the shot sees that phase",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the warrior at the start; set to 2 and back to 1 the bar took the other ability's number on its next frame"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/icon_proto"]
+input = [
+    "until iconslot A", "shot 01-ranger-first",
+    "until iconslot B", "shot 02-warrior",
+    "until iconslot C", "shot 03-ranger-again",
+    "key Escape", "wait 3", "shot 04-menu", "click 660 655", "wait 3", "shot 05-options", "move 510 408", "wait 1", "hold mouse1 1", "wait 4", "shot 06-after-exit",
+]
+script = """
+log iconslot: task 4.5 of add-ability-api, the icon of slot 4
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# A: the ranger first (112, no icon)
+inspect set data.class_type 2
+wait 20
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log iconslot A
+wait 8
+# B: the warrior (113, smash's icon)
+inspect set data.class_type 1
+wait 20
+expect - value i32 == 113 [[@0x7691C8] + 0x80080C] + 20
+log iconslot B
+wait 8
+# C: the ranger again
+inspect set data.class_type 2
+wait 20
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log iconslot C
+wait 6
+log iconslot done
+"""

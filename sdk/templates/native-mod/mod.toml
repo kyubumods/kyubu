@@ -1,0 +1,10 @@
+id = "my_mod"
+name = "My Mod"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+authors = ["you"]
+description = "A native Kyubu mod."
+
+[native]
+common = "bin/my_mod.dll"

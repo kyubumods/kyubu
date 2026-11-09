@@ -1,0 +1,9 @@
+id = "hook_sample"
+name = "Hook sample"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "The example from docs/hooks.md: a function hook, an import hook, a mid-function hook and a mod-defined symbol."
+
+[native]
+client = "bin/hook_sample.dll"

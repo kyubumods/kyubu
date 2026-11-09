@@ -1,0 +1,10 @@
+id = "bow_model_proto"
+name = "Bow model prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe bow-model): registers a white bow model of the mod's own and, for a ranger of specialization 5, makes the right weapon a bow marked with minus_modifier 0x4C49; a hook on ModelLoader::itemModel gives a marked item the mod's model in place of the game's."
+
+[scripts]
+client = "scripts/client.lua"

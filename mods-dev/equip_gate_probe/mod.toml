@@ -1,0 +1,10 @@
+id = "equip_gate_probe"
+name = "Equip gate probe"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe rank-and-equip-gate): the console command equip_gate_probe:check calls the game's can_equip_item on stand-in creatures of chosen levels and a copy of the player's weapon at chosen levels, and creature_power on stand-in creatures."
+
+[scripts]
+client = "scripts/client.lua"

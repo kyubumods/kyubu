@@ -1,0 +1,57 @@
+# add-skills-unleashed, the Fire Mage's circle light (2026-10-18): the circle pushed a light record into the frame's light vector at
+# light_collect_site every frame and gave no light in play, while the player's light showed. mods-dev/light_proto puts lights of its
+# own there in phases of 8 s (none, the player's own lamp lit by hand, 4 blocks ahead, at the player, very bright, high up, the lamp's
+# own record copied 4 ahead, none) and logs every record of the vector at the start of each phase. The shots show which light.
+id = "light-place"
+build = "cube-0x51D2CE9C"
+kyubu = "1.1"
+date = "2026-10-18"
+steps = [
+    "Wine replay: gamepilot makes a character and a new world; light_proto runs its phases from the world's first frame with a player",
+]
+observations = [
+    "run 2 (morning, 9:04): no shot shows any light, the game's lamp's included: daylight hides them. Run 3 holds the time of day (int32 ms, World + 0x80015C, read by the HUD's TIME through 0x471B60) at 0: night",
+    "run 3: the records of the mod, pushed at light_collect_site and moved to the front, light the player's model (yellower at 'ahead', strongly at 'bright') and the flying particles (red at 'bright'), as the game's own lamp record lights the player orange at 'ready'",
+    "run 3: no record lights the terrain: the ground is the same in all eight shots, the game's lamp's included. The frame's light vector lights models and particles only: a light at an empty spot on the ground shows nothing (the Fire Mage's circle in play, 2026-10-18)",
+    "run 3, whole-picture diffs against 'off' (evidence light-place-2026-10-18/run3/diff-*.png): only the player's model, the flying particles and the HUD change; not one terrain pixel, cliffs and grass included, for the mod's lights or the game's lamp. The shots land one phase late (the `until` matches the phase line, the shot comes 4 s later while the phase is 8 s: kept for the record)",
+    "read statically: every vanilla light reaches the same vector: world objects (render 0x4ACA86, a flickering radius about 15), projectiles (World + 0x14 list, +0x60 == 1, radius 16), timed flashes (GameController + 0x800740, std::list, pushed by 0x4868A0 with {pos, colour, radius, time 0, life 400 or 800 ms}: hit effects in GameController 0x494F21/0x495005, creature modes 0x1E-0x21 at render 0x4B40F8), creatures with a lamp or with +0xAA9/+0x991 == 0x14",
+    "the only 3D vertex shader (Cube.exe file offset 0x2FB528) lights per vertex: pointLightPositions c0 (xyz + radius in w) and pointLightColors c10, declared [16] but compiled to 10 registers each: at most 10 lights count",
+    "the game's records: +0x28 is the squared distance to the camera in blocks (16.7 for the player's lamp, 88,407 for a light about 297 blocks away), +0x2C padding; the player's lamp of rarity 0 is radius 10, colour 0.45 0.375 0.3; other lights in view (radius 20, colour 0.023 0.016 0.008) are far ones",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.equipment"
+observed = "24 (a lamp) in slot 10 of the new character, runs 2 and 3"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 150
+mods = ["mods-dev/light_proto"]
+input = [
+    "until light_proto: phase ready",
+    "wait 1", "shot 00-ready",
+    "until light_proto: phase lamp",
+    "wait 1", "shot 01-lamp",
+    "until light_proto: phase ahead",
+    "wait 1", "shot 02-ahead",
+    "until light_proto: phase at-player",
+    "wait 1", "shot 03-at-player",
+    "until light_proto: phase bright",
+    "wait 1", "shot 04-bright",
+    "until light_proto: phase high",
+    "wait 1", "shot 05-high",
+    "until light_proto: phase lamp-copy",
+    "wait 1", "shot 06-lamp-copy",
+    "until light_proto: phase off",
+    "wait 1", "shot 07-off",
+    "until light_proto: phase done",
+]
+script = """
+log light-place: start
+wait world
+wait 5
+expect cube::CreatureData.equipment value u8 == 24 [[@0x7691C8] + 0x8006C8] + 0xDF0
+wait 115
+log light-place: done
+"""

@@ -1,0 +1,83 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/weapon_swap_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on the
+# Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester"
+# and a new world. The mod writes sub_type 6 (a bow) on the player's right weapon slot (equipment 7) and the probe reads the bar,
+# looks at the model, and waits for the game's 60 s autosave twice: once with the bow in the slot, once with the mod putting the
+# real weapon into the copy that the save writes (task 8.2b of add-skills-unleashed). Replays 1 to 3 detoured save_character from
+# Lua for that; in play that detour froze the game at an autosave, so replay 4 uses cube::GameController::saveCopiedSite instead.
+id = "weapon-swap"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2 (a ranger) with specialization 0: the mod writes sub_type 6 on the right weapon slot; picture; waited 66 s through one autosave",
+    "Wrote specialization 1: the mod writes the real sub_type into the copy at saveCopiedSite (replay 4; replays 1 to 3: a detour put it back for the length of save_character); waited 66 s through one autosave",
+    "Wrote specialization 2: the mod puts the real weapon back for good; picture",
+]
+observations = [
+    "Wine replay 3 passed, 3 of 3 checks held (replay 1 expected a sub_type below 6; the warrior's weapon is 17); evidence evidence/skills-unleashed-sniper-2026-10-12/weapon-swap-3, with pictures of the club, the bow and the club again",
+    "a new warrior's right weapon, slot 7: type 3, sub_type 17, material 2, level 1; the left slot (6) is empty; slot 10 (the lamp) is type 24",
+    "sub_type 6 written: the bar went from [57, 59] to [22, 25] at the next frame, the HUD's M1 and M2 icons turned into the bow's, the class line read LVL 1 RANGER, the model in the hand was a bow (02-bow.png)",
+    "autosave with the bow in the slot (specialization 0): save_character logged slot 0, type 3, sub_type 6, guard false: the character would be saved with the bow",
+    "autosave with the guard (specialization 1): the detour wrote sub_type 17 back before calling the game's save_character and 6 after: `guard true`, `save_character done, the bow is back`; the frame of that save read the bar [57, 59] once and [22, 25] the next",
+    "specialization 2: sub_type 17 written back, the bar [57, 59] at once",
+    "the autosave came every 60 s (18:26:55, 18:27:24 ... 18:28:24, 18:29:24)",
+    "Wine replay 4 (the mid hook at saveCopiedSite in place of the detour) passed, 4 of 4 checks held; evidence evidence/skills-unleashed-sniper-fixes-2026-10-12/weapon-swap-4",
+    "replay 4: the save of the new character ran on the frame's thread (36), the three autosaves on another thread (372): the autosave is a worker thread's",
+    "replay 4, autosave with the bow in the slot: at the site the copy (EBX) read sub_type 6; with the guard the mod wrote 17 into the copy and the player kept 6. The bar stayed [22, 25] through that save (the detour of replay 3 showed [57, 59] for a frame)",
+    "replay 4: the copy's level read 67371009, 1033437185, 33554433 where the player's is 1: the level is 16 bits and the copy's padding is not written",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.equipment"
+observed = "sub_type (+0xAA9 of the player) 17 -> 6 -> 17 through a plain write: bar, HUD icons, modes and the model followed; save_character copies the slot as it is at the call"
+
+[[confirms]]
+entry = "save_character"
+observed = "called every 60 s in the world with (this, slot 0, the player): a detour that changes the player's slot 7 around its own call decides what is saved"
+
+[[confirms]]
+entry = "cube::GameController.ability_bar"
+observed = "[57, 59] with the club, [22, 25] with sub_type 6, one frame later in both directions"
+
+[[confirms]]
+entry = "cube::GameController::saveCopiedSite"
+observed = "reached once in each save_character call (four in the run) with EBX a copy of the player ([EBP+0xC]) whose slot 7 was the player's; a sub_type written into the copy left the player's own at 6"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/weapon_swap_proto"]
+input = [
+    "until swap before",
+    "shot 01-club",
+    "until swap bow",
+    "shot 02-bow",
+    "until swap back",
+    "shot 03-club-again",
+]
+script = """
+log weapon-swap: task 8.2b of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.equipment value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0xAA8
+log swap before
+wait 3
+inspect set data.class_type 2
+inspect set data.specialization 0
+log swap bow
+wait 4
+expect cube::CreatureData.equipment value u8 == 6 [[@0x7691C8] + 0x8006C8] + 0xAA9
+wait 66
+inspect set data.specialization 1
+log swap guarded
+wait 66
+expect cube::GameController::saveCopiedSite value u8 == 6 [[@0x7691C8] + 0x8006C8] + 0xAA9
+inspect set data.specialization 2
+wait 3
+expect cube::CreatureData.equipment value u8 == 17 [[@0x7691C8] + 0x8006C8] + 0xAA9
+log swap back
+wait 4
+"""

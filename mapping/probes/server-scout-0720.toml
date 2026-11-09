@@ -1,0 +1,80 @@
+# Tasks 8.3 and 10.8 of add-skills-unleashed-multiplayer: the Scout's Trap Deployment on Server.exe with a joined client and a watcher
+# (kmap probe replay, client = "join"). The client, made a Scout by su_rank, holds key 4; at its spawn marker it sends `throw { from,
+# yaw }` (design D13) and draws its own trap. The server checks the throw against its copy of the player, throws the trap, flies and
+# lands it on its own blocks (world_block, D9), arms it, and when su_dummy's monster is on it the jaws close: damage, and the snare
+# (lib/snare: rooted). It tells every change to both clients (trap_thrown ... trap_gone, D14): the caster's trap becomes the server's,
+# the watcher draws it from the events alone. Both clients log what they did (log_effects), so log_expect compares them.
+id = "server-scout-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Scout at rank 3 (su_rank options), log_effects on; the client moved 4 blocks east and 4.6 north (teleport:tp rel) onto the low side of a 1-block step of the seed world (tops 81 there, 82 at the spawn: world-block-server run 2), still facing south toward the high side, and held key 4 for 0.8 s",
+]
+observations = [
+    "task 10.8 run 5 2026-11-08 passed (evidence/scout-throw-2026-11-08/server-scout-0720-run5): the client moved onto the low side of the step and sent its throw; the server took it (no refusal) and threw trap 1 from the client's 8396932.0, 8396932.0, 84.4 (feet z 82.48, the player still settling on ground 82), flew it on its own blocks over the rise and landed it on the high side at z 83.00, 0.8 s later; it sprang 0.6 s after that on su_dummy's monster and closed 127 ms later: 18 damage, snared. The caster's prediction became server trap 1 at once and was drawn 0.03 blocks from the server's landing; the watcher drew it from the events alone (0.01 blocks off) and logged the spring and the jaws within 30 ms of the server",
+    "task 10.8 run 4 2026-11-08 failed on the record, not the game (evidence/scout-throw-2026-11-08/server-scout-0720-run4): `hold s 1.2` moved the player 1.2 blocks without turning it, so su_dummy's monster was not on the trap and it faded after 5 min; the throw (thrown in the air, landed 1.86 below), the events and both clients' drawing worked. Run 2 was broken by a second replay of the same id started over its sandbox; run 1 passed on flat ground",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-scout-0720), passed in 22 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "run 1 2026-11-08 passed (evidence/scout-mp-2026-11-08/server-scout-0720-run1): the server threw trap 1 from the client's position and facing (yaw -91, no ground lookup), it sprang 1.5 s later on su_dummy's monster, and the jaws closed 124 ms after: 18 damage, snared; the client threw its own trap",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Scout throws its trap"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy", "mods-dev/teleport"]
+input = [
+    "console config su_rank specialization scout",
+    "console config su_rank ability skills_unleashed:scout",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "console teleport:tp rel 4 4.6",
+    "hold 4 0.8",
+    "shot 02-client-cast",
+    "until server: scout: trap 1 thrown",
+    "until server: scout: trap 1 landed",
+    "until server: scout: trap 1 closed on creature",
+    "shot 03-client-ring",
+    "until watcher scout: trap 1 closed (the server's 1)",
+    "shot watcher 02-closed",
+]
+# What each game must have done. The server: the throw, the trap going off and the jaws closing on a monster. The client: its own cast.
+log_expect = { latest = [
+    "skills_unleashed: server: scout: trap 1 thrown",
+    "skills_unleashed: server: scout: trap 1 landed",
+    "skills_unleashed: server: scout: trap 1 sprung",
+    "skills_unleashed: server: scout: trap 1 closed on creature",
+], client = [
+    "su_rank: the character is class 2, specialization 1 (scout)",
+    "skills_unleashed: scout: trap 1 thrown",
+    "skills_unleashed: scout: trap 1 is the server's trap 1",
+    "skills_unleashed: scout: trap 1 sprung (the server's 1)",
+    "skills_unleashed: scout: trap 1 closed (the server's 1)",
+], watcher = [
+    "skills_unleashed: scout: trap 1 shown for the server's trap 1 of player",
+    "skills_unleashed: scout: trap 1 sprung (the server's 1)",
+    "skills_unleashed: scout: trap 1 closed (the server's 1)",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs end on the server's jaws line.
+script = """
+log server-scout-0720: task 8.3 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-scout-0720: done
+"""

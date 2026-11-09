@@ -1,0 +1,8 @@
+<root>
+  <speech key="title:warrior:1.4">
+    A Slimy Affair
+  </speech>
+  <speech key="objective:warrior:1.4">
+    [Slimes $creature] defeated (@num/@amount)
+  </speech>
+</root>

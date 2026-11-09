@@ -1,0 +1,10 @@
+id = "particle_proto"
+name = "Particle prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe particle-types): once the player is in a world it starts the game's own particle effects through kyubu.game.particle_spawn, a row of the five types and a row of accelerations, and logs a marker before each stage so that a replay can take pictures. Does nothing else."
+
+[scripts]
+client = "scripts/client.lua"

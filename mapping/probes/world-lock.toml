@@ -1,0 +1,64 @@
+# Recorded with kyubu_probe and the Kyubu loader of add-game-api (API 1.1, a MinGW build), unattended under Wine 9.0
+# (WSL on the Windows laptop): kmap probe replay starts Cube.exe, and gamepilot makes a new character and world
+# (single-player) and walks.
+# Static reading: as in world-lock-client. In single-player no network thread runs, but the three threads the
+# GameController constructor starts do: zone_loader_step enters the World lock (0x59ACD0, and directly in 0x5A30A0,
+# 0x5A3120 and 0x5A31B0) to load, add and drop zones, and 0x469B80 enters it briefly.
+id = "world-lock"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.1)"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Cube.exe with --kyubu-dev, a new character and world (single-player)",
+    "Traced the lock 0x59ACD0, the unlock 0x59E770 and the zone loader's EnterCriticalSection calls",
+    "Traced from the world's entry: 15 s while it loaded, then 100 s walking; tallied every call by caller, this, thread",
+]
+observations = [
+    "Wine replay 2 passed, 8 of 8 held (replay 1 checked 0x5A3030 instead, which does not lock: corrected)",
+    "main thread (36): cube::GameController::update and render, 1,579 frames each, this = the World (0x044202FC)",
+    "thread 0x469B80 (384): 1,487 times, this = the World; no receive or send thread runs",
+    "zone loader (392): entered it directly once, in 0x5A31B0 (a zone dropped while walking), argument 0x04C203BC",
+    "= World + 0x8000C0; the spin count at World+0x8000D4 is 1024",
+]
+
+[[confirms]]
+entry = "cube::World.lock"
+observed = "single-player Cube.exe: the main thread around the whole update, and the zone loader and 0x469B80 threads"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+input = [
+    "until 2.2: walk",
+    "hold w 50", "shot 01-walk-50", "hold w 50", "shot 02-walk-100",
+]
+script = """
+log World lock (add-game-api 2.2): which threads take World+0x8000C0 in single-player
+trace add @0x59ACD0
+trace add @0x59E770
+trace add @0x5A30EB
+trace add @0x5A3173
+trace add @0x5A3259
+wait world
+# from the world's entry on: the zone loader adds the zones around the player while the world loads
+trace start
+wait 15
+log 2.2: walk
+wait 100
+trace stop
+trace report
+# the main thread: cube::GameController::update (around the whole update) and render
+expect cube::World.lock from @0x59ACD0 0x489284 this [cube::game_controller] + 0x2DC
+expect cube::World.lock from @0x59E770 0x49D4AF this [cube::game_controller] + 0x2DC
+expect cube::World.lock from @0x59ACD0 0x4AC363 this [cube::game_controller] + 0x2DC
+# the constructor's thread 0x469B80
+expect cube::World.lock from @0x59ACD0 0x469E6D this [cube::game_controller] + 0x2DC
+# the main thread and 0x469B80 at least (no network thread runs)
+expect cube::World.lock threads @0x59ACD0 >= 2 this [cube::game_controller] + 0x2DC
+# zone_loader_step's own lock entries: a mid hook on the `call EnterCriticalSection` of 0x5A30A0, 0x5A3120 and
+# 0x5A31B0 (which only it calls), where the first stack word is the argument, &World.lock
+expect cube::World.lock from @0x5A30EB,@0x5A3173,@0x5A3259 [cube::game_controller]+0x2DC+0x8000C0
+expect cube::World.lock value u32 == 1024 [cube::game_controller] + 0x2DC + 0x8000D4
+expect - hooks == 0
+"""

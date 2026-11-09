@@ -1,0 +1,43 @@
+# Task 2.6 of add-ability-animation (A6, argument 5 of draw_creature). mods-dev/draw_arg5_proto reads argument 5 at the entry of draw_creature
+# (0x4129C0) and logs it per frame for the local player beside the frame's dt (frame.begin), GameController + 0x8006E0 (the field the call site pushes)
+# and GameController + 0x2A4 (a field the static read named as its source). Question: a running counter, or the frame time in ms?
+id = "draw-arg5"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Idle about 15 s, then walked (W) 8 s",
+]
+observations = [
+    "Wine replay 1 passed, 1 of 1 expectations held; the mid hook at 0x4129C0 installed; 400 frames logged (frames 219 to 1503, not every frame has a line), the player's first draw of each, all from 0x4B5D97",
+    "argument 5 equals GameController + 0x8006E0 in all 400 frames, and equals the frame's dt in ms (frame.begin, 31.4 to 206.2 ms) to within 1.2 in 400 of 400 (within 1.0 in 396); it is the previous frame's dt in none (differences of -41 to +66 ms)",
+    "GameController + 0x2A4 was 262384 in every frame: it is not the source (the static read that update copies the argument from it was wrong)",
+    "no draw of another creature carried an argument 5 different from the player's in the same frame (0 lines in 400 frames)",
+    "the 400-line cap ended 10 s before the script's `idle` marker, so every logged frame is the world's first minute at idle: the walk was not measured (the argument is a game-wide field, so it is not expected to change)",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "argument 5 is read from GameController + 0x8006E0 and logged per frame with the frame's dt"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+mods = ["mods-dev/draw_arg5_proto"]
+input = [
+    "until arg5 walk",
+    "hold w 8",
+]
+script = """
+log arg5: task 2.6, argument 5 of draw_creature
+wait world
+wait 20
+log arg5 idle
+wait 15
+log arg5 walk
+wait 12
+log arg5 done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

@@ -1,0 +1,52 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. The developer mod mods-dev/teleport writes the player's cube::CreatureData.pos (65,536 units per block), hovers the
+# player until `teleport:tp land` and finds the dungeons in the regions the World has built. The input goes to a level-61 dungeon
+# and surveys the creatures there with level_rework (task 5.4 of add-level-rework).
+id = "teleport-check"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport and level_rework beside kyubu_probe; waited 20 s there",
+    "the input turned dev_commands on, listed the level-61 dungeons (`teleport:tp dungeons 61`), went to the nearest (`teleport:tp dungeon 61`, hovering), took a screenshot, landed, took a screenshot and ran `level_rework:levels creatures`",
+]
+observations = [
+    "Wine replays 5 and 7 passed, no fault. The player starts at x 8396928, y 8396928, z 215.1 (blocks, 65,536 units per block). Writing cube::CreatureData.pos moves the player: `teleport:tp rel 60 0` gave x 8396988 and the player stood on the ground at z 219.1 four seconds later; `teleport:tp rel 3000 1000` (run 5) gave x 8399988, y 8397928, hovered at z 250 and the screenshot shows terrain the start does not have. After `teleport:tp land` the player stayed at z 253.1: the ground there is about 253. Replay 3 (a 3,000-block hop that kept z 215, before the hover rule) left the player at z 235.1 with the start scene still on screen: no zone was loaded where it landed",
+    "dungeon positions (run 6 dumped the raw data of the 9 regions the new world builds, with no level_rework): a region's 64 missions (+0x14018, 0x68 bytes) hold the dungeons as kind 0xE; the mission's origin (u64 x at +0, u64 y at +8, 65,536 per block) is the centre of the dungeon's zone tile. It equals the tile position computed from the tile index a*64+b of the 4096 zone tiles (kind byte 3): x = (row*64 + a)*256 + 128 blocks, y = (column*64 + b)*256 + 128, in all three regions compared (48 dungeons, levels matching one to one)",
+    "run 7, with level_rework loaded: `teleport:tp dungeons 61` listed 9 level-61 dungeons of 144 built, the nearest 8034 blocks away at x 8400000, y 8389504; `teleport:tp dungeon 61` hovered there at z 250; after `teleport:tp land` the HUD read CATACOMBS OF ASTAR and the screen was the dark inside of a dungeon (02-landed.png), z 241.1. `levels creatures` then listed 94 creatures, levels 1 to 61, 0 outside 1-100: SKELETON (17) 4, UNDEAD_MALE (15) 26, UNDEAD_FEMALE (16) 41 and ZOMBIE (96) 7 are all level 61 with +p 2; BAT (59) 3 and the chests (143) 3 are level 61 with +p 0; the others (types 87, 98, 105, 120, 127, 132, 135 and the player) are outside the dungeon, levels 1 to 39",
+    "the console command is `teleport:tp` (a name needs the mod's namespace); output goes to the console and to the log",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61",
+    "wait 50", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 60", "shot 02-landed",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "until tp: done",
+]
+script = """
+log teleport check (the mod mods-dev/teleport)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log tp: start
+wait 330
+log tp: done
+"""

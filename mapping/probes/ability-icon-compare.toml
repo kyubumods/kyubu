@@ -1,0 +1,49 @@
+# Recorded with kyubu_probe and mods-dev/icon_file_proto (for these runs its icon_file was a byte-for-byte copy of the game's own smash.png, saved as
+# proto-smash.png in its assets/icons/; that file is NOT in the repository, because game files never enter it: to repeat the replay, extract smash.png
+# with `python tools/cwmod/cwmod.py extract`, copy it there under that name and point the mod's icon_file at it) and the
+# Kyubu loader of task 8.3 of add-ability-api, unattended under Wine 9.0: is a PNG loaded through loadIcon by Kyubu drawn as crisply as the game's
+# own icon? Slot 4 of the warrior shows the copy; with class_type 2 (the mage, whose slot 4 is the placeholder with smash's own vanilla object) the
+# same picture is drawn by the game's object. Screenshots 01-copy and 02-vanilla are compared. P is the player's cube::Creature.
+id = "ability-icon-compare"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there, CONFIG with `skill_tree = false` so that slot 4 is filled at once",
+    "screenshot of the bar (01-copy): slot 4 draws the copy of smash.png loaded by Kyubu",
+    "class_type set to 2 (the mage): slot 4 is the placeholder, which draws smash's vanilla icon object; screenshot (02-vanilla)",
+]
+observations = [
+    "run 1: the copy of smash.png loaded by Kyubu (slot 4 of the warrior, grey because its 0.1 mp cost cannot be paid at mp 0) drew visibly softer than the game's own smash icon (the mage's placeholder): same 14 x 14 pixels, blurred edges. So the softness came from how the object was made, not from the art. Evidence: evidence/ability-icon-compare-2026-10-06/01-copy.png, 02-vanilla.png",
+    "run 2: the mod dumped the icon object of ability 54 (smash, made by the game's constructor) and of 112 (made by Kyubu) and the objects they point to (dump-run2.log). The two are the same class (vtable 0x721558) with the same texture data; they differ in the pointers, the id (+0x44: 0x31 and 0x6e), and two 4-byte flags at +0x34 and +0x38: 0 and 0 on the game's icon, 1 and 1 on Kyubu's (five flags at +0x30 read 1,0,0,1,1 against 1,1,1,1,1; the texture builder 0x658110 passes {1,1,1,1,1})",
+    "run 3, with the loader clearing the two flags after loadIcon (ability_iconfile.cpp, match_vanilla_icon_flags): the dump shows 1,0,0,1,1 for both objects and the copy now draws with the same crisp pixel steps as the original (evidence/ability-icon-compare-2026-10-06/run3-fixed/01-copy.png against 02-vanilla.png; the copy is grey only because of the mp cost). What the two flags mean is not mapped (they behave as filtering flags); who clears them in the game, and when, was not found",
+]
+
+[[confirms]]
+entry = "cube::GameController::loadIcon"
+observed = "the object it returned for the copy of smash.png was drawn on slot 4"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 360
+mods = ["mods-dev/icon_file_proto"]
+input = [
+    "until cmp A", "shot 01-copy", "until cmp B", "wait 4", "shot 02-vanilla",
+]
+script = """
+log cmp: icon_file_proto with a copy of smash.png
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+wait 3
+log cmp A
+wait 10
+inspect set data.class_type 2
+inspect set data.specialization 0
+wait 3
+log cmp B
+wait 20
+log cmp done
+"""

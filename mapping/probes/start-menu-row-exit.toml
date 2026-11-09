@@ -1,0 +1,34 @@
+# Task 2.4 of add-mod-manager, the Exit half: with the Mods row in the game's third place, Exit is drawn by the dev mod at y 180
+# (screen y 614 at 1024 x 768). A click on it sets quit_requested, as the game's own third row did, and the game closes.
+id = "start-menu-row-exit"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-19"
+steps = [
+    "Replayed at the start menu under Wine at 1024 x 768: hovered and clicked the moved Exit row",
+]
+observations = [
+    "replay 2 passed under Wine: the moved Exit row is cyan under the pointer at (512, 609); a click logged 'quit requested' and the log ends with a clean shutdown",
+]
+
+[[confirms]]
+entry = "cube::StartMenuWidget::drawEndSite"
+observed = "the mod's Exit row at y 180 turns cyan under the pointer and quits on a click"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "until startrow rest",
+    "move 512 609", "wait 4", "shot 01-exit-hover",
+    "click 512 609", "wait 10", "shot 02-after-exit",
+]
+script = """
+log startrow: task 2.4 (exit) of add-mod-manager
+wait 15
+log startrow rest
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+wait 40
+"""

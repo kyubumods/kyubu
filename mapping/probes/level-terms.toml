@@ -1,0 +1,335 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 3.3 of add-level-rework (M3): where the strength functions take the creature's level, and every caller of
+# level_curve in a world session. A kill as in kill-xp (the top-id creature, made hostile and killed by the player's forced
+# cyclone) runs applyHit and hitCreature; the fireball (mode 37) runs the projectile path, as in projectile-spawn; the HUD
+# runs every frame. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "level-terms"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Phase A traced level_curve alone, in four windows with a report each: A1 12 s idle; A2 one kill (the kill-xp setup: the top-id creature made hostile, level 10, hp 1, armour factor 0, show_patch_time -1, stunned and put half a block from the player, who has damage factor 100 and a forced cyclone, mode 86); A3 two fireballs (mode 37) at a stunned hostile creature 3 blocks along +y, as in projectile-spawn; A4 10 s with the inventory opened by key c",
+    "Phase B traced, in one window, the entries of ten strength functions (maxHp, armor, resistance, creature_damage, creature_projectile_damage, creature_crit, creature_tempo, 0x43EA30, creature_xp_to_next, creature_power) and the twelve instructions that follow the level's conversion to a float (the movd and cvtdq2ps of each level load) in them: one kill, two fireballs, then two kills by a player whose data.appearance.flags (+0x7E) were 8 and then 0x10, and 5 s more",
+]
+observations = [
+    "Wine replay 6 passed: 21 of 21 expectations held, with the loader that saves XMM0-7 in every mid hook (the tracer's instruction traces are mid hooks: the game ran through 46,000 passes of the maxHp site unharmed); runs 1 to 4 were the same script at earlier stages; no fault, and the probe's hooks were all removed at the end",
+    "level_curve, the return addresses of all its calls in the four windows (each report lists every caller; that needed a small change of the probe's report: the tracer now also tallies the return addresses when more than 24 (caller, ECX, thread) lines exist): A1 idle 96 calls, all from 0x4C7D48 (thread 372, an item level re-roll made while the world is built); A2 kill 45 calls: 44 from 0x4C7D48 and 1 from 0x594B55 (the call at 0x594B50, applyHit's kill XP, thread 36); A3 two fireballs 0 calls; A4 inventory open 138 calls, all from 0x4C75EA (item_power, thread 36)",
+    "every caller seen is one of the 22 direct call sites of the static read, and the image holds no other reference to 0x43D2F0 (no jump, no pointer), so no caller is unexplained; the 22 sites are listed in combat.toml",
+    "the strength functions never called level_curve: no strength function appears among the callers of A1 to A4, although the four named ones ran in A2 and A3; their level terms are inline (movd, cvtdq2ps, then the curve), read in the disassembly",
+    "calls in phase B: cube::Creature::maxHp 46,225 (the HUD and the World step), armor 3, resistance 2, creature_damage 3, creature_projectile_damage 2, creature_crit 5, creature_tempo 69,647 (the HUD), creature_xp_to_next 636 (the HUD's XP bar); each level-load instruction ran as often as its function: maxHp 46,225, armor 3, resistance 2, creature_damage's base term 3, creature_projectile_damage's base term 2, creature_crit 5, creature_tempo 69,645",
+    "armor and creature_damage ran with the three kills (0.7 s, 13.7 s and 19.9 s); resistance and creature_projectile_damage only with the two fireballs (7.5 s and 10.6 s), the magic hits: hitCreature subtracts resistance for them, not armor; creature_crit ran with both",
+    "not reached, so these entries carry no probe evidence: the flag branches of creature_damage (0x43E5E9, 0x43E694) and of creature_projectile_damage (0x4475CA, 0x447672), even with the player's +0x7E at 8 and at 0x10 (the branch needs the list built by 0x43E7F0 to be empty); creature_damage_alt (0x43EA30, called from the update and from hitCreature when the target's +0x174 is above 0); creature_power (the character sheet: key c opened the inventory, not the sheet); and the hit chance of hitCreature (0x596D04, 0x596D1D), not entered with the target's +0x12C set to -1.0 either. The engine cannot hook those two call instructions (the displaced instruction is a relative call)",
+    "key c opened the inventory with the weapons list and the item box (screenshot 01-inventory)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "level_curve"
+observed = "called in the world session only from 0x4C7D48 (96 + 44 calls), 0x594B55 (1, applyHit) and 0x4C75EA (138, item_power), all among the 22 direct call sites; never from a strength function"
+
+[[confirms]]
+entry = "cube::Creature::maxHp"
+observed = "46,225 calls in 20 s with kills and fireballs, from the World step (0x6103E6, 0x61780E), 0x42D3A1, 0x42D651 and the HUD (0x491067, 0x491374, 0x492E04, 0x492F80); level_curve was never among the callers of a window"
+
+[[confirms]]
+entry = "cube::Creature::armor"
+observed = "3 calls, with the three kills"
+
+[[confirms]]
+entry = "cube::Creature::resistance"
+observed = "2 calls, with the two fireballs (magic hits)"
+
+[[confirms]]
+entry = "creature_damage"
+observed = "3 calls, with the three kills (melee)"
+
+[[confirms]]
+entry = "creature_projectile_damage"
+observed = "2 calls, with the two fireballs"
+
+[[confirms]]
+entry = "creature_crit"
+observed = "5 calls: the three kills and the two fireballs"
+
+[[confirms]]
+entry = "creature_tempo"
+observed = "69,647 calls (the HUD draws the TEMPO every frame)"
+
+[[confirms]]
+entry = "creature_xp_to_next"
+observed = "636 calls in 20 s, all while the HUD draws: the HUD calls this function, not creature_level_up, for the XP bar"
+
+[[confirms]]
+entry = "cube::Creature::maxHpLevelSite"
+observed = "passed as often as maxHp (46,225): the level is loaded there"
+
+[[confirms]]
+entry = "cube::Creature::armorLevelSite"
+observed = "passed 3 times, with armor"
+
+[[confirms]]
+entry = "cube::Creature::resistanceLevelSite"
+observed = "passed 2 times, with resistance"
+
+[[confirms]]
+entry = "creature_damage_level_site"
+observed = "passed 3 times, with creature_damage"
+
+[[confirms]]
+entry = "creature_projectile_damage_level_site"
+observed = "passed 2 times, with creature_projectile_damage"
+
+[[confirms]]
+entry = "creature_crit_level_site"
+observed = "passed 5 times, with creature_crit"
+
+[[confirms]]
+entry = "creature_tempo_level_site"
+observed = "passed 69,645 times, with creature_tempo"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1200
+input = ["until level-terms: A4 inventory", "wait 1", "key c", "wait 3", "shot 01-inventory"]
+script = """
+log level terms (task 3.3 of add-level-rework): the callers of level_curve and the level loads of the strength functions
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 1
+# phase A: every caller of level_curve, in three windows: idle, a kill, two fireballs
+trace add @0x43D2F0
+trace start
+log level-terms: A1 idle
+wait 12
+trace stop
+trace report
+expect level_curve from @0x43D2F0 0x4C7D48
+trace start
+log level-terms: A2 kill
+# kill A2: level 10, hp 1, armour factor 0, then the forced cyclone
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect level_curve from @0x43D2F0 0x594B55
+expect level_curve from @0x43D2F0 0x4C7D48
+trace start
+log level-terms: A3 fireball
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x30000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 100
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+trace start
+log level-terms: A4 inventory
+wait 10
+trace stop
+trace report
+expect level_curve from @0x43D2F0 0x4C75EA
+# phase B: the level loads of the strength functions, in one window with a kill, two fireballs and two kills by a player with appearance flags 8 and 0x10
+trace clear
+trace add @0x4453B0
+trace add @0x43D880
+trace add @0x446DF0
+trace add @0x43E4F0
+trace add @0x4474D0
+trace add @0x43F2E0
+trace add @0x447F00
+trace add @0x43EA30
+trace add @0x445360
+trace add @0x446510
+trace add @0x4453CF
+trace add @0x43D89F
+trace add @0x446E0F
+trace add @0x43E52D
+trace add @0x43E5E9
+trace add @0x43E694
+trace add @0x44750D
+trace add @0x4475CA
+trace add @0x447672
+trace add @0x43F2FF
+trace add @0x447F1F
+trace add @0x43EA4F
+trace start
+log level-terms: B
+# kill B1: level 10, hp 1, armour factor 0, then the forced cyclone
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x30000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 100
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+# kill B2 (flags 8): level 10, hp 1, armour factor 0, then the forced cyclone
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+inspect set data.damage_multiplier 100
+inspect set data.appearance.flags 8
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.appearance.flags 0
+# kill B3 (flags 0x10): level 10, hp 1, armour factor 0, then the forced cyclone
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+inspect set data.damage_multiplier 100
+inspect set data.appearance.flags 16
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.appearance.flags 0
+wait 5
+trace stop
+trace report
+expect cube::Creature::maxHp calls @0x4453B0 >= 1
+expect cube::Creature::armor calls @0x43D880 >= 1
+expect cube::Creature::resistance calls @0x446DF0 >= 1
+expect creature_damage calls @0x43E4F0 >= 1
+expect creature_projectile_damage calls @0x4474D0 >= 1
+expect creature_crit calls @0x43F2E0 >= 1
+expect creature_tempo calls @0x447F00 >= 1
+expect creature_xp_to_next calls @0x445360 >= 1
+expect cube::Creature::maxHpLevelSite calls @0x4453CF >= 1
+expect cube::Creature::armorLevelSite calls @0x43D89F >= 1
+expect cube::Creature::resistanceLevelSite calls @0x446E0F >= 1
+expect creature_damage_level_site calls @0x43E52D >= 1
+expect creature_projectile_damage_level_site calls @0x44750D >= 1
+expect creature_crit_level_site calls @0x43F2FF >= 1
+expect creature_tempo_level_site calls @0x447F1F >= 1
+wait 5
+expect - hooks == 0
+"""

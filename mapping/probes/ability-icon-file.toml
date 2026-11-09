@@ -1,0 +1,69 @@
+# Recorded with kyubu_probe, mods-dev/icon_file_proto, mods-dev/skill_ranks_proto and the Kyubu loader of task 8.3 of add-ability-api
+# (a mod ability with its own icon), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay with gamepilot, which
+# creates the level-1 human warrior "Tester" and a new world, with CONFIG=<a config.toml that holds `[abilities] skill_tree = true`>.
+# icon_file_proto claims the warrior's slot 4 as number 112 with icon_file = "proto-burst.png" (a 14 x 14 PNG in its assets/icons/, like
+# the vanilla icons) and smash as the fallback icon. skill_ranks_proto writes rank 5 into skills 6 to 8 while the skill panel is closed.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; skills[9] is at P + 0x115C.
+id = "ability-icon-file"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there; the level was written to 30 (58 skill points)",
+    "the key X opened the skill panel; screenshot (01-panel): the fourth ability's button with the mod's own icon, rank 0",
+    "clicked button 9 with the mouse held down, twice; screenshot (02-click)",
+    "clicked LEARN; screenshot (03-learned); closed the panel with the key X; screenshot of the bar (04-bar): slot 4 with the mod's own icon",
+]
+observations = [
+    "Wine replay 1 passed (4 of 4 expectations held; first run). Evidence: evidence/ability-icon-file-2026-10-06/ (README, config.toml, report, log, 4 screenshots and a crop of slot 4)",
+    "the log has one `ability 112 draws its own icon proto-burst.png (object 0x2984FD60)` line 1.6 s after the panel opened (the first frame that needed the icon), then `skill button 9 shows the icon of ability 112 (proto-burst.png)` and, after LEARN, `ability 112 shows its icon (proto-burst.png)`: loadIcon was called once with the loader's own data3.db Database, the asset layer served the mod's PNG (the load-time summary `overrides 1 vanilla key(s)` counts any key outside data1.db as an override: proto-burst.png is a new key), and no fault followed",
+    "03-learned.png: the skill panel's fourth button draws the magenta PNG with rank 3 (skills[9] 0 to 3, Points 18/58) instead of smash's icon",
+    "04-bar.png: slot 4 draws the PNG's disc shape; it is grey because mp is 0, so the colours are only visible on the skill button. The icon object is shared by the bar and the button (one load)",
+    "a clean exit did not run: the replay ends the game with a timeout. The game never frees icon objects (task 2.6), so the one extra texture matches the vanilla icons' lifetime; this is not checked at exit",
+]
+
+[[confirms]]
+entry = "cube::GameController::loadIcon"
+observed = "called once by the loader for proto-burst.png with the loader's own data3.db Database; the returned object filled the null nodes of ability_icons[112] and skill_icons[9]"
+
+[[confirms]]
+entry = "cube::GameController.ability_icons"
+observed = "the node of the mod's number held the object of proto-burst.png (not smash's) and the HUD drew it"
+
+[[confirms]]
+entry = "cube::GameController.skill_icons"
+observed = "key 9's node held the same object and the skill button drew it"
+
+[[confirms]]
+entry = "cube::CreatureData.skills"
+observed = "skills[9] went 0 to the learned rank when LEARN applied the working copy, and the bar followed it"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/icon_file_proto", "mods-dev/skill_ranks_proto"]
+input = [
+    "until icon A", "key x", "wait 6", "shot 01-panel",
+    "click 244 272", "hold mouse1 2", "wait 6", "shot 02-click", "hold mouse1 2", "wait 6",
+    "click 106 537", "hold mouse1 2", "wait 8", "shot 03-learned",
+    "key x", "wait 6", "shot 04-bar",
+]
+script = """
+log icon: task 8.3 of add-ability-api, a mod ability with its own icon
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.level 30
+watch player9 u32 [[@0x7691C8] + 0x8006C8] + 0x115C
+wait 3
+log icon A
+wait 12
+# not learned yet: the mod's number 112 is not on the bar (index 5 = begin + 20)
+expect cube::CreatureData.skills value u32 == 0 [[@0x7691C8] + 0x8006C8] + 0x115C
+expect - value i32 != 112 [[@0x7691C8] + 0x80080C] + 20
+wait 150
+expect cube::CreatureData.skills watch player9 increased
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log icon done
+"""

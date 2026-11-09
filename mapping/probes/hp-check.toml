@@ -1,0 +1,57 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. The developer mod mods-dev/teleport goes to a level-61 dungeon of "+p" 4 and then to one of "+p" 2, and level_rework's
+# `levels creatures` lists the max HP and max_hp_multiplier of the creatures there (task 5.4 of add-level-rework, "HP of a plus-four monster").
+id = "hp-check"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport and level_rework beside kyubu_probe; waited 20 s there",
+    "the input turned dev_commands on, listed the level-61 dungeons with their '+p', went to the nearest of '+p' 4 and surveyed the creatures there, then to the nearest of '+p' 2 and surveyed them again",
+]
+observations = [
+    "Wine replay 1 passed, no fault. The world is the same in every new-world run: `teleport:tp dungeons 61` listed the 9 level-61 dungeons with '+p' 2, 3, 2, 2, 1, 4, 2, 2, 4 (nearest first; the two '+p' 4 are 19255 and 27904 blocks away). `teleport:tp dungeon 61 4` went to x 8381312, y 8385664 and, after `teleport:tp land`, `levels creatures` listed 71 creatures, levels 1 to 61, 0 outside 1-100",
+    "max HP of a level-61 monster of entity type 19 (9 creatures, all with max_hp_multiplier 100): 696.46 in the '+p' 4 dungeon, 492.47 in a '+p' 2 dungeon (2 creatures); 696.46 / 492.47 = 1.4142 = 2^((4-2)/4), so a '+4' monster has twice the HP of a '+0' one (348.23), as the spec says. Types 2 and 3 show the same step with a spread of HP within a group (type 3 in the '+p' 4 dungeon 816.05 to 1405.63, in the '+p' 2 dungeon 563.34 to 7530.02 with a multiplier of 1500 on some): other things than '+p' move the HP of those groups, so the clean ratio is type 19 alone",
+    "no level-61 '+p' 0 monster of a dungeon kind exists to compare directly: the only '+p' 0 creatures at level 61 are the chests (type 143, max_hp_multiplier 10, 34.82 HP) and, outside the dungeons, kinds at other levels",
+    "the earlier test (shown-levels run 4) set power_base 0 and 4 on the PLAYER and `cube::Creature::maxHp` gave the same HP; the monsters here show the '+p' effect, so that function does apply it to a monster, or the player is special-cased (not mapped which)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61 4",
+    "wait 50",
+    "console teleport:tp land",
+    "wait 60", "shot 01-plus4",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "wait 5",
+    "console teleport:tp dungeon 61 2",
+    "wait 50",
+    "console teleport:tp land",
+    "wait 60", "shot 02-plus2",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "until tp: done",
+]
+script = """
+log hp check (the mods mods-dev/teleport and level_rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log tp: start
+wait 560
+log tp: done
+"""

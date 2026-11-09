@@ -1,0 +1,66 @@
+# add-skills-unleashed-multiplayer 8.1, the cooldown after a fizzle (kmap probe replay, client = "join"). The client, made a Fire
+# Mage by su_rank, taps key 4: the charge is under min_charge, so it fizzles, casts nothing and the client clears its cooldown. The
+# server's admission had started the full cooldown (80 s at rank 1); its Fire Mage module gives it back at the run's end
+# (kyubu.game.ability_cooldown_set). The client then holds key 4 for 1.2 s at once, and the server must admit that start and cast.
+id = "server-fire-mage-retry-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a client, both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Fire Mage with rank 3 (su_rank options); a tap of key 4 (fizzle), then key 4 held for 1.2 s",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-fire-mage-retry-0720), passed in 23 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 1, 2026-11-08 (evidence/fire-mage-mp-2026-11-08/server-fire-mage-retry-0720-run1), passed: the tap released with charge 0.06, under min_charge 0.1, so the client fizzled; the server's run ended interrupted after 54 ms and its module set the cooldown to 0 ms; 2.3 s later the client's second start was admitted (no refusal in the server's log), the restart kept at 53 ms after 1229 ms, the cast at the client's spot (x and y the same, z 83.1 against 83.0), charge 0.91, radius 9.5, and the circle active 1.9 s later",
+    "limits: one client, no watcher; the damage ticks are not counted (test_parity_fire_mage.cpp); a charge cut off by a stun or a dodge was not played, only the fizzle (both end without a cast, which is what the module reads)",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server for a joined client's fizzled Fire Circle and for its second start right after"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization fire_mage",
+    "console config su_rank ability skills_unleashed:fire_mage",
+    "console config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "click 820 384",
+    "hold 4 0.08",
+    "until server: fire_mage: no cast",
+    "hold 4 1.2",
+    "shot 02-client-release",
+    "until server: fire_mage: cast at",
+    "shot 03-client-cast",
+]
+# The server: the fizzled run gave its cooldown back, and the second start was admitted and cast (a refused start casts nothing).
+# The client: its fizzle, then its own release and cast.
+log_expect = { latest = [
+    "skills_unleashed: server: fire_mage: no cast",
+    "the cooldown set to 0 ms",
+    "skills_unleashed: server: fire_mage: cast at",
+], client = [
+    "su_rank: the character is class 3, specialization 0 (fire_mage)",
+    "skills_unleashed: fire_mage: over (fizzled)",
+    "skills_unleashed: fire_mage: released after",
+    "skills_unleashed: fire_mage: cast at",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs end on the server's cast line.
+script = """
+log server-fire-mage-retry-0720: task 8.1 of add-skills-unleashed-multiplayer, the cooldown after a fizzle
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-fire-mage-retry-0720: done
+"""

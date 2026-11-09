@@ -1,0 +1,314 @@
+# plasma's scene tree and its Direct3D 9 drawing, from Cube.exe: the part the title screen and every HUD shape go
+# through. Read in the draw call, the buffer upload and render_init, and followed in the running game from the
+# controller's node pointers (probe title-scene). Offsets not listed are not read yet.
+
+[[type]]
+name = "plasma::Node"
+kind = "class"
+size = 0
+builds = ["cube-0x51D2CE9C", "cube-0x51EA955E"]
+status = "verified"
+evidence = ["rtti:plasma::Node", "probe:title-scene"]
+source = "kyubu"
+notes = "a scene-tree node of a .plx: a name, a parent, children, a display and (by the name) the widget that was set on it. Bases plasma::NamedObject, plasma::Object; the vtable is at +0. The tree under the engine's root holds the HUD, every menu panel and the start scene"
+
+[[type.field]]
+offset = 0x0C
+name = "name"
+type = "std::wstring"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::set_node_widget"]
+source = "kyubu"
+notes = "the node's name as a std::wstring (MSVC 2012: 16-byte buffer, size at +0x1C, capacity at +0x20): up to 7 characters sit in the buffer, longer names behind the pointer in its first word. Unnamed nodes have an empty name; names repeat (every letter layer of the logo has its own C, U, B ...)"
+
+[[type.field]]
+offset = 0x28
+name = "parent"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene"]
+source = "kyubu"
+notes = "null for the engine's root. Walking it from any named node of the HUD or the start scene ends at the node named root"
+
+[[type.field]]
+offset = 0x2C
+name = "children"
+type = "std::list"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::set_node_widget"]
+source = "kyubu"
+notes = "embedded std::list<plasma::Node*>: head at +0x2C, count at +0x30. A list node is {next, prev, Node*}. The order is the .plx's, and the order the shapes are drawn in"
+
+[[type.field]]
+offset = 0x3C
+name = "display"
+type = "plasma::Display*"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the node's plasma::Display: its colour and mask settings. plasma::D3D9Drawing::draw reads the colour and the flags of it on every call"
+
+[[type.field]]
+offset = 0x38
+name = "transformation"
+type = "void*"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize"]
+source = "kyubu"
+notes = "the node's plasma::Transformation. Its position is keyed like plasma::Display.visible_values: x and y floats at [+0x94] + [+0x68] * 8, minus a pivot read at [+0x19C] + [+0x170] * 8; after a write the game calls the transformation's vtable slot 1 with 1"
+
+[[type.field]]
+offset = 0x40
+name = "widget"
+type = "plasma::Widget*"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize"]
+source = "kyubu"
+notes = "the widget on the node, if any: onResize reads cube::GameController.start_menu_node + 0x40 to place the start menu"
+
+[[type]]
+name = "plasma::Display"
+kind = "class"
+size = 0
+builds = ["cube-0x51D2CE9C", "cube-0x51EA955E"]
+status = "verified"
+evidence = ["rtti:plasma::Display", "probe:title-scene"]
+source = "kyubu"
+notes = "the part of a node that says how it is coloured and masked. The game's animation attributes (plasma::ContinuousAttribute and others) live in it, so it is large (at least 0x204 bytes)"
+
+[[type.field]]
+offset = 0x68
+name = "key"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "xref:cube::GameController::onMouseDown"]
+source = "kyubu"
+notes = "the index of the attribute value in use; the game reads and writes visible_values at this index"
+
+[[type.field]]
+offset = 0x94
+name = "visible_values"
+type = "int32_t*"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "xref:cube::GameController::onMouseDown"]
+source = "kyubu"
+notes = "the node's visibility: [visible_values + key * 4] is 1 when the node is shown and 0 when hidden. The game shows and hides its panels by writing this word (Start Game writes 0 to start_scene's and 1 to character_select's); 0x411C80 (node, bool) does the same for a node"
+
+[[type.field]]
+offset = 0x118
+name = "colour_index"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the row of colour_table that the draw call uses; 0 for every node of the logo"
+
+[[type.field]]
+offset = 0x144
+name = "colour_table"
+type = "float*"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "rows of 4 floats, RGBA. The draw call multiplies row colour_index by the colour its caller passes and gives that to the vertex shader as the shape's colour, so a node fades by its alpha here"
+
+[[type.field]]
+offset = 0x200
+name = "flags"
+type = "uint32_t"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "read by draw: bit 0, the node uses a mask or texture; bit 1, the mask is multiplied; otherwise bit 2 picks the mask's alpha only (set) or its colour over the shape (clear). These become the pixel shader's filter value 2, 3 or 1"
+
+[[type]]
+name = "plasma::D3D9Drawing"
+kind = "class"
+size = 0
+builds = ["cube-0x51D2CE9C", "cube-0x51EA955E"]
+status = "verified"
+evidence = ["rtti:plasma::D3D9Drawing", "probe:title-scene"]
+source = "kyubu"
+notes = "the Direct3D 9 drawing of one shape: its vertices and indices on the CPU and in buffers, its bounds, and the engine it draws with. A node's shape has one per fill and per stroke, which is why a node is drawn two times in a frame. Base plasma::Drawing; vtable 0x721548"
+
+[[type.field]]
+offset = 0x110
+name = "bounds"
+type = "float[4]"
+status = "verified"
+evidence = ["manual:read at the logo's D: the plus placed within a pixel", "xref:plasma::D3D9Drawing::updateBuffers"]
+source = "kyubu"
+notes = "min x, min y, max x, max y of the shape's points, in the node's own units (before the engine's transform)"
+
+[[type.field]]
+offset = 0x124
+name = "engine"
+type = "plasma::D3D9Engine*"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the engine the drawing draws with; draw and updateBuffers reach the device, the shaders and the matrices through it"
+
+[[type.field]]
+offset = 0x128
+name = "vertex_buffer"
+type = "void*"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Drawing::updateBuffers", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "IDirect3DVertexBuffer9*, 48 bytes a vertex (position 2 floats, 4 floats, 4 floats, 2 floats). Null until updateBuffers has run; draw does nothing when it is null"
+
+[[type.field]]
+offset = 0x12C
+name = "index_buffer"
+type = "void*"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Drawing::updateBuffers", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "IDirect3DIndexBuffer9*, 32-bit indices, drawn as a triangle list. Null for a shape with no indices (draw then draws nothing)"
+
+[[type]]
+name = "plasma::D3D9Engine"
+kind = "class"
+size = 0x2D0
+builds = ["cube-0x51D2CE9C", "cube-0x51EA955E"]
+status = "verified"
+evidence = ["rtti:plasma::D3D9Engine", "manual:render_init allocates 0x2D0 bytes for it", "probe:title-scene"]
+source = "kyubu"
+notes = "the engine that owns the scene root, the fonts and the device. Bases plasma::Engine, plasma::ObjectManager; vtable 0x7214D4. One instance, in plasma::d3d9_engine and at cube::GameController.engine"
+
+[[type.field]]
+offset = 0xB4
+name = "root"
+type = "plasma::Node*"
+status = "verified"
+evidence = ["probe:title-scene"]
+source = "kyubu"
+notes = "the scene's root node, named root, made by plasma::Engine::Engine. Its children are the HUD, the menu panels, the start scene, textFX, wait and the other top-level nodes. The nodes named sources and fonts are the next two words"
+
+[[type.field]]
+offset = 0x10C
+name = "width"
+type = "int32_t"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the size in pixels the engine draws into (the window's client width); draw divides its transform by it. It follows the window, not options.cfg"
+
+[[type.field]]
+offset = 0x110
+name = "height"
+type = "int32_t"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the client height, as width"
+
+[[type.field]]
+offset = 0xD4
+name = "cursor_x"
+type = "float"
+status = "candidate"
+evidence = ["xref:plasma::Widget::getCursor", "manual:WinMain passes it to ClientToScreen", "probe:start-menu-symbols"]
+source = "kyubu"
+notes = "the cursor in the window client area, pixels; zeroed by plasma::Engine::Engine. WinMain hands it to ClientToScreen and SetCursorPos to put the cursor back"
+
+[[type.field]]
+offset = 0xD8
+name = "cursor_y"
+type = "float"
+status = "candidate"
+evidence = ["xref:plasma::Widget::getCursor", "manual:WinMain passes it to ClientToScreen", "probe:start-menu-symbols"]
+source = "kyubu"
+notes = "the cursor y, as cursor_x"
+
+[[type.field]]
+offset = 0x194
+name = "vertex_shader"
+type = "void*"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "IDirect3DVertexShader9*, set by every draw call"
+
+[[type.field]]
+offset = 0x198
+name = "pixel_shader"
+type = "void*"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "IDirect3DPixelShader9*, the ps_3_0 shader draw sets for every shape. A mod that stores another shader here for the length of one call recolours that shape; draw sets it again on the next"
+
+[[type.field]]
+offset = 0x224
+name = "world_view"
+type = "float[16]"
+status = "verified"
+evidence = ["manual:read at the logo's D: the plus placed within a pixel", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "the current transform of the shape being drawn, a 4x4 of floats with a row per axis (x' = x * m[0] + y * m[4] + m[12], y' = x * m[1] + y * m[5] + m[13]), in pixels of the client area. draw pushes it onto the matrix stack before the draw and restores it after"
+
+[[type.field]]
+offset = 0x2B0
+name = "matrix_stack"
+type = "std::list"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "embedded std::list of saved world_view matrices (head at +0x2B0, count at +0x2B4); draw pushes one and pops it"
+
+[[type.field]]
+offset = 0x2C0
+name = "device"
+type = "void*"
+status = "verified"
+evidence = ["probe:title-scene", "xref:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "IDirect3DDevice9*, the game's one device; every draw call goes through its vtable. Also the global d3d9_device"
+
+[[type]]
+name = "cube::StartMenuWidget"
+kind = "class"
+size = 0x168
+builds = ["cube-0x51D2CE9C", "cube-0x51EA955E"]
+status = "candidate"
+evidence = ["rtti:cube::StartMenuWidget", "manual:operator new(0x168) in cube::GameController::GameController", "xref:cube::StartMenuWidget::draw"]
+source = "kyubu"
+notes = "the title screen's menu: no child nodes, it draws its three rows itself (cube::StartMenuWidget::draw). Built on cube::GameController.start_menu_node, size 200 x 100; the rows are 50 px apart, so they reach y 140"
+
+[[type.field]]
+offset = 0x4
+name = "engine"
+type = "plasma::D3D9Engine*"
+status = "candidate"
+evidence = ["xref:plasma::Widget::Widget", "xref:cube::StartMenuWidget::draw"]
+source = "kyubu"
+notes = "the first constructor argument, stored by every plasma widget; the draw takes the font engine from its +0x34"
+
+[[type.field]]
+offset = 0x148
+name = "node"
+type = "plasma::Node*"
+status = "candidate"
+evidence = ["xref:plasma::Widget::Widget", "xref:cube::StartMenuWidget::draw"]
+source = "kyubu"
+notes = "the widget's node (the node's widget field points back); the draw passes it to the engine's vtable +0x40 before drawing the rows"
+
+[[type.field]]
+offset = 0x160
+name = "hover"
+type = "int32_t"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "xref:cube::GameController::onMouseDown"]
+source = "kyubu"
+notes = "the row under the cursor, set by each draw: -1 none, 0 Start Game, 1 Options, 2 Exit. A left click acts on it while start_scene and start_menu_node are visible; any other value is ignored, so 3 is free"
+
+[[type.field]]
+offset = 0x164
+name = "controller"
+type = "cube::GameController*"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::StartMenuWidget"]
+source = "kyubu"
+notes = "the third constructor argument"

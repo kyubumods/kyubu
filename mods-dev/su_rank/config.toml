@@ -1,0 +1,14 @@
+# The options of su_rank (docs/config.md). A replay sets them with the console command `config su_rank <key> <value>`.
+
+[options.ability]
+type = "string"
+default = "skills_unleashed:berserker"
+label = "Ability"
+description = "The ability whose rank is set to 3."
+
+[options.specialization]
+type = "string"
+default = "keep"
+choices = ["keep", "berserker", "guardian", "sniper", "scout", "fire_mage", "water_mage", "assassin", "ninja"]
+label = "Specialization"
+description = "Makes your character this class and specialization; keep leaves it as it is."

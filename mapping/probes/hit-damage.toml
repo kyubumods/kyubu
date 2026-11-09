@@ -1,0 +1,245 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Hits and damage in single-player (task 9.5): the World runs every creature's mode, detects its hits
+# (cube::World::hitCreature) and applies them at once (cube::World::applyHit), since it is not a joined client's.
+# The target is the creature with the top id T = [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] (the creature map's last node),
+# made hostile (hostile_type 1, which cube::World::canHit lets a player hit) and put half a block from the player
+# with `inspect set ... from ... plus`. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "hit-damage"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced hitCreature, applyHit, canHit, the damage and forward sites and the hit-list push (3 args each)",
+    "Idle control: traced 5 s with nothing forced",
+    "Phase 1: T made hostile, stunned, max hp raised, hp 1000, moved next to P; P forced into cyclone (86), then 4",
+    "Phase 2a: T unstunned and moved next to P again; P's hp 2000; T forced into cyclone each second at its own level",
+    "Phase 2b: T at level 50, moved next to P again, forced into cyclone each second",
+    "Phase 3: T back at level 1 and stunned; P's mp 0; four real M2 holds with T half a block along +x, then +y",
+]
+observations = [
+    "Wine replay 7 passed, 26 of 26 checks held; screenshots 01-player-hits, 02-creature-hits, 03-m2",
+    "World+0xB4 (joined) read 0; idle 5 s: no hit, no damage-site pass",
+    "phase 1: hitCreature 13 times (target T, attacker P), all from the melee case 0x61308D; applyHit 13 from 0x596F25",
+    "phase 1: damage passed to hitCreature 0.9 to 10.4; T's hp 10000 -> 9888.1 in 13 steps (damage site 13 passes)",
+    "phase 2a: T (level 1) hit P 8 times with 0.9 to 1.2 before armour; applyHit reached its damage test (0x59473D)",
+    "phase 2a: no damage-site pass and P's hp stayed 2000: P's armour took the whole damage (hitCreature clamps at 0)",
+    "phase 2b: T at level 50 hit P 8 times with 3.4 to 5.4 before armour; P's hp fell to 1977.3 (8 damage-site passes)",
+    "phase 3: 4 hits of real M2 presses with mp 0, each with damage exactly 0; applyHit's damage test 4, damage site 0",
+    "the forward site never passed: a single-player World has a local player",
+    "setting hp above max hp is undone within a step: replay 1's T (max 25 hp) died after 4 hits ('You gain 1 XP.')",
+    "replays 1 to 4 failed on script mistakes (hp clamp, an inspect that switched objects, T wandering off in 2b)",
+    "replay 6 failed phase 1 (only one weak hit landed: T's placement); its phase 3 found the M2 damage of 0",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "called when the player's forced attack reaches the creature, and when the creature's reaches the player"
+
+[[confirms]]
+entry = "cube::World::applyHit"
+observed = "called for each hit in single-player: the World applies its own hits"
+
+[[confirms]]
+entry = "cube::World::canHit"
+observed = "called while the attacks look for targets"
+
+[[confirms]]
+entry = "cube::World::hitDamageSite"
+observed = "passes when a hit lowers the target's hp, never idle"
+
+[[confirms]]
+entry = "cube::World::hitForwardSite"
+observed = "never passes in single-player (the World has a local player)"
+
+[[confirms]]
+entry = "cube::CreatureData.hp"
+observed = "the target's falls when it is hit, the player's when the creature hits it"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 390
+input = [
+    "until 9.5: the player hits",
+    "wait 2",
+    "shot 01-player-hits",
+    "until 9.5: the creature hits harder",
+    "wait 2",
+    "shot 02-creature-hits",
+    "until 9.5: M2 1", "wait 1", "hold mouse3 2",
+    "until 9.5: M2 2", "wait 1", "hold mouse3 2",
+    "until 9.5: M2 3", "wait 1", "hold mouse3 2",
+    "until 9.5: M2 4", "wait 1", "hold mouse3 2",
+    "shot 03-m2",
+]
+script = """
+log hits and damage in single-player (task 9.5): the player and the creature with the top id hit each other
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 3
+trace add @0x595580
+trace add @0x5942B0
+trace add @0x5970F0
+trace add @0x59483E
+trace add @0x59435C
+trace add @0x486760
+# idle control: nothing forced
+trace start
+wait 5
+trace stop
+trace report
+expect cube::World::hitDamageSite calls @0x59483E == 0
+expect cube::World::hitForwardSite calls @0x59435C == 0
+# phase 1: the player hits T. T becomes hostile (a player can hit hostile_type 1), stunned (so it neither moves
+# nor attacks), with hp 1000 (the step clamps hp to max hp, which scales with max_hp_multiplier), half a block (0x8000)
+# from the player
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch thp f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace start
+log 9.5: the player hits
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+watch
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect cube::World::hitCreature calls @0x595580 > 0
+expect cube::World::hitCreature caller @0x595580 0x61308D
+expect cube::World::applyHit calls @0x5942B0 > 0
+expect cube::World::applyHit caller @0x5942B0 0x596F25
+expect cube::World::canHit calls @0x5970F0 > 0
+expect cube::World::hitDamageSite calls @0x59483E > 0
+expect cube::World::hitForwardSite calls @0x59435C == 0
+expect cube::CreatureData.hp watch thp decreased
+expect cube::CreatureData.hp value f32 > 0 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+watch clear
+# phase 2: T hits the player. T is freed and put next to the player again, the player gets hp 2000 (max hp raised
+# first), and T is forced into cyclone each second (the dispatch runs a hostile creature's mode in single-player)
+inspect player [@0x7691C8]
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+inspect set data.max_hp_multiplier 1000
+inspect set data.hp 2000
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.stun_time 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+# 2a: at T's own level its cyclone deals about 1 before armour. hitCreature subtracts the player's armour (0x43D880,
+# which grows with the level) and clamps at 0, so the hits reach applyHit (0x59473D, the damage test) with no damage
+trace add @0x59473D
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+trace start
+log 9.5: the creature hits
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+watch
+expect cube::World::hitCreature calls @0x595580 > 0
+expect cube::World::applyHit calls @0x59473D > 0
+expect cube::World::hitDamageSite calls @0x59483E == 0
+expect cube::World::hitForwardSite calls @0x59435C == 0
+expect cube::CreatureData.hp watch php unchanged
+watch clear
+# 2b: T at level 50 hits harder than the armour (moved next to the player again: replay 4's T had wandered off)
+inspect set data.level 50
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+trace start
+log 9.5: the creature hits harder
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+watch
+inspect player [@0x7691C8]
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect cube::World::hitCreature calls @0x595580 > 0
+expect cube::World::hitDamageSite calls @0x59483E > 0
+expect cube::World::hitForwardSite calls @0x59435C == 0
+expect cube::CreatureData.hp watch php decreased
+watch clear
+# phase 3: a real M2 without rage (mp 0, so nothing is charged: spent_mp 0), as the joined client's attacks in
+# hit-authority. T is back at level 1, stunned, and put half a block along +x and +y in turn while gamepilot holds M2.
+# Replay 6 saw hitCreature called with a damage of exactly 0: the release (60) of an uncharged M2 deals nothing
+inspect set data.level 1
+inspect set data.stun_time 60000
+inspect player [@0x7691C8]
+inspect set data.mp 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+watch thp f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+trace start
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+log 9.5: M2 1
+wait 12
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x8000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+log 9.5: M2 2
+wait 12
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+log 9.5: M2 3
+wait 12
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x8000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+log 9.5: M2 4
+wait 12
+trace stop
+trace report
+watch
+inspect player [@0x7691C8]
+expect cube::World::hitCreature calls @0x595580 > 0
+expect cube::World::applyHit calls @0x59473D > 0
+expect cube::World::hitDamageSite calls @0x59483E == 0
+expect cube::CreatureData.hp watch thp unchanged
+watch clear
+wait 5
+expect - hooks == 0
+"""

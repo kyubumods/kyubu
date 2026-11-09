@@ -1,0 +1,121 @@
+# Cube.exe: multiplayer client.
+
+[[function]]
+name = "Net::connectPortSite"
+address = 0x46FF38
+convention = "cdecl"
+kind = "site"
+sig_len = 10
+subsystem = "network"
+status = "verified"
+evidence = ["import:ws2_32.dll!htons", "manual:push 0x3039 (port 12345) as the argument of htons"]
+source = "kyubu"
+
+# Task 6.6: the client side of the protocol. The socket is at GameController+0x8006C4.
+
+[[function]]
+name = "client_connect"
+address = 0x46FE90
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!connect", "string:\"Error: Server is full.\""]
+source = "kyubu"
+notes = "on the game controller, (host): socket, connect to port 12345 (Net::connectPortSite is inside), send id 0x11 and the client version (Net::connectVersionSite), then switch on a u32 reply: 16 join, 18 full, 17 version mismatch, else Connection error. A vanilla Server.exe never sends 17"
+
+[[function]]
+name = "Net::connectVersionSite"
+address = 0x470159
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:client_connect", "manual:the client version is stored here, then sent", "probe:protocol-version"]
+source = "kyubu"
+notes = "in client_connect: the store of the client version (a vanilla server accepts only 3). The immediate is at +6 (0x47015F): level_rework patches it (mod symbol level_rework:protocol_version_send), so a probe must not hook it. The error text shows the client version from a constant, not this value"
+
+[[function]]
+name = "Net::connectJoinSite"
+address = 0x470286
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:client_connect", "manual:the join reply (16) branch", "probe:protocol-version"]
+source = "kyubu"
+notes = "observation point, 6 bytes (lea esi,[ebx+0x2DC]): reached once per join, never on a refusal"
+
+[[function]]
+name = "Net::connectMismatchSite"
+address = 0x4709AA
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:client_connect", "manual:the version mismatch reply (17) branch", "probe:protocol-version"]
+source = "kyubu"
+notes = "observation point, 6 bytes: reads the server's version, then shows the version error. A vanilla Server.exe never sends 17, so a refusal by one does not reach it (see Net::connectUnknownReplySite)"
+
+[[function]]
+name = "Net::connectUnknownReplySite"
+address = 0x4701FD
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:client_connect", "manual:the default of client_connect's reply switch: the Connection error text", "probe:protocol-version"]
+source = "kyubu"
+notes = "observation point, 5 bytes (push imm32): any reply other than 16, 17 and 18 shows 'Connection error' and closes the socket. A vanilla Server.exe answers a client with a version other than 3 with a bare 3, which lands here"
+
+[[function]]
+name = "client_receive_loop"
+address = 0x46BBA0
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!recv", "cuwo:cuwo/packet.py"]
+source = "kyubu"
+notes = "thread: reads a uint32 id and switches on 0-5, 10 and 15, cuwo's server-to-client packets; 0 builds unknown creatures and skips the player's own (GameController+0x8006C8)"
+
+[[function]]
+name = "client_send_loop"
+address = 0x46A070
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!send", "manual:thread with no caller: send and Sleep under the game lock"]
+source = "kyubu"
+
+[[function]]
+name = "client_disconnect"
+address = 0x471C40
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!closesocket", "xref:cube::GameController::onKeyDown"]
+source = "kyubu"
+notes = "closes the socket at +0x8006C4 and waits for the two threads (handles at +0x800588 and +0x80058C)"
+
+# The creature update (packet 0) writer and reader (read statically on 2026-09-30).
+
+[[function]]
+name = "creature_update_write"
+address = 0x4CD840
+convention = "cdecl"
+prototype = "void __cdecl creature_update_write(void* buffer, cube::CreatureData* last_sent, cube::CreatureData* now, bool full)"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:client_send_loop", "cuwo:cuwo/entity.pyx"]
+source = "kyubu"
+notes = "compares every CreatureData field with the last sent copy (all when full) and writes a u64 mask followed by the changed fields, in cuwo's order. The spare fields (not_used_1-6, not_used7/8, unknown_or_not_used1/2/4, not_used19/20) are compared and sent too"
+
+[[function]]
+name = "creature_update_read"
+address = 0x4CCD40
+convention = "cdecl"
+prototype = "int32_t __cdecl creature_update_read(void* buffer, cube::CreatureData* data)"
+subsystem = "network"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx", "manual:reads a u64 mask, then each masked field into data"]
+source = "kyubu"
+notes = "the buffer reader of the masked creature data (0x4CD180 reads the same format from the socket)"

@@ -1,0 +1,10 @@
+id = "markers_proto"
+name = "Markers prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe anim-markers): markers_proto:swing claims the warrior's slot 4 (800 ms, no mp cost), is bound to a clip with four markers (assets/animations/swing.anim.toml) and logs the names ctx:marker() gives in each step and in on_end."
+
+[scripts]
+client = "scripts/client.lua"

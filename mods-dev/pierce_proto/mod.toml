@@ -1,0 +1,10 @@
+id = "pierce_proto"
+name = "Pierce prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe projectile-pierce): for a ranger of specialization 1 the bow's M1 starts the held charge, its release fires one straight arrow (kind 1, no skill flag) that goes through every creature, hits each once and ends at a surface with the game's own arrow end. The first three creatures of the World are lined up in front of the player. Specialization 0 leaves the game's own bow."
+
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,13 @@
+id = "frost_spells"
+name = "Frost spells"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+trust = "restricted"
+description = "Registry example: adds two spells to spells_lib's registry."
+
+[dependencies]
+spells_lib = "^1.0"
+
+[scripts]
+common = "scripts/common.lua"

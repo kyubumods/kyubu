@@ -1,0 +1,52 @@
+# Task 6.4 of add-mod-manager. The Actions menu of the Mods page (Enable or Disable with the mods that need it, Reset options, Delete after a
+# box, Undo last apply) and the change bar (Discard, Apply, Apply & restart). ModManager's own Disable and Delete are grey. The replay lists
+# ModManager, the base and user fixtures and the options fixture.
+id = "mod-actions"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built src/actions.h (collected changes, menu rows, ops, undo record) and wired the Actions menu, DISCARD, APPLY and Undo in main.cpp",
+    "Replayed at the start menu under Wine at 1024 x 768: Actions on ModManager, an option and APPLY, a toggle and APPLY & RESTART, then Undo last apply",
+]
+observations = [
+    "run 7 passed (evidence/mod-actions-2026-10-24): self rows grey; option Apply writes at once and Undo restores it; a toggle takes its dependent along, APPLY & RESTART restarts and the next boot lists both OFF; Undo after the restart queues both back (pending.toml: 2 applied, 0 failed)",
+    "the restarted process opens at 792 x 600 under Wine; console output is not in screenshots",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook acts on the Actions menu, the change bar and Undo here"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 800
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_base", "mods-dev/mm_fixture_user", "mods-dev/mm_fixture_opts"]
+input = [
+    "until modact open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 01-list", "console mod_manager:state",
+    "click 195 465", "wait 3", "click 750 229", "wait 2", "move 700 286", "wait 2", "shot 02-self-menu", "click 700 286", "wait 2", "click 750 229", "wait 2", "move 700 346", "wait 2", "shot 03-self-delete", "click 700 346", "wait 2", "console mod_manager:state",
+    "click 195 401", "wait 4", "click 911 540", "wait 3", "shot 04-glow-off", "console mod_manager:state",
+    "click 860 695", "wait 4", "shot 05-applied", "console mod_manager:state",
+    "click 750 229", "wait 2", "click 700 376", "wait 4", "shot 05b-undo-options", "console mod_manager:state",
+    "click 195 369", "wait 3", "click 750 229", "wait 2", "click 700 286", "wait 3", "shot 06-base-off", "console mod_manager:state",
+    "click 195 433", "wait 3", "click 750 229", "wait 2", "click 700 346", "wait 3", "shot 07-delete-box", "click 593 433", "wait 3",
+    "click 860 695", "wait 3",
+    "until Restarted by game_restart",
+    "wait 30", "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 08-after-apply", "console mod_manager:state",
+    "click 750 229", "wait 2", "click 700 376", "wait 4",
+    "until Restarted by game_restart",
+    "wait 40", "shot 10-after-undo",
+    "wait 5",
+]
+script = """
+log modact: task 6.4 of add-mod-manager
+wait 15
+log modact open
+wait 300
+log modact done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

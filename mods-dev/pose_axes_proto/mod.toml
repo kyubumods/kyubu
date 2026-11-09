@@ -1,0 +1,9 @@
+id = "pose_axes_proto"
+name = "Pose axes prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe pose-axes): a mid hook at the join site of draw_creature (0x41F135) that writes the euler of one part of the local player's draw record, plus or minus 30 degrees on one axis, per phase, in the front view and then the left profile, so that a screenshot per phase shows what each sign does. It steps through the phases by wall clock and logs a line per phase and per screenshot."
+[scripts]
+client = "scripts/client.lua"

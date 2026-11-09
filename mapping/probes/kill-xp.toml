@@ -1,0 +1,200 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 3.1 of add-level-rework (M1): the kill XP of a monster in single-player. As in hit-damage, the target is
+# the creature with the top id T = [[[[@0x7691C8] + 0x2E0] + 8] + 0x18], made hostile, stunned and put half a block from
+# the player; the player's forced cyclone (mode 86) kills it. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "kill-xp"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced the two new sites in applyHit's death branch (0x594BDD, 0x5950E4), kill_record_apply, creature_level_up and the type-13 item site (0x48FB04, 3 args each)",
+    "Four kills, each on the creature with the top id T: made hostile, level and power_base and appearance flags set, hp 1, armour factor 0, stunned, put half a block from the player; the player's current_xp set (0, 0, 0, 7), its damage factor 100, then a forced cyclone (mode 86) for 3 s, mode 0 for 1 s, mode 4 for 2 s",
+    "Kill 1: level 10, power_base 0, flags 0. Kill 2: level 10, power_base 4. Kill 3: level 1, flags 0x200. Kill 4: level 10, flags 0x800, the player's XP set to 7 first",
+]
+observations = [
+    "Wine replay 2 passed, 8 of 8 entries held; replay 1 failed on kill 2 only (the target, a ginseng with power_base 4, survived the cyclone: its armour took all the damage), so the script now sets the target's armour factor to 0 and the player's damage factor to 100",
+    "the four targets were a bush (type 120), a ginseng (127), a bush and a cobweb scrub (125): none of the ten large kinds, so no x20 applies",
+    "kill 1 (level 10, power_base 0): the player's current_xp went 0 -> 6. 20*f(10) = 6.207, truncated to 6",
+    "kill 2 (level 10, power_base 4): 0 -> 7. 20*f(14) = 7.879, so the XP follows level + power_base",
+    "kill 3 (level 1, flags 0x200): 0 -> 10. 20*f(1) = 0 is raised to 1, then x10: the minimum of 1 comes before the multiplier",
+    "kill 4 (level 10, flags 0x800): the player's 7 stayed 7, with the kill record applied (4 calls in all): the flag gives 0 XP",
+    "the trace: 0x594BDD 4 calls (once per death), 0x5950E4 4 calls (once per kill: one player in each threat map), kill_record_apply 4 calls, all from 0x59513D (the call at 0x595138), creature_level_up 4 calls, all from 0x59F5E7 (the call at 0x59F5E2, the player's branch)",
+    "0x48FB04 (item type 13) 0 calls: no zone-completion item was made by these kills",
+    "no level-up (the player stayed below 50 XP), no pet, no fault; the probe's hooks were all removed at the end (hooks == 0)",
+    "not tried: hold mouse1 (gamepilot's mouse1 did nothing in earlier records), a giant kind, a joined client, and a kill that completes a zone",
+]
+
+[[confirms]]
+entry = "cube::World::killXpSite"
+observed = "passed 4 times, once per death, with the victim in EBX and the XP at [EBP-0x2F8]; the player's XP then rose by exactly the vanilla amount (6, 7, 10, 0)"
+
+[[confirms]]
+entry = "cube::World::killRecordXpSite"
+observed = "passed 4 times, once per kill, before kill_record_apply; the amount the player gained is the XP at [EBP-0x2F8] truncated"
+
+[[confirms]]
+entry = "cube::GameController::itemXpSite"
+observed = "never passed (0 calls) in kills that complete no zone"
+
+[[confirms]]
+entry = "kill_record_apply"
+observed = "called 4 times, always from 0x59513D inside applyHit, once per kill; the local player's current_xp rose by the record's XP"
+
+[[confirms]]
+entry = "creature_level_up"
+observed = "called 4 times, all from 0x59F5E7 (kill_record_apply's player branch); no pet existed"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "the player's rose by 6, 7 and 10 in the three kills that award XP, and stayed 7 in the one with flag 0x800"
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+input = []
+script = """
+log kill XP of a monster in single-player (task 3.1 of add-level-rework): applyHit's death branch and its sites
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 3
+trace add @0x594BDD
+trace add @0x5950E4
+trace add @0x59F4E0
+trace add @0x448150
+trace add @0x48FB04
+trace start
+# kill 1: level 10, power_base 0, flags 0: floor(20*f(10)) = 6
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+log kill 1: level 10, power_base 0, flags 0: floor(20*f(10)) = 6
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 6 [[@0x7691C8] + 0x8006C8] + 0x194
+# kill 2: level 10, power_base 4, flags 0: floor(20*f(14)) = 7
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+log kill 2: level 10, power_base 4, flags 0: floor(20*f(14)) = 7
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 7 [[@0x7691C8] + 0x8006C8] + 0x194
+# kill 3: level 1, flags 0x200: max(1, 20*f(1)) * 10 = 10
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 512
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+log kill 3: level 1, flags 0x200: max(1, 20*f(1)) * 10 = 10
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 10 [[@0x7691C8] + 0x8006C8] + 0x194
+# kill 4: level 10, flags 0x800: no XP, the 7 stays
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 2048
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 7
+inspect set data.mp 1
+log kill 4: level 10, flags 0x800: no XP, the 7 stays
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 7 [[@0x7691C8] + 0x8006C8] + 0x194
+trace stop
+trace report
+expect cube::World::killXpSite calls @0x594BDD >= 4
+expect cube::World::killRecordXpSite calls @0x5950E4 >= 4
+expect kill_record_apply calls @0x59F4E0 >= 4
+expect creature_level_up calls @0x448150 >= 4
+expect cube::GameController::itemXpSite calls @0x48FB04 == 0
+wait 5
+expect - hooks == 0
+"""

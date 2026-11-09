@@ -1,0 +1,9 @@
+id = "anim_signals_proto"
+name = "Animation signals (proto)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe anim-signals): one clip whose `expr` tracks read the signals of a draw (charge, speed, rank). The mod puts it on the local player with the preview clock, keeps mp at 1 so that a held right button (a vanilla hold mode) builds charged_mp, and a mid hook at the join site of draw_creature logs the creature's charged_mp next to the vectors the draw reads."
+[scripts]
+client = "scripts/client.lua"

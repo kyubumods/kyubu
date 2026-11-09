@@ -1,0 +1,9 @@
+id = "ground_height_proto"
+name = "Ground height prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe world-ground-height): scans cube::World::getBlock down from above for 9 points on a line in front of the player, logs the ground heights and puts a particle marker on the terrain at each."
+
+[native]
+common = "bin/ground_height_proto.dll"

@@ -1,0 +1,32 @@
+# Cube.exe: the world map (cube::WorldMap, its tiles and its save file).
+# Server.exe has no cube::WorldMap, no map tiles and no Save/map_ string: the map is client-only.
+
+[[function]]
+name = "cube::WorldMap::WorldMap"
+address = 0x5F9850
+convention = "thiscall"
+subsystem = "travel"
+status = "candidate"
+evidence = ["rtti:cube::WorldMap", "xref:cube::GameController::GameController"]
+source = "kyubu"
+notes = "stores the vtable; loads skull.cub and the map-tile-*.cub models (plains, village, forest, mountains, hills); its cube::Database is at +0x8000F0"
+
+[[function]]
+name = "cube::WorldMap::~WorldMap"
+address = 0x5FA270
+convention = "thiscall"
+subsystem = "travel"
+status = "candidate"
+evidence = ["rtti:cube::WorldMap", "manual:only caller is vtable slot 0 (the deleting destructor)"]
+source = "kyubu"
+notes = "calls world_map_close, then the Database destructor"
+
+[[function]]
+name = "world_map_close"
+address = 0x600A10
+convention = "thiscall"
+subsystem = "travel"
+status = "candidate"
+evidence = ["string:\"discovered\"", "xref:cube::Database::setBuffer"]
+source = "kyubu"
+notes = "on the world map: writes discovered (the dword at +0x8000BC) to the map save, then frees the 1024x1024 grid of tile blocks at +0xB0 (0x1000 cube::ZoneTile of 0x34 bytes each); called by ~WorldMap and by cube::WorldMap::openSave before it opens the next save"

@@ -1,0 +1,11 @@
+id = "world_block_proto"
+name = "world_block probe (dev)"
+version = "0.1.0"
+kyubu = "^1.4"
+sides = ["client", "server"]
+trust = "full"
+description = "Development only (probes world-block-client and world-block-server): reads 81 columns round the player with kyubu.game.world_block and compares each block with cube::World::getBlock."
+
+[scripts]
+client = "scripts/main.lua"
+server = "scripts/main.lua"

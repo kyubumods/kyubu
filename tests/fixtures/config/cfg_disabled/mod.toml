@@ -1,0 +1,6 @@
+id = "cfg_disabled"
+name = "Config: disabled"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Fixture: declares options but is disabled; its config file must not be created."

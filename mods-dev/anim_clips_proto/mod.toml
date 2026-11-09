@@ -1,0 +1,6 @@
+id = "anim_clips_proto"
+name = "Animation clips (proto)"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+description = "Ships clips for the registry. The replay anim-hot-reload copies the files of edits/ over them."

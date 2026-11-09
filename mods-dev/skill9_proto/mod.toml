@@ -1,0 +1,10 @@
+id = "skill9_proto"
+name = "Skill 9 prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-skilltree): console commands that read and write the player's 11 skill ranks (Creature+0x1138), read the skill panel's working copy (SkillWidget+0x160) and read or fill the skill-icon map at GameController+0x800820, to see whether the skill tree can show a fourth ability (skill 9)."
+
+[scripts]
+client = "scripts/client.lua"

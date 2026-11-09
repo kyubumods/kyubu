@@ -1,0 +1,9 @@
+id = "draw_record_proto"
+name = "Draw record prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe anim-draw-record): a mid hook on draw_creature (0x4129C0, and one on its ret) that passes every call through and logs the draw record (this): its creature, the mode time (+4) and the mode id (+8), next to the creature's own current_mode and mode_start_time, for the local player and for other creatures, per caller."
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,20 @@
+# Options of the config demo fixture.
+[options.radius]
+type = "float"
+default = 8.0
+min = 1.0
+max = 32.0
+description = "Blast radius in blocks."
+
+[options.mode]
+type = "string"
+default = "fire"
+choices = ["fire", "ice"]
+description = "What the blast is made of."
+
+[options.speed]
+type = "int"
+default = 3
+min = 1
+max = 10
+description = "Projectile speed."

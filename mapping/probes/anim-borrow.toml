@@ -1,0 +1,46 @@
+# Task 4.2 of add-ability-animation (the pose provider, phase 1): mods-dev/anim_borrow_proto defines three mod abilities (112 no clip, 113 a clip that borrows pose 2,
+# 114 the same with the head and the weapons hidden), forces the local player's current_mode into each of them (and into vanilla mode 57, whose pose id is 2) with the
+# mode time pinned at 300 ms, and a screenshot per phase shows what the provider draws. A mid hook at the join site logs the pose id and time the draw reads.
+id = "anim-borrow"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 80 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; six phases of 6 s (idle, vanilla mode 57, mod 112, 113, 114, idle again), a screenshot 3 s into each",
+]
+observations = [
+    "Wine replay 2 passed (evidence/ability-animation-2026-10-07/anim-borrow-run2/: six screenshots, sheet-player.png, latest.log); replay 1 (anim-borrow-run1/) had the same log lines but a 40 s warm-up, and its first two screenshots show the player still turning, so the later run waits 80 s",
+    "the log has 'the pose provider is installed (draw_creature, borrowed looks)' and 'game API: available on this build: ... animation_pose'; the mod's clips load and the three abilities define (numbers 112, 113, 114 in id order)",
+    "at the join site the record read: idle pose 0 time 0; forced vanilla mode 57 pose 2 time 411 (the game's own values, the provider did not touch it); mod 112 (no clip) pose 0 time 0; mod 113 (borrows pose 2) pose 2 time 427; mod 114 (the same, hides head and weapons) pose 2 time 429; mode 0 again pose 0 time 0. The creature's own mode time was pinned at 300 ms each draw, so the record time is the game's step on top of it",
+    "screenshots: mode 112 draws the game's default pose 0 (the club raised over the head); mode 113 draws a different pose; mode 114 draws the arms crossed over the chest as vanilla mode 57 does, with the club and the face gone (the hide groups head and weapons work: the hair stays, a separate slot); mode 113 shows the same crossed arms behind the club, which is held in front of the body, while vanilla 57 has the club behind the head: not explained (the length-reading cases ask modeDuration for the creature's real mode: 800 ms for the mod, the game's own for 57)",
+    "the record's model slots at the join site (head, hair, body, weapon A: 0x17) were the same in every phase, including 114: the hide mask clears them after the join site",
+    "the pin writes mode_start_time = 300 every draw, so the step runner sees the time go back and starts the ability again on every step (197 on_start lines): harmless here, the pose reads the record's copy",
+    "no WARN or ERROR line from the provider; the idle_after phase (mode 0) draws the game's idle again",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a function hook on draw_creature rewrites the draw record's pose id and time for a mod mode with a borrow clip, and the draw shows the borrowed pose"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-dev/anim_borrow_proto"]
+input = [
+    "until animborrow: first draw", "wheel down 3",
+    "until animborrow: shot01 idle", "shot 01-idle",
+    "until animborrow: shot02 vanilla57", "shot 02-vanilla57",
+    "until animborrow: shot03 a_plain", "shot 03-a_plain",
+    "until animborrow: shot04 b_borrow", "shot 04-b_borrow",
+    "until animborrow: shot05 c_hide", "shot 05-c_hide",
+    "until animborrow: shot06 idle_after", "shot 06-idle_after"
+]
+script = """
+log anim-borrow: task 4.2 of add-ability-animation, the borrowed look
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

@@ -1,0 +1,13 @@
+# Phase 2: the weapon arm far out of its place, so a screenshot shows it at a glance. The rotation is a ramp over the ability (0 to 160 degrees),
+# so the value the draw reads shows the clip time: the probe pins the mode at 300 ms and the draw reads about 140 ms more, so about 88 degrees.
+duration = "ability"
+
+[[track]]
+part = "hand_r"
+channel = "pos"
+keys = [ { t = 0, v = [0, 0, 14] } ]
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+keys = [ { t = 0, v = [0, 0, 0] }, { t = 1, v = [160, 0, 0] } ]

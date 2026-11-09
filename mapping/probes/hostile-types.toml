@@ -1,0 +1,168 @@
+# Recorded with kyubu_probe, the entity_spawner mod (prototype, spawn_raw) and the Kyubu 1.0.1 loader, unattended under
+# Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world (seed 1234). Task 3.4 of add-entity-spawner: for each cube::HostileType
+# value 1, 2, 3 and 6 the mod's `spawner hostile <value>` puts five green slimes in a line 12 to 28 blocks north of the
+# player (the crosshair of a new world's camera is over one of them: the name tag) and one half a block east of it
+# (the hit); the script then forces the player's cyclone (mode 86) and basic attack (mode 4), as hit-damage does, and
+# watches the near slime's hp (the map's leftmost node: the lowest id, spawned last).
+id = "hostile-types"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-29"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Four phases, one per hostile_type 1, 2, 3, 6: `console entity_spawner:spawner hostile <n>` (the mod removes the earlier phase's slimes with hp 0, spawns five level-1 green slimes 12, 16, 20, 24 and 28 blocks north and one 0.5 blocks east of the player, all with that hostile_type), a screenshot 35 s after the console step, and 90 s after the phase's log line the script checked the near slime's hostile_type, gave the player mp 1 and forced its cyclone for 3 s, mode 0 for 1 s, mode 4 for 2 s (mode_start_time 0 each time), and read the slime's hp from a watch",
+    "Two runs before this one are kept beside it, not as the record: the far slime 4 blocks north was hidden behind a terrain step and 8 blocks north was below the crosshair (no name tag in either run; the hits came out the same); the run before this one only had a wrong prediction for type 6 (unchanged instead of decreased)",
+]
+observations = [
+    "Wine replay 4 passed, 8 of 8 checks held; screenshots hostile-1, hostile-2, hostile-3 and hostile-6 (evidence folder entity-spawner-3.4-2026-09-29)",
+    "the slime that was spawned last read the hostile_type asked for in all four phases (the World's map has it as the leftmost node, lowest id, as the id rule says), level 1, hp 100 = max hp",
+    "can it be hit: type 1 (HOSTILE) lost hp, 100 -> 46.2 -> 29.1; type 6 (TARGET) lost hp, 100 -> 58.7 -> 10.3; types 2 (FRIENDLY) and 3 (NAMED_FRIENDLY) stayed at exactly 100 through the same 6 s of forced cyclone and basic attack. The three earlier runs gave the same split (type 1 ended at 47.9, 37.8 and 53.1 hp, type 6 at 15.1, 7.1 and 12.1, types 2 and 3 at 100). The four far slimes of each line never lost hp, the cyclone does not reach 12 blocks",
+    "this fits the combat page's rule (a player hits a monster of hostile_type 0 or 1, a neutral creature only when it is flagged at Creature+0x124): a spawned creature of type 2 or 3 has no flag; type 6 could be hit, so canHit lets a player hit TARGET creatures too (the creature-fields probe's bush, EntityType 120, is HostileType 6)",
+    "the name tag over a spawned creature (the crosshair on one of the far slimes): 1 has the name SLIME in cyan over a red hp bar; 2 the same name over a blue bar; 3 a blue bar with the game's own personal names above the slimes' (SANSEL and IKOGOR, from stacked slimes) and an [R] TALK prompt under the crosshair; 6 the name SLIME in white over a grey hp bar. The colours are read off the screenshots",
+    "the creatures stand still (no behaviour); the player was pushed a few blocks between phases and its yaw changed (the cyclone spins it), the camera stays north",
+]
+
+[[confirms]]
+entry = "cube::HostileType"
+observed = "values 1, 2, 3 and 6 were set on spawned creatures and read back; 1 and 6 can be hit by the player, 2 and 3 cannot; the name tag's hp bar is red for 1, blue for 2 and 3, grey for 6; 3 is talkable and gets personal names; cuwo's names fit"
+
+[[confirms]]
+entry = "cube::CreatureData.hostile_type"
+observed = "1, 2, 3 and 6 written by the recipe's caller (spawn_raw) read back from the creature in the World's map, and the game acted on them (hits, tags, talk)"
+
+[[confirms]]
+entry = "cube::World::canHit"
+observed = "a forced cyclone and basic attack of the player hurt a level-1 creature of hostile_type 1 and one of 6, and left ones of 2 and 3 untouched (hp watch)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 3.4: hostile 1", "console entity_spawner:spawner hostile 1", "wait 35", "shot hostile-1",
+    "until 3.4: hostile 2", "console entity_spawner:spawner hostile 2", "wait 35", "shot hostile-2",
+    "until 3.4: hostile 3", "console entity_spawner:spawner hostile 3", "wait 35", "shot hostile-3",
+    "until 3.4: hostile 6", "console entity_spawner:spawner hostile 6", "wait 35", "shot hostile-6",
+]
+script = """
+log hostile types (task 3.4 of add-entity-spawner): one creature per cube::HostileType to look at and one to hit
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+# hostile_type 1: `spawner hostile 1` puts five green slimes 12 to 28 blocks north of the player (the name tag: the crosshair is over one of the far ones) and one half a block east of it (the hit); the console step runs 20 to 40 s late under Wine, the shot 35 s after it
+log 3.4: hostile 1
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the one next to the player
+expect cube::CreatureData.hostile_type value u8 == 1 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x60
+watch nhp f32 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log 3.4: hostile 1 cyclone
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+watch
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::World::canHit watch nhp decreased
+watch clear
+# hostile_type 2: `spawner hostile 2` puts five green slimes 12 to 28 blocks north of the player (the name tag: the crosshair is over one of the far ones) and one half a block east of it (the hit); the console step runs 20 to 40 s late under Wine, the shot 35 s after it
+log 3.4: hostile 2
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the one next to the player
+expect cube::CreatureData.hostile_type value u8 == 2 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x60
+watch nhp f32 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log 3.4: hostile 2 cyclone
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+watch
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::World::canHit watch nhp unchanged
+watch clear
+# hostile_type 3: `spawner hostile 3` puts five green slimes 12 to 28 blocks north of the player (the name tag: the crosshair is over one of the far ones) and one half a block east of it (the hit); the console step runs 20 to 40 s late under Wine, the shot 35 s after it
+log 3.4: hostile 3
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the one next to the player
+expect cube::CreatureData.hostile_type value u8 == 3 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x60
+watch nhp f32 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log 3.4: hostile 3 cyclone
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+watch
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::World::canHit watch nhp unchanged
+watch clear
+# hostile_type 6: `spawner hostile 6` puts five green slimes 12 to 28 blocks north of the player (the name tag: the crosshair is over one of the far ones) and one half a block east of it (the hit); the console step runs 20 to 40 s late under Wine, the shot 35 s after it
+log 3.4: hostile 6
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the one next to the player
+expect cube::CreatureData.hostile_type value u8 == 6 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x60
+watch nhp f32 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log 3.4: hostile 6 cyclone
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+watch
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::World::canHit watch nhp decreased
+watch clear
+log 3.4: end
+wait 5
+"""

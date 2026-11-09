@@ -1,0 +1,19 @@
+# markers_proto:swing (task 7.8). No tracks: the clip only names four moments of the ability's own 800 ms, written out of order on purpose.
+# At 800 ms the marker `done` sits on the very end, which no on_step can reach before the ability ends: on_end is told it.
+duration = "ability"
+
+[[marker]]
+t = 0.5
+name = "hit"
+
+[[marker]]
+t = 1.0
+name = "done"
+
+[[marker]]
+t = 0.0
+name = "start"
+
+[[marker]]
+t = 0.25
+name = "wind"

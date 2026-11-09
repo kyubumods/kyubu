@@ -1,0 +1,10 @@
+id = "ability_api_proto"
+name = "Ability API prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probes ability-api and ability-ranks-*): defines one ability for the warrior's slot 4 and console commands that call ability_get, ability_cooldown, ability_start, ability_end, ability_rank_get and ability_rank_set on the player and log each answer."
+
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,68 @@
+# Task 10.9a of add-skills-unleashed-multiplayer (design D15): on a joined Cube.exe, the site where the player's own projectile
+# makes its hit. The client, made a Sniper by su_rank, summons its bow and shoots one arrow at the monster su_dummy (on the local
+# Server.exe) puts 3 blocks in front of it. cube::World::projectileHitSite is the start of the projectile step's non-water hit, just
+# before its call of cube::World::hitCreature; the arrow passing there is the hit the client would send as packet 7.
+# Passed in task 10.9 (run 7), once the server no longer flies its own arrow from the mode bytes. Since 10.9 the client's arrow makes no
+# hit on a joined client (lib/bow, server_hits): the record also expects that cut and the server's hit with its copy of the arrow.
+id = "projectile-hit-client-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Cube.exe joined to a local Server.exe, both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Sniper at rank 3 (su_rank options); held key 4 for 0.8 s, waited for the bow, then held mouse1 for 1.5 s (one arrow)",
+]
+observations = [
+    "task 10.9 run 7 2026-11-08 passed (evidence/sniper-shot-2026-11-08/projectile-hit-client-0720-run7): the site ran 5 times with ESI the shooter; at its hitCreature call lib/bow skipped the hit on su_dummy's monster (no hit here, the server makes it), and the server's copy of the arrow hit the same monster 21 ms after the packet for 188.9, then stopped on a block",
+    "task 10.9 run 6 passed the site (5 calls) but lib/bow's cut failed: the hitCreature detour gets the World as a void* cdata and server_hits did arithmetic on it (fixed: tonumber of the pointer; the unit tests now pass a pointer)",
+    "run 1 2026-11-08 failed on the record: `until the run ended` is the server's line, so the bow expired before the shot; and the hook engine refuses a trace on the call at 0x621E8C (a relative call), so the record traces only the site",
+    "runs 2 to 5 2026-11-08 failed (evidence/projectile-packet-2026-11-08/projectile-hit-client-0720-run2 to run5): the client's arrow flew (run 4: 12 passes of projectileUpdateSite, 522 of the creature loop at 0x6215EB) but no creature reached the box test at 0x621CDF, so the site never ran. The server's own Sniper arrow (189) hits su_dummy's monster (151 hp) about 0.1 s before the client's arrow is out, so the client's copy is most likely dead by then; raising its hp once on the server did not hold (the game set it back to 151.57 on the next step), and holding it in place in the bow modes did not help. Open: needs a target the server's Sniper does not kill first (10.9 cuts that flight anyway)",
+]
+
+[[confirms]]
+entry = "cube::World::projectileHitSite"
+observed = "the site passes when the joined client's own arrow meets the monster, with the shooter in ESI"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+server = "local"
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization sniper",
+    "console config su_rank ability skills_unleashed:sniper",
+    "console config skills_unleashed log_effects true",
+    "shot 01-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "until skills_unleashed:sniper ends",
+    "shot 02-summoned",
+    "hold mouse1 1.5",
+    "until projectile-hit-client-0720: done",
+    "shot 03-shot",
+]
+log_expect = { latest = [
+    "su_rank: the character is class 2, specialization 0 (sniper)",
+    "sniper: the arrow",
+    "no hit here (the server makes it)",
+], server = [
+    "su_dummy: target hp",
+    "shot an arrow",
+    "server: sniper: arrow hit creature",
+] }
+script = """
+log projectile-hit-client-0720: task 10.9a of add-skills-unleashed-multiplayer
+wait world
+trace add @0x620ACD
+trace add @0x6215EB
+trace add @0x621CDF
+trace add @0x621E28
+trace start
+wait 300 until calls @0x621E28 >= 1
+trace stop
+trace report
+expect cube::World::projectileHitSite calls @0x621E28 >= 1
+expect cube::World::projectileHitSite reg @0x621E28 esi != 0
+log projectile-hit-client-0720: done
+"""

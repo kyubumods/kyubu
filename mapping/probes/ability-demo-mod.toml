@@ -1,0 +1,127 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 4.7 of add-ability-api, unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. mods-examples/fourth_ability_demo
+# (trust full, Lua) claims the warrior's slot 4 with `any` as number 112 (800 ms, mp_cost 0.1, max_rank 3, cooldown 6000 - 500 * rank);
+# the other classes keep kyubu:placeholder (111). P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-demo-mod"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "mp 1, key 4 held 1.5 s as the warrior: the demo's callbacks log on_start, each on_step and on_end",
+    "class_type 1 to 4 with specialization 0 and 1 written with the inspector (the eight pairs, the warrior between every two others): bar index 5 read after each",
+    "class_type 3 (the mage): screenshot of the bar with the placeholder on slot 4",
+]
+observations = [
+    "Wine run 2 passed (run 1 too, but its readings repeated the previous value: the game does not clear the bar vector's sixth entry, so they proved nothing; run 2 alternates the warrior with another class). Evidence: evidence/ability-demo-2026-10-05/. 37 expectation checks held",
+    "bar index 5 (begin + 20), each reading different from the one before: 112 for the warrior's two specializations; 111 (the placeholder) for the ranger, the mage and the rogue, both specializations each",
+    "key 4 as the warrior at mp 1: the log has `on_start fourth_ability_demo:burst number 112 rank 1 side client`, 44 on_step lines (the World steps 20 ms apart) and `on_end done after 44 steps, 803 ms`; the loader's own line says the same ends `done`; mode 0 after",
+    "01-warrior.png: slot 4 greyed with the cooldown after the use; 02-mage.png: slot 4 shows smash's icon (the placeholder's stand-in)",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "set to 1 to 4 by the inspector (the warrior between every two other classes), the bar's slot 4 followed on the next frames"
+
+[[confirms]]
+entry = "cube::CreatureData.specialization"
+observed = "set to 0 and 1 by the inspector; the warrior's slot 4 is the demo's ability for both (reads alternate 112 and 111, so each is a real change)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-examples/fourth_ability_demo"]
+input = [
+    "until demo A", "hold 4 1.5", "shot 01-warrior",
+    "until demo mage", "shot 02-mage",
+]
+script = """
+log demo: task 4.7 of add-ability-api, mods-examples/fourth_ability_demo
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+# the bar: the five vanilla ids and the demo's burst, number 112 (index 5 = begin + 20)
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.mp 1
+log demo A
+wait 10
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# the eight pairs. Index 5 keeps its old value when the bar is rebuilt with five entries, so a reading proves a push only when it differs
+# from the one before: the warrior (112) and a placeholder class (111) alternate
+inspect set data.class_type 2
+inspect set data.specialization 0
+wait 3
+expect cube::CreatureData.class_type value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 1
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 2
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 1
+inspect set data.specialization 0
+wait 3
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 3
+inspect set data.specialization 0
+wait 3
+expect cube::CreatureData.class_type value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+log demo mage
+wait 4
+inspect set data.class_type 1
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 3
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 1
+inspect set data.specialization 0
+wait 3
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 4
+inspect set data.specialization 0
+wait 3
+expect cube::CreatureData.class_type value u8 == 4 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 1
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.class_type 4
+inspect set data.specialization 1
+wait 3
+expect cube::CreatureData.class_type value u8 == 4 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+watch
+watch clear
+log demo done
+"""

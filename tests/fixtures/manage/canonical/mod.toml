@@ -1,0 +1,8 @@
+id = "mm_loaded"
+name = "Manage: loaded"
+version = "1.0.0"
+kyubu = "^1.1"
+sides = ["client"]
+manage_mods = true
+authors = ["Kyubu tests"]
+description = "Unit test: the manage listing's trusted caller, and the D5 folder-hash vector."

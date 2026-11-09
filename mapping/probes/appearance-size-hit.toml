@@ -1,0 +1,47 @@
+# Replay it with KEEP=1 in a sandbox that holds the save of character Tester and world testworld (kyubu-mapping/tmp/fast_replay.sh appearance-size-hit <out>).
+# Written 2026-11-06 for task 2.4 of add-dragon-boss (M4). Question: is appearance.size (Creature+0x80) the box that the melee hit test reads?
+# The dev mod mods-dev/size_box_proto parks two hostile pink slimes at the same spot 4 blocks in front of the player; slime 0 gets size (8, 8, 12) every frame, slime 1 keeps its own.
+id = "appearance-size-hit"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-06"
+steps = [
+    "native replay with KEEP=1 and mods-dev/auto_enter: Tester enters testworld by itself",
+    "`spawner hostile 1 PINK_SLIME` puts two pink slimes near the player",
+    "size_box_proto parks both 4 blocks in front of the player and widens slime 0; the script holds mouse1 so the player swings; the mod logs both hp values",
+]
+observations = [
+    "run 1 (evidence/dragon-size-hit-2026-11-06/run1): two hostile pink slimes (hostile_type 1, 100 hp, default size 0.80 x 0.80 x 0.80) parked at the same spot 4 blocks in front of the player; slime 0 had size (8, 8, 12) written at Creature+0x80 every frame",
+    "the player's basic attack swung at them for 3 s: the big slime lost hp (100 -> 86 -> 79 -> 48) and the control stayed at 100: the game tests the box of appearance.size (melee circle size.x*0.7 + reach), a 0.8 box does not reach 4 blocks",
+    "no crash; one hook (draw_creature_end_site); arrows and spells (the projectile box test) were not shot: read from the disassembly only",
+]
+
+[[confirms]]
+entry = "cube::AppearanceData.scale"
+observed = "a write of (8, 8, 12) at Creature+0x80 made the slime hittable by melee from 4 blocks, the default 0.8 box was not; the slime's draw and hp were otherwise normal"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-dev/size_box_proto", "mods-examples/entity_spawner"]
+input = [
+    "until sbx: A", "console entity_spawner:spawner hostile 1 PINK_SLIME",
+    "until sbx: B", "hold mouse1 3.0",
+    "until sbx: C",
+]
+script = """
+log appearance-size-hit: size_box_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log sbx: A
+wait 5
+log sbx: B
+wait 6
+log sbx: C
+expect - hooks == 0
+"""

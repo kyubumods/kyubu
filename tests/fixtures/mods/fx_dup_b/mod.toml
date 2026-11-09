@@ -1,0 +1,5 @@
+id = "fx_dup"
+name = "Fixture: duplicate id"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]

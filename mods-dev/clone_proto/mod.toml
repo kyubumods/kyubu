@@ -1,0 +1,10 @@
+id = "clone_proto"
+name = "Shadow clone prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe shadow-clone-draw): the console command clone_proto:run draws the local player again, as the Assassin's shadow clones would be, from the creature draw site: the same draw_creature call with the matrix moved, the colour black, the shader's opacity lowered for a fade, and the pose of an ability clip (clone_proto:dash, an ability on no bar) by the player's mode swapped for the extra draw. Replaced by the Assassin ability."
+
+[scripts]
+client = "scripts/client.lua"

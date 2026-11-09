@@ -1,0 +1,81 @@
+# Tasks 2.3 and 2.4 of add-mod-manager. The dev mod mods-dev/start_menu_row hooks cube::StartMenuWidget::drawEndSite by
+# name and puts Mods between Options and Exit: it rewrites the Exit label literal to Mods and draws Exit at y 180 of the widget with the
+# game's two drawText calls (outline, fill); hover 3 is Mods (y 110 to 140), 4 is Exit (y 160 to 190). The input hovers every row, clicks Mods on the title screen, then enters character creation (Start
+# Game) and clicks the Mods place there (y 559). The mod's counters are read with its console command.
+id = "start-menu-row"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-19"
+steps = [
+    "Wrote the dev mod start_menu_row: it rewrites the Exit label to Mods, and the mid hook draws Exit at y 180 with the font in edi and maps hover 2 to 3 and the new band to 4",
+    "Replayed at the start menu under Wine at 1024 x 768: hovered each row, clicked Mods (y 559), entered character creation and clicked the Mods place",
+]
+observations = [
+    "replay 2 passed under Wine at 1024 x 768 (evidence/start-menu-row-2026-10-19): rewriting the Exit label literal to Mods makes the game's own third row the Mods row (y 559, its own cyan hover); the mod's hook draws Exit at y 180 (y 609) in the same font and outline",
+    "hover reached 0, 1, 3 and 4; hover 2 never survives the hook (the hook turns 2 into 3), so the game's quit click cannot fire from Mods",
+    "a click at (512, 559) was logged once as a Mods click (draws 406) and the title screen stayed",
+    "in character creation the draw counter stayed at 496 and clicks at 1 across two state reads 15 s apart: nothing drawn, the click at the row's place not counted",
+]
+
+[[confirms]]
+entry = "cube::StartMenuWidget.hover"
+observed = "0 and 1 over Start Game and Options as before, 3 over the new Mods row (x 512, y 559, the game's third row with its label rewritten) and 4 over the moved Exit row (y 609); the game's hover 2 never survives the hook"
+
+[[confirms]]
+entry = "cube::StartMenuWidget::drawEndSite"
+observed = "a mid hook here draws draws Exit at y 180 in the game's font and outline"
+
+[[confirms]]
+entry = "plasma::ScalableFont::drawText"
+observed = "called by a mod with the 13 stack arguments of the table in the ui atlas: MODS is drawn with outline and fill"
+
+[[confirms]]
+entry = "plasma::Widget::getCursor"
+observed = "called from the hook: the cursor in the widget's frame, in the Mods band over the row"
+
+[[confirms]]
+entry = "plasma::Widget::getWidth"
+observed = "called from the hook: 200, the right end of the band and half of it the row's x"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "until startrow sweep",
+    "move 512 459", "wait 4", "shot 01-start-hover",
+    "move 512 509", "wait 4",
+    "move 512 559", "wait 4", "shot 02-mods-hover",
+    "move 512 609", "wait 4", "shot 03-exit-hover",
+    "until startrow click",
+    "move 512 559", "wait 2", "click 512 559", "wait 6", "shot 04-after-mods-click",
+    "until startrow creation",
+    "move 511 457", "wait 2", "click 511 457", "wait 6", "shot 05-creation",
+    "move 512 559", "wait 2", "click 512 559", "wait 6", "shot 06-creation-click",
+    "console start_menu_row:state", "console start_menu_row:state",
+]
+script = """
+log startrow: tasks 2.3 and 2.4 of add-mod-manager
+wait 15
+watch hover i32 [[@0x7691C8] + 0x800914] + 0x160
+log startrow sweep
+wait 45
+expect cube::StartMenuWidget.hover watch hover reached 0
+expect cube::StartMenuWidget.hover watch hover reached 1
+expect cube::StartMenuWidget.hover watch hover reached 3
+expect cube::StartMenuWidget.hover watch hover reached 4
+watch clear
+log startrow click
+wait 20
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+expect - value i32 == 0 [[[[@0x7691C8] + 0x800880] + 0x3C] + 0x94]
+expect - value u8 == 0 [@0x7691C8] + 0x198
+log startrow creation
+wait 25
+expect - value i32 == 0 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+expect - value i32 == 1 [[[[@0x7691C8] + 0x800880] + 0x3C] + 0x94]
+log startrow done
+wait 45
+expect - hooks == 0
+"""

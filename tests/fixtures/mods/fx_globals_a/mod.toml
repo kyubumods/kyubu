@@ -1,0 +1,9 @@
+id = "fx_globals_a"
+name = "Fixture: globals a"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+trust = "restricted"
+description = "Defines the global 'shared' as 'a'; with fx_globals_a and fx_globals_b loaded each still sees its own value (script-runtime/Global clash)."
+[scripts]
+client = "scripts/client.lua"

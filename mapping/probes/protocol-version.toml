@@ -1,0 +1,67 @@
+# Recorded with kyubu_probe, the level_rework mod and the Kyubu 1.1 loader in development (MinGW build), unattended under
+# Wine 9.0 (WSL on the Windows laptop): kmap probe replay starts the probed Cube.exe, then a plain Kyubu-loaded Server.exe beside
+# it (server = "local"); the Cube.exe joins 127.0.0.1 with a new character. Only the Cube.exe has the mod (mods_on). Task 3.6
+# of add-level-rework (M12): the mod patches the version that client_connect sends (design D7), so a modded client must not
+# join a vanilla server. The probe reads the patched immediate, and traces the three branches of client_connect's switch on
+# the reply: the join (0x470286), the version mismatch of reply 17 (0x4709AA) and any other reply, 'Connection error'
+# (0x4701FD). The version store itself (0x470159) is not traced: the mod's patch owns its bytes.
+id = "protocol-version"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: Cube.exe with --kyubu-dev, kyubu_probe and the level_rework mod beside a plain Kyubu-loaded Server.exe without it; gamepilot made a character and connected to 127.0.0.1",
+    "Traced three sites of client_connect: the join branch, the mismatch branch (reply 17) and the default branch of the reply switch",
+    "Read the patched immediate at 0x47015F after the attempt",
+]
+observations = [
+    "Wine replay 1 passed, 5 of 5 held (run kept with --keep to read the server's console); no fault, and the probe's hooks were all removed at the end (hooks == 0)",
+    "the mod's log at load: `protocol version 0x4B4C0001 sent in place of 3`; the symbol file `symbols/level_rework.toml` loaded 1 symbol and its signature verified",
+    "the join attempt came about a minute after the script started (Kyubu's own log: connected to 127.0.0.1:12345, then disconnected from server 1 ms later); the patched immediate read back as 1263271937 (0x4B4C0001) at 0x47015F",
+    "the vanilla Server.exe (no mods) printed `Client version: 1263271937` and then `Wrong client version. Closing client connection.`: it read the mod's version and refused it",
+    "the client took the default branch of the reply switch (0x4701FD, 1 call): 01-refused.png shows CONNECTION ERROR under the address field of the connect screen. The join branch (0x470286) and the mismatch branch (0x4709AA, reply 17) were not reached: the vanilla server answers a wrong version with a bare 3 (static read of 0x425290, 0x42554E to 0x42557B), which is not 16, 17 or 18, so the game's own 'different version' text is not shown",
+]
+
+[[confirms]]
+entry = "Net::connectVersionSite"
+observed = "the immediate at +6 (0x47015F) read back as the mod's version, written by patch_bytes"
+
+[[confirms]]
+entry = "Net::connectJoinSite"
+observed = "not reached: the modded client was refused by a vanilla server"
+
+[[confirms]]
+entry = "Net::connectMismatchSite"
+observed = "not reached: a vanilla server answers a wrong version with a bare 3, not 17"
+
+[[confirms]]
+entry = "Net::connectUnknownReplySite"
+observed = "reached once: the vanilla server's bare 3; the screen shows Connection error"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+server = "local"
+seconds = 420
+mods = ["mods-gameplay/level_rework"]
+mods_on = ["Cube.exe"]
+input = [
+    "until 3.6: refused", "shot 01-refused",
+]
+script = """
+log protocol version (task 3.6 of add-level-rework): a modded client against a vanilla server
+trace add @0x470286
+trace add @0x4709AA
+trace add @0x4701FD
+trace start
+# gamepilot starts the server, makes the character and clicks Connect: about 2 minutes
+wait 240
+trace stop
+trace report
+log 3.6: refused
+expect Net::connectVersionSite value u32 == 0x52C11B93 @0x47015F
+expect Net::connectJoinSite calls @0x470286 == 0
+expect Net::connectMismatchSite calls @0x4709AA == 0
+expect Net::connectUnknownReplySite calls @0x4701FD == 1
+expect - hooks == 0
+"""

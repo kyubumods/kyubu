@@ -1,0 +1,54 @@
+# Recorded from the Kyubu 1.0.1 Windows re-test (Windows 10 22H2, real Cube.exe), logs in the re-test
+# results folder of that run (03-6-examples.log, 02-fault-frame.log, 03-7-15-crash.log).
+id = "windows-retest-1-0-1"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-26"
+steps = [
+    "Installed Kyubu 1.0.1 into a copy of the game and started Cube.exe with all example mods",
+    "Waited on the start menu for 40 s, then closed the game",
+    "Started again with fx_fault_frame and hello_lua, waited 20 s and captured the game window",
+]
+observations = [
+    "Model slots: 2571 total: vanilla's 2569, 1 from mods, 1 Kyubu placeholder(s)",
+    "hook_sample mid hook: model table sized at 0x0078D0EA (image base 0x006A0000)",
+    "gold_sword: assets: overrides 2 vanilla key(s); hello_native:crate is model slot 2569",
+    "Hello Lua window drawn and counting frames (frame 2428 after 20 s)",
+    "fx_fault_frame FAULTED and disabled: access violation in frame.begin",
+]
+
+[[confirms]]
+entry = "Game::frame"
+observed = "frame.begin handlers ran once per frame: the Hello Lua frame counter kept increasing"
+
+[[confirms]]
+entry = "ModelLoader::loadAll"
+observed = "the loadAll hook extended the model table: Model slots: 2571 total"
+
+[[confirms]]
+entry = "ModelLoader::resizeSite"
+observed = "a mid hook at the site fired once at runtime 0x78D0EA = 0x4ED0EA at base 0x400000"
+
+[[confirms]]
+entry = "ModelVector::resize"
+observed = "called by the loader with 2571; the game then used slots 2569 and 2570"
+
+[[confirms]]
+entry = "Model::Model"
+observed = "the loader constructed the mod and placeholder models with it (slots 2569, 2570)"
+
+[[confirms]]
+entry = "Model::load"
+observed = "the mod model hello_native:crate loaded into slot 2569 through it"
+
+[[confirms]]
+entry = "cube::Database::open"
+observed = "the overlay learns the game's databases from this hook and then served mod assets"
+
+[[confirms]]
+entry = "cube::Database::get"
+observed = "the get hook served 2 overridden and 1 added asset key(s) to the game"
+
+[[confirms]]
+entry = "asset_decode"
+observed = "overlay bytes re-encoded with the cwdb cipher decoded to a working model (slot 2569)"

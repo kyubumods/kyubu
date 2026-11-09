@@ -1,0 +1,7 @@
+id = "gold_sword"
+name = "Gold Sword"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+authors = ["Kyubu examples"]
+description = "Asset-only example: reskins the iron sword gold and translates two warrior quest lines."

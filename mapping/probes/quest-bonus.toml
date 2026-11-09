@@ -1,0 +1,101 @@
+# Task 4.6 of add-level-rework: the quest bonus. In applyHit, a kill of a creature with flag 0x2000 inside a zone whose record completes (the dungeon)
+# queues a type-13 item whose quantity vanilla sets to int(50*f(zone level + p) + 1); cube::GameController::update then adds 10 XP per unit
+# (0x48FB04). The mod sets the quantity to a tenth of xp_to_next(zone level) (118 at level 61) and the unit to 1 XP. The tracer cannot trace a
+# site the mod hooks, so the evidence is the XP the player gains and the mod's log line "quest bonus at zone level". Expected: 13 (kill XP
+# of a level-61 monster) + 118 = 131.
+id = "quest-bonus"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport, level_rework; the console command teleport:tp dungeons 61 and teleport:tp dungeon 61 took the player to a level-61 dungeon (as item-levels-dungeon)",
+    "in the dungeon the player was set to level 61 with 0 XP, and the creature with the top id was made hostile, level 61, flag 0x2000, hp 1, stunned and put half a block from the player in the dungeon's chunk 32812, 32772 (applyHit finds the zone from it); a forced cyclone (mode 86) killed it",
+]
+observations = [
+    "Wine replay 8 passed, 3 of 3 expectations held, no fault. Runs 1 to 7 found, in order: a replay needs the record to confirm each expected entry; the zone is looked up from the victim's start chunk (Creature+0x1B0, +0x1B4), not its position; the mission record of a cell is World+0xBC + 4*(region_x*1024 + region_y) -> +0x14018 + (cell_y%8 + 8*(cell_x%8))*0x68 (cell = chunk/8, region = cell/8); a dungeon record has 0 at +0x34, which is the quest type (1 to 5 and 0xD complete at once, 7 to 12 count kills), so a dungeon never completes a quest",
+    "the quest type and level are written into the record by the script, since a dungeon has none: +0x34 = 1, +0x3C = 61 (the level, an int) and +0x40 = 0 (the +p, a byte); run 7 showed that the level that applyHit sums with the +p is the pair +0x3C and +0x40. A real \"Defeat X\" zone has these fields set by the game; none was found to test, so the type and level of a real quest zone are not shown",
+    "the mod's log: `quest bonus at zone level 61 (+p 0): 118 XP (vanilla: 38 units of 10 XP)` and `item level 61 -> 32 (caller 0x005952AB)`: the vanilla quantity of the same kill is 38 units, which is 380 XP at 10 XP per unit; the mod pays 118",
+    "the player (level 61, 0 XP) gained 131 XP: 13 for the kill (X(61) = 13) and 118 for the bonus (a tenth of xp_to_next(61) = 1,177, rounded half up); with the unit hook alone (run 6, zone level 0) the bonus was 3 XP, not 30",
+]
+
+[[confirms]]
+entry = "cube::GameController::itemXpSite"
+observed = "the mid hook at 0x48FB04 divides the 10 XP per unit by 10: a bonus of 118 units paid 118 XP (the tracer cannot trace a hooked site: the XP and the mod log are the evidence)"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "131 XP after one kill of a level-61 monster with flag 0x2000 in a level-61 dungeon zone: 13 kill XP and 118 bonus XP"
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0: the replay is single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61",
+    "wait 50", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 60", "shot 02-landed",
+    "until tp: done",
+]
+script = """
+log quest bonus of level_rework in a level-61 dungeon: 131 XP (task 4.6 of add-level-rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log tp: start
+wait 150
+inspect cube::MissionData [[@0x7691C8] + 0x200B98] + 0x15058
+# a dungeon record has type 0 at +0x34 and never completes: write 1 there (a MissionData overlay 0x10 higher puts its area_level on +0x34)
+inspect cube::MissionData [[@0x7691C8] + 0x200B98] + 0x15068
+inspect set area_level 1
+# applyHit copies the record's +0x3C (the level, an int) and +0x40 (the +p, a byte) into the bonus item (found by run 7: the sum of the two is vanilla's level + p): write 61 and 0 there (overlays 0x18 and 0x1C higher)
+inspect cube::MissionData [[@0x7691C8] + 0x200B98] + 0x15070
+inspect set area_level 61
+inspect cube::MissionData [[@0x7691C8] + 0x200B98] + 0x15074
+inspect set area_level 0
+inspect cube::MissionData [[@0x7691C8] + 0x200B98] + 0x15058
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 61
+inspect set data.power_base 0
+inspect set data.appearance.flags 8192
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.start_chunk.x 32812
+inspect set data.start_chunk.y 32772
+inspect player [@0x7691C8]
+inspect set data.level 61
+inspect set data.current_xp 0
+inspect set data.mp 1
+log quest bonus of level_rework in a level-61 dungeon: 131 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 131 [[@0x7691C8] + 0x8006C8] + 0x194
+log tp: done
+wait 5
+expect - hooks == 0
+"""

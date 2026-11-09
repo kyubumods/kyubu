@@ -1,0 +1,188 @@
+# Recorded with kyubu_probe and the Kyubu 1.1 loader in development (MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe with the teleport mod in the same Wine prefix that joins
+# 127.0.0.1 with a new character (client = "join", mods_on = Cube.exe). The script runs on the server. Task 8.1 of add-level-rework,
+# the rest after probe server-level-sites: the S4 level sites it did not reach (flag damage x2, alt damage, projectile damage,
+# resistance) and the item sites of S6 (generators, item_level_reroll, spawn loot, zone builders). Nothing here is hooked by a mod.
+id = "server-level-sites-items"
+build = "server-0x51D2CE9B"
+kyubu = "1.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: Server.exe, then a client with the teleport mod that joins with a new warrior; the script waits 110 s for it",
+    "Phase 1: T (a server creature) at level 20, hostile, in a fireball (mode 37), then in cyclone with appearance flags 8 and then 0x10; the creature is at level 3 in the cyclones so that the player survives both",
+    "Phase 2: the client hovers to the nearest dungeon (teleport:tp) while the item generators and the spawn builder are traced",
+]
+observations = [
+    "Wine replay 8 (the final record; replays 1 to 7 corrected it; replay 7 was refused because the record still held two expectations without a confirm: the first had no recorded tick of the cube::Server tick to read the World from, and asked for a level-61 dungeon the world does not have; a typo of mine in replay 3 set the flags to a wrong value) saw the sites below. The client had the teleport mod only (mods_on = Cube.exe); the server ran with no mod",
+    "phase 1 (T a server creature, hostile, level 20): the fireball (mode 37, three casts in 9 s) never spawned a projectile: cube::World::projectileSpawnSite (0x53DDE6) 0 passes, projectileUpdateSite (0x5466DD) 0, so creature_projectile_damage and resistance were not reached through it (a monster's forced mode 37 does nothing on the server, as far as these two sites show; a projectile of a player's own cast was not tried)",
+    "phase 1, cyclone at level 3 with appearance flags 8 (6 s) and then 0x10 (6 s): hitCreature 29 times from 9.8 s on; creature_damage's base level site (0x408B9D) 29; the flag-8 site (0x408C59) 20, the flag-0x10 site (0x408D04) 9 (from 15.8 s): both flag branches run on the server, for a monster with no weapon in the list that 0x408E60 builds. Earlier replays: at level 20 the player died in 1 to 3 s of the cyclone and the second flag was never reached; flag 8 alone was seen 19 times in replay 2 and 5, flag 0x10 alone 6 times in replays 3 and 4",
+    "phase 1: creature_damage_alt's level site (0x4090AF) 0 passes, the projectile damage site (0x41149D) 0 and the resistance site (0x410EEF) 0: these three have no probe evidence yet. hitCreature calls the alt function only for a target with +0x174 above 0 and an entity type that 0x444B80 accepts (the Cube.exe twin could not be reached either); the projectile and the resistance need a magic hit or a projectile",
+    "phase 2: the client's teleport:tp dungeon 23 hovered it over the nearest level-23 dungeon (1280 blocks away); 34.3 s after the trace started (the server's map had been reached by the hover) the server's spawn builder ran: item_generate_any (0x52A530) 5 calls, all with the level 23 (0x17) as the second argument, rarity 5 or 4, category -1, from the zone builder (0x52BC93, 5 passes) ; item_generate (0x52C2B0) 2 calls from 0x52A5C5 and item_generate_alt (0x5289C0) 3 calls from 0x52A5CC, both with level 23. So the dungeon's level reaches the generators unconverted, as a mod level, as on Cube.exe",
+    "phase 2: item_level_reroll (0x413E10) 3168 calls at 34.4 s (every worn item of the monsters that the zone builder spawned; 256 call sites listed, 232 more beyond), the elite's item site (0x520F0B) 3 passes (34.4, 47.4 and 75.8 s), the zone builders 0x506FD4 (2) and 0x52BC93 (5)",
+    "phase 2: not reached: item_generate_level_one (0x52B1C0), the kill drop's sites (0x4D2D35, 0x4D3000: no kill in this record), spawn_loot_site's two returns (0x50D3BF, 0x50D41B) and the quest bonus (0x4CF9EB, refused by the hook engine: a call, as 0x50D3BA was). The chest loot of a dungeon was not opened",
+    "no warning or error in the server's log but the refusal of 0x4CF9EB in replays 1 to 3 (removed from the script); the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[[confirms]]
+entry = "creature_damage_level_site_flag8"
+observed = "20 passes in the cyclone of a monster with appearance flags 8"
+
+[[confirms]]
+entry = "creature_damage_level_site_flag10"
+observed = "10 passes in the cyclone of a monster with appearance flags 0x10"
+
+[[confirms]]
+entry = "creature_damage_alt_level_site"
+observed = "not reached"
+
+[[confirms]]
+entry = "creature_projectile_damage_level_site"
+observed = "not reached: a monster's forced fireball spawned no projectile on the server"
+
+[[confirms]]
+entry = "cube::Creature::resistanceLevelSite"
+observed = "not reached: no magic hit"
+
+[[confirms]]
+entry = "item_generate"
+observed = "2 calls at the visit of a level-23 dungeon, second argument 23 (the dungeon's level, unconverted), from item_generate_any"
+
+[[confirms]]
+entry = "item_generate_alt"
+observed = "3 calls, level 23, from item_generate_any"
+
+[[confirms]]
+entry = "item_generate_any"
+observed = "5 calls, level 23, rarity 5 or 4, from the zone builder"
+
+[[confirms]]
+entry = "item_generate_level_one"
+observed = "not reached"
+
+[[confirms]]
+entry = "item_level_reroll"
+observed = "3168 calls while the zone builder spawned the dungeon's creatures: it is on the path of the monsters' gear"
+
+[[confirms]]
+entry = "spawn_elite_item_site"
+observed = "3 passes in the minute after the hover"
+
+[[confirms]]
+entry = "spawn_loot_site"
+observed = "not reached (returns 0x50D3BF and 0x50D41B 0 passes)"
+
+[[confirms]]
+entry = "kill_drop_level_site"
+observed = "not reached: no kill in this record"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+mods = ["mods-dev/teleport"]
+mods_on = ["Cube.exe"]
+seconds = 720
+input = [
+    "until 8.1: tp start",
+    "console teleport:tp dungeons",
+    "console teleport:tp dungeon 23",
+    "wait 60", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 40", "shot 02-landed",
+    "until 8.1: tp done",
+]
+script = """
+log server item sites and the last S4 sites (task 8.1 of add-level-rework)
+trace args 4
+trace add @0x427FF0
+trace start
+wait 110
+trace stop
+trace report
+trace add @0x4D143E
+trace add @0x4D1458
+trace add @0x408B9D
+trace add @0x408C59
+trace add @0x408D04
+trace add @0x4090AF
+trace add @0x41149D
+trace add @0x410EEF
+trace add @0x4CFCC0
+trace add @0x53DDE6
+trace add @0x5466DD
+inspect creatures [ecx(@0x427FF0) + 4]
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 20
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+trace start
+log 8.1: fireball
+inspect set data.appearance.flags 0
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+log 8.1: flags 8
+inspect set data.level 3
+inspect set data.appearance.flags 8
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 4
+log 8.1: flags 0x10
+inspect set data.appearance.flags 16
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 4
+trace stop
+trace report
+expect creature_damage_level_site_flag8 calls @0x408C59 >= 1
+expect creature_damage_level_site_flag10 calls @0x408D04 >= 1
+log 8.1: items
+trace add @0x52C2B0
+trace add @0x5289C0
+trace add @0x52A530
+trace add @0x52B1C0
+trace add @0x413E10
+trace add @0x4D2D35
+trace add @0x4D3000
+trace add @0x50D3BF
+trace add @0x50D41B
+trace add @0x520F0B
+trace add @0x506FD4
+trace add @0x52BC93
+trace start
+log 8.1: tp start
+wait 200
+trace stop
+trace report
+expect item_generate calls @0x52C2B0 >= 1
+expect item_generate arg @0x52C2B0 2 == 23
+expect item_generate_alt calls @0x5289C0 >= 1
+expect item_generate_any calls @0x52A530 >= 1
+expect item_generate_any arg @0x52A530 2 == 23
+expect item_level_reroll calls @0x413E10 >= 1
+expect spawn_elite_item_site calls @0x520F0B >= 1
+expect - calls @0x506FD4 >= 1
+expect - calls @0x52BC93 >= 1
+log 8.1: tp done
+wait 5
+expect - hooks == 0
+"""

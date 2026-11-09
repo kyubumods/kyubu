@@ -1,0 +1,11 @@
+id = "fourth_ability_demo"
+name = "Fourth ability demo"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+trust = "full"
+description = "Lua example for the fourth ability slot: fourth_ability_demo:burst takes the warrior's slot 4 (key 4) from the placeholder. It lasts 800 ms, costs no mp (a test setting), has a cooldown that shrinks with the rank, draws a clip of the weapon arm swinging (assets/animations/burst.anim.toml), and logs on_start, every on_step and on_end."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

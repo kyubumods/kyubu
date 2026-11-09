@@ -1,0 +1,55 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 5.1 of add-level-rework: the mod level_rework hooks creature_level_range (0x444610, a cdecl function that fills the
+# two ints it is given with the entity type's vanilla range) and converts both ends with power(). The mod logs the first
+# conversion of each entity type, and its dev command `levels creatures` lists the World's live creatures with their levels. The
+# tracer cannot trace a function the mod hooks, so the result is read from those log lines.
+id = "creature-level-range"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 15 s there",
+    "Window A: the input turned dev_commands on and ran `level_rework:levels creatures` in the console",
+    "Window B: 100 s later the same command again",
+]
+observations = [
+    "Wine replay 1 passed: 1 of 1 expectation held, no fault. The mod logged `creature levels converted by kind` at load",
+    "the mod's hook logged the first conversion of 37 entity types while the starting region was built (the world is built on a worker thread, within about 30 s): every pair is power() of the vanilla pair: [2, 4] -> [5, 14] (types 22, 23, 27, 33, 34, 35, 55, 56, 71, 74, 92), [3, 6] -> [10, 21] (19, 20, 25, 26, 30, 31, 32, 60, 63, 67, 69, 70), [6, 9] -> [21, 29] (98, 100), [9, 14] -> [29, 40] (53, 88, 105, 151), [14, 21] -> [40, 51] (28, 90), [21, 31] -> [51, 61] (54, 91), [31, 47] -> [61, 70] (21, 102, 104). No pair is outside the spec's table",
+    "`levels creatures` listed the 17 live creatures in two windows 82 s apart (the same 17): levels 1 to 69, 0 outside 1-100. Type 104 (vanilla [31, 47]) had 3 creatures at levels 61 to 69; type 91 ([21, 31]) one at 55; type 31 ([3, 6]) one at 13; type 34 ([2, 4]) one at 14; type 92 ([2, 4]) one at 7: all inside the converted range of their type. Types 120 to 127 and the player (type 2) are at level 1: kinds the table does not give a range (a default of [1, 1] stays [1, 1])",
+    "the three callers of the game (0x5B9072, 0x5EA1E2, 0x5EA53B) roll `rand() % (max - min + 1) + min` from the two ints that the function fills (static read), so the converted range is what they roll from",
+    "not tried: 1,000 rolls of one kind (the top-tier scenario of the spec), creatures that take their level from an area, a mission or a dungeon instead of the type table (task 5.2), Server.exe",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "creature_level_range"
+observed = "replaced by level_rework: 37 entity types showed their vanilla [lo, hi] converted to [power(lo), power(hi)], and the live creatures of the starting region had levels inside the converted ranges (1 to 69, none above 100)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until lc: A ready",
+    "console config level_rework dev_commands true",
+    "console level_rework:levels creatures",
+    "until lc: B ready",
+    "console level_rework:levels creatures",
+]
+script = """
+log creature level range of level_rework (task 5.1 of add-level-rework)
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log lc: A ready
+wait 100
+log lc: B ready
+wait 100
+log lc: done
+"""

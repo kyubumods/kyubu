@@ -1,0 +1,59 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Server.exe), in a copy of the game with the Kyubu
+# 1.0.1 release installed and dev mode on (kmap probe replay, host Server.exe). Server.exe keeps its World and Server
+# only as locals of main, so the probe reaches them through the this (ECX) of a cube::Server method main calls on
+# every tick (0x427FF0), read by the call tracer: ecx(@0x427FF0). Types are read from MSVC RTTI as in
+# game-access-client.
+id = "game-access-server"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Read main, cube::Server::Server and the calls in main's loop statically",
+    "Started Server.exe with --kyubu-dev and kyubu_probe through kmap probe replay; the script ran after listen",
+    "Traced 0x427FF0 (called by main once per tick with the cube::Server in ECX) for 3 s",
+    "Read the RTTI type names of that this and of the pointer at this+4",
+]
+observations = [
+    "main: World = operator new(0x80029C), World::World, openSave, then ModelLoader::loadAll on World+0x1C",
+    "main: Server = operator new(0x54), cube::Server::Server(server, world); both stay locals of main",
+    "cube::Server::Server stores the World at +4, the world's seed at +8 and a copy of its name string at +0xC",
+    "main's own loop is the 20 ms tick: server calls, World lock (0x4D3D50), step, send, unlock, Sleep(20)",
+    "0x427FF0 is thiscall (mov ecx, ebx at 0x549EEC) and loads [ecx+4] before calling the World lock",
+    "sim_loop (0x423BC0) sends to one connection's socket: a per-client thread, not the tick (see 7.5)",
+    "in the run: ECX of 0x427FF0 is a cube::Server (RTTI), and [ECX+4] is a complete cube::World",
+]
+
+[[confirms]]
+entry = "cube::Server"
+observed = "the this of 0x427FF0, called every tick by main, has the RTTI type .?AVServer@cube@@"
+
+[[confirms]]
+entry = "cube::Server.world"
+observed = "+4 points at a complete cube::World (RTTI name, complete-object offset 0)"
+
+[[confirms]]
+entry = "cube::World"
+observed = "allocated by main, reached only through cube::Server.world"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+seconds = 60
+script = """
+log game access, server side: the cube::Server main ticks, and its World
+trace add @0x427FF0
+trace start
+wait 3
+trace stop
+expect cube::Server calls @0x427FF0 > 20
+# the this is a cube::Server (".?AVServer@cube@@": "Serv", "er@c"; locator offset 0)
+expect cube::Server value u32 == 1987208531 [[[ecx(@0x427FF0)] - 4] + 0xC] + 0xC
+expect cube::Server value u32 == 1665167973 [[[ecx(@0x427FF0)] - 4] + 0xC] + 0x10
+expect cube::Server value u32 == 0 [[ecx(@0x427FF0)] - 4] + 4
+# Server.world: a complete cube::World (".?AVWorld@cube@@": "Worl", "d@cu")
+expect cube::Server.world value u32 == 1819438935 [[[[ecx(@0x427FF0) + 4]] - 4] + 0xC] + 0xC
+expect cube::Server.world value u32 == 1969438820 [[[[ecx(@0x427FF0) + 4]] - 4] + 0xC] + 0x10
+expect cube::World value u32 == 0 [[[ecx(@0x427FF0) + 4]] - 4] + 4
+expect cube::World value u32 != 0 [ecx(@0x427FF0) + 4] + 0x20
+expect - hooks == 0
+"""

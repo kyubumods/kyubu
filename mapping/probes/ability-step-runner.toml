@@ -1,0 +1,97 @@
+# Recorded with kyubu_probe, mods-dev/steps_proto and the Kyubu loader of task 4.4 of add-ability-api (the step runner at
+# cube::World::abilityDispatchSite, the ends after each World step), unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. steps_proto defines
+# steps_proto:burst (number 112, 800 ms, mp_cost 0.5, cooldown 4000 ms at rank 0) for the warrior's slot 4 and steps_proto:fail
+# (113) for the ranger's, whose on_step raises an error on its second step; the mage and the rogue have the placeholder (111, 500 ms,
+# no callbacks). P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-step-runner"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "mp 1, key 4 held 1.5 s as the warrior: burst runs, ends at 800 ms, and the game cannot restart it while the key is held (cooldown 4000, mp 0.5)",
+    "mp 1, mode 112 forced, then stun_time 2000 written 0.4 s later: the ability ends stunned",
+    "class 2 (the ranger), mode 113 forced: on_step raises an error in its second step",
+    "class 3 (the mage, the placeholder on slot 4), key 4 held 1.5 s: the placeholder ends done within a step after 500 ms; the tracer counts the starts at abilityStartSite",
+]
+observations = [
+    "Wine replay 2 passed (run 1 too, with `dt_ms` at 0 after the first step: fixed). Evidence: evidence/ability-step-runner-2026-10-05/",
+    "the real press at mp 0.753: on_start once, 43 on_step (the World steps 20 ms apart, elapsed 0 to 791, dt 20), then `ends done` at 811 ms and on_end done; the mp was 0.210 at the end, so the cost 0.5 was taken once and the rest is the game's own rage decay",
+    "the mode was 0 after the end: Kyubu wrote it (the game would have kept it until its 10 s rule); the key was still held for 0.7 s and the game did not start it again (cooldown 4000 ms, mp under 0.5); the tracer counts 2 starts in all (the burst and the placeholder)",
+    "forced mode 112 and stun_time 2000 at 0.4 s: the game cleared the mode in its next step, on_step did not run again, and the end was `stunned` (449 ms, 26 steps): ability_stun is verified, so the label is not `interrupted`",
+    "forced mode 113 (the ranger): the Lua error in on_step 2 was logged with the mod and the ability, the ability ended `cancelled` after 2 steps, on_end ran once, and the game went on (the player had mode 0 and the loader no fault)",
+    "the mage's placeholder (no callbacks): `ends done` at 517 ms, mode 0 afterwards, mp unchanged (cost 0); the HUD shows the sweep on slot 4 (02-after-placeholder.png)",
+    "the World steps in this build are 20 ms of game time each, several per frame under software rendering (about 4 fps), and the mode time is moved on inside the step after the dispatch site: the pass after the step reads a time one step later than the hook did",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the warrior; set to 2 and 3 the bar took the ranger's and the placeholder's numbers on its next frame"
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "2 calls: the warrior's press (burst) and the mage's press (placeholder); the forced modes and the held key after the end start nothing"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+mods = ["mods-dev/steps_proto"]
+input = [
+    "until steprun A", "hold 4 1.5", "shot 01-after-burst",
+    "until steprun D", "hold 4 1.5", "shot 02-after-placeholder",
+]
+script = """
+log steprun: task 4.4 of add-ability-api, the step runner
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# the bar: the five vanilla ids and the number of steps_proto:burst, 112 (index 5 = begin + 20)
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+trace args 2
+trace add @0x49BF68
+trace start
+# A: a real press at mp 1: on_start, an on_step in every World step, the end `done` at 800 ms; the mp is 0.5 less once
+inspect set data.mp 1
+log steprun A
+wait 10
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# B: the ability is forced (no key), and a stun ends it
+wait 5
+inspect set data.mp 1
+inspect set data.mode_start_time 0
+inspect set data.current_mode 112
+wait 0.4
+inspect set data.stun_time 2000
+log steprun B
+wait 4
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# C: the ranger's ability raises an error in on_step 2: logged, ended cancelled, on_end once, the game goes on
+inspect set data.stun_time 0
+inspect set data.class_type 2
+wait 4
+expect - value i32 == 113 [[@0x7691C8] + 0x80080C] + 20
+inspect set data.mode_start_time 0
+inspect set data.current_mode 113
+log steprun C
+wait 5
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# D: the mage has the placeholder on slot 4: a real press, 500 ms, no cost
+inspect set data.class_type 3
+inspect set data.mp 1
+wait 4
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+log steprun D
+wait 10
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+trace stop
+trace report
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 2
+watch
+watch clear
+log steprun done
+"""

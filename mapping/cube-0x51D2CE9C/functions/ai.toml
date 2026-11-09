@@ -1,0 +1,183 @@
+# Cube.exe: creature behaviours (cube::Behavior and its subclasses).
+
+[[function]]
+name = "cube::CombatBehavior::CombatBehavior"
+address = 0x42CD80
+convention = "thiscall"
+prototype = "cube::CombatBehavior* __thiscall cube::CombatBehavior::CombatBehavior(cube::CombatBehavior* this, float value)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::CombatBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:the zone default, 0x60EC04", "probe:spawn-behavior", "manual:all 24 call sites pass 20.0f (8.1)"]
+source = "kyubu"
+notes = "stores the vtable and sets +4 to 20000; sizeof 20 (operator_new(0x14)); one stack argument, stored at +8; +0xC and +0x10 are zeroed. Returns this. Every site passes 20.0f: the region generators, the zone default, the pet (0x5ED249) and the summon (0x6143CB)"
+
+[[function]]
+name = "cube::CombatBehavior::update"
+address = 0x42D2E0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CombatBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "probe:taunt-target"]
+source = "kyubu"
+notes = "the combat AI, 8846 bytes. The target is the id topThreat returns, looked up in the World and kept while it exists. With none it scans for the nearest enemy in range and gives it threat 1.0. While the target is far or unseen its threat falls 0.9 a step; after 20 s the AI gives up"
+
+[[function]]
+name = "cube::CombatBehavior::targetScanSite"
+address = 0x42D8AE
+convention = "cdecl"
+kind = "site"
+subsystem = "ai"
+status = "candidate"
+evidence = ["xref:cube::CombatBehavior::update", "manual:the first-target scan's range test of each candidate"]
+source = "kyubu"
+notes = "once per candidate in the scan for a first target: EBX the candidate, XMM2 its squared distance (already divided by the stealth factor), XMM4 the squared radius. XMM4 <= XMM2 skips it, so a huge XMM2 written here keeps that creature out of the scan (the ninja's true stealth). safesites.py: ok"
+
+[[function]]
+name = "cube::Creature::topThreat"
+address = 0x4451F0
+convention = "thiscall"
+prototype = "uint64_t __thiscall cube::Creature::topThreat(cube::Creature* this)"
+subsystem = "ai"
+status = "verified"
+evidence = ["xref:cube::CombatBehavior::update", "manual:walks Creature+0x13A4, returns the key of the largest value", "probe:taunt-target"]
+source = "kyubu"
+notes = "the id of the creature holding the most threat (a tie goes to the later key), 0 when the map is empty. The combat AI looks it up in the World and attacks it, so a large value written for an id sets the target"
+
+[[function]]
+name = "cube::CompanionBehavior::CompanionBehavior"
+address = 0x43B420
+convention = "thiscall"
+prototype = "cube::CompanionBehavior* __thiscall cube::CompanionBehavior::CompanionBehavior(cube::CompanionBehavior* this)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::CompanionBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:the pet 0x5ED2B1 and the summon 0x614409 call it, then write +8 and +0xC", "probe:spawn-behavior-all"]
+source = "kyubu"
+notes = "sizeof 16; +4 is never written (zero the block); +8 and +0xC (zeroed here) are the owner creature's id, a uint64. 0x43B440 takes the id as two stack arguments (one caller, 0x5D6206). Returns this. 8.2: with the player's id at +8 it follows the player and fights what the player fights"
+
+[[function]]
+name = "cube::CompanionBehavior::update"
+address = 0x43B580
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CompanionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::LookAtPlayerBehavior"
+address = 0x4C7FD0
+convention = "thiscall"
+prototype = "cube::LookAtPlayerBehavior* __thiscall cube::LookAtPlayerBehavior::LookAtPlayerBehavior(cube::LookAtPlayerBehavior* this)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::LookAtPlayerBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:the zone default, 0x60EC46", "probe:spawn-behavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::update"
+address = 0x4C7FF0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::LookAtPlayerBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::RandomInteractionBehavior"
+address = 0x4D9E10
+convention = "thiscall"
+prototype = "cube::RandomInteractionBehavior* __thiscall cube::RandomInteractionBehavior::RandomInteractionBehavior(cube::RandomInteractionBehavior* this)"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::RandomInteractionBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:record behaviours 0x5BCA1A and 0x5DD679"]
+source = "kyubu"
+notes = "sizeof 8: the vtable and +4, zeroed here. No argument. Returns this. Built only into the region generators' records (a town character and one monster pack), never at run time"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::update"
+address = 0x4D9FB0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomInteractionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::RandomWalkBehavior"
+address = 0x4DADB0
+convention = "thiscall"
+prototype = "cube::RandomWalkBehavior* __thiscall cube::RandomWalkBehavior::RandomWalkBehavior(cube::RandomWalkBehavior* this)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::RandomWalkBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:the zone default, 0x60ECBA", "probe:spawn-behavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::update"
+address = 0x4DADC0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomWalkBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SequentialBehavior::SequentialBehavior"
+address = 0x4DB170
+convention = "thiscall"
+prototype = "cube::SequentialBehavior* __thiscall cube::SequentialBehavior::SequentialBehavior(cube::SequentialBehavior* this)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::SequentialBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:the zone default, 0x60EBC7", "probe:spawn-behavior"]
+source = "kyubu"
+notes = "0x4DB0A0 (copy, used by clone) and 0x4DB1A0 (destructor, vtable slot 2) also store the vtable; sizeof 12: the vtable and a std::list of behaviours at +4 (its head node comes from 0x607CC0). Returns this. Children are added with std::list::push_back on this+4"
+
+[[function]]
+name = "cube::SequentialBehavior::update"
+address = 0x4DB230
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SequentialBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+notes = "no direct calls: probably steps its child behaviours through their vtables"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::SpawnLocationBehavior"
+address = 0x4DEBA0
+convention = "thiscall"
+prototype = "cube::SpawnLocationBehavior* __thiscall cube::SpawnLocationBehavior::SpawnLocationBehavior(cube::SpawnLocationBehavior* this)"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::SpawnLocationBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:record behaviour 0x5BC9D4"]
+source = "kyubu"
+notes = "sizeof 4: only the vtable, no state. No argument. Returns this. The home position is the creature's, not the behaviour's (the zone path copies the Spawn's position to cube::Creature +0x1C0). One site: a town character's record"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::update"
+address = 0x4DEBC0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SpawnLocationBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::WalkPathBehavior::WalkPathBehavior"
+address = 0x58B8A0
+convention = "thiscall"
+prototype = "cube::WalkPathBehavior* __thiscall cube::WalkPathBehavior::WalkPathBehavior(cube::WalkPathBehavior* this, float value)"
+subsystem = "ai"
+status = "verified"
+evidence = ["rtti:cube::WalkPathBehavior", "manual:stores the vtable; called directly, not from a slot", "manual:16 sites, 2.0f except the leader's 10.0f (8.1)", "probe:spawn-behavior-all"]
+source = "kyubu"
+notes = "sizeof 28: +4 a vector of cube::LongVector3 (24 bytes each), +0x10 zero (waypoint index, seen 0 to 3), +0x14 not written (a timer: zero the block or it does not walk), +0x18 the float. 0x58B860 is the copy constructor (copies +4, +0x10, +0x18, zeroes +0x14)"
+
+[[function]]
+name = "cube::WalkPathBehavior::update"
+address = 0x58B950
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::WalkPathBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"

@@ -1,0 +1,61 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (kmap probe replay, setup "menu"). At the start menu the World already holds the
+# player's creature, which the controller's constructor builds. The creature's type is read from MSVC RTTI as in
+# game-access-client: ".?AVCreature@cube@@" holds "Crea" at +0xC and "ture" at +0x10 of its type descriptor.
+id = "creature-collection"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Read the controller's constructor and Server.exe's main statically for the World's creature map and the player",
+    "Started Cube.exe with --kyubu-dev and kyubu_probe through kmap probe replay, and waited at the start menu",
+    "Read the std::map at World+4 (GameController+0x2E0): its size, its head node and the one element",
+    "Compared the element's value with GameController+0x8006C8, read its RTTI name, listed both probe views",
+]
+observations = [
+    "at the menu World+4 is a std::map of size 1; its head node has isnil set, the root node not",
+    "the one element's key is the uint64 1 (node+0x10, node+0x14 = 0) and its value at node+0x18 a creature pointer",
+    "GameController+0x8006C8 holds the same pointer: the constructor inserts the player's creature under id 1",
+    "that object is a complete .?AVCreature@cube@@ (RTTI name, complete-object offset 0)",
+    "cube::Creature is 0x1E60 bytes: operator new(0x1E60) precedes every constructor call in both builds",
+    "Server.exe's main walks the same map at World+4 every tick; the client's receive loop skips the player",
+    "its vtable pointer is @0x6FC8CC, cube::Creature's vtable in classes.toml",
+    "inspect creatures listed one creature, id 1, cube::Creature, at the address inspect player showed",
+    "the replay's 1.0.1 loader doesn't resolve cube::game_controller, so the views were given the addresses",
+]
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "a std::map at World+4 from a uint64 id to cube::Creature*; the walk visits size elements"
+
+[[confirms]]
+entry = "cube::GameController.player"
+observed = "+0x8006C8 is the creature stored under id 1 in world.creatures, a complete cube::Creature"
+
+[[confirms]]
+entry = "cube::Creature"
+observed = "the values of world.creatures carry the RTTI type .?AVCreature@cube@@"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+log the local player and the creature collection, client side, at the start menu
+wait 5
+inspect creatures [@0x7691C8] + 0x2DC
+inspect player [@0x7691C8]
+# World.creatures: the walk agrees with the map's size, and the menu world holds only the player
+expect cube::World.creatures creatures == 1 [@0x7691C8] + 0x2DC
+expect cube::World.creatures value u32 == 1 [@0x7691C8] + 0x2E4
+expect cube::World.creatures value u8 == 1 [[@0x7691C8] + 0x2E0] + 0xD
+# the first element (the head's left): key 1 as a uint64, its value a complete cube::Creature
+expect cube::World.creatures value u32 == 1 [[[@0x7691C8] + 0x2E0]] + 0x10
+expect cube::World.creatures value u32 == 0 [[[@0x7691C8] + 0x2E0]] + 0x14
+expect cube::Creature value u32 == 1634038339 [[[[[[[@0x7691C8] + 0x2E0]] + 0x18]] - 4] + 0xC] + 0xC
+expect cube::Creature value u32 == 1701999988 [[[[[[[@0x7691C8] + 0x2E0]] + 0x18]] - 4] + 0xC] + 0x10
+expect cube::Creature value u32 == 0 [[[[[[@0x7691C8] + 0x2E0]] + 0x18]] - 4] + 4
+# GameController.player is that creature: value - player = 0 lands on the name in cube::Creature's type descriptor
+expect cube::GameController.player value u32 != 0 [@0x7691C8] + 0x8006C8
+expect cube::GameController.player value u32 == 1634038339 [[[[@0x7691C8] + 0x2E0]] + 0x18] - [[@0x7691C8] + 0x8006C8] + @0x7639E8
+"""

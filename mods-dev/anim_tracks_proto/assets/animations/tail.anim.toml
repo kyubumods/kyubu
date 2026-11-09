@@ -1,0 +1,15 @@
+# Task 5.2 of add-ability-animation: a hand track and a tail track. The human warrior has no tail (its model slot is 0), so the tail
+# track is skipped and logged once per mode; the hand track still applies.
+duration = 800
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+mode = "set"
+keys = [ { t = 0, v = [60, 0, 0] } ]
+
+[[track]]
+part = "tail"
+channel = "rot"
+mode = "set"
+keys = [ { t = 0, v = [0, 0, 60] } ]

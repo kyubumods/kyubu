@@ -1,0 +1,51 @@
+# Task 5.1 of add-ability-animation (the pose provider, phase 2): mods-dev/anim_tracks_proto defines six mod abilities (112 no clip; 113, 114 and 115 clips with
+# tracks only: the weapon arm by 30 degrees, the weapon arm far out of its place, the head turned by 60 degrees with `set`; 116 a clip that borrows pose 2; 117 the
+# same with the head turned), forces the local player's current_mode into each of them with the mode time pinned at 300 ms, and a screenshot per phase shows what
+# the provider draws. A mid hook at the join site logs the vectors the draw reads, and frame.end logs them after the draw (the loader puts the game's values back).
+id = "anim-tracks"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 80 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; eight phases of 6 s (idle, mod 112 to 117, idle again), a screenshot 3 s into each",
+]
+observations = [
+    "Wine replay 2 passed (evidence/ability-animation-2026-10-07/anim-tracks-run2/: eight screenshots, sheet-player.png, latest.log); replay 1 (anim-tracks-run1/) passed too, with a constant rotation of 90 degrees in the arm clip instead of the ramp",
+    "the log has 'the pose provider is installed (draw_creature, borrowed looks; draw_creature_join_site, tracks)'; the five clips load and the six abilities define (numbers 112 to 117 in id order)",
+    "at the join site the record read, for hand B's position and euler and the head's euler: mod 112 (no clip) all zero; mod 113 (weapon_r rot add 30 on x) hand euler 30 0 0; mod 114 (hand_r pos add 14 on z, rot a ramp from 0 to 160 on x over the 800 ms ability) position 0 0 14 and euler 84.8 0 0, so the tracks read 424 ms of the clip for a pin of 300 ms (the draw's step on top, as in anim-borrow-time); mod 115 (head rot set 60 on z) head euler 0 0 60",
+    "mod 116 (borrow pose 2) read pose 2 with the game's own hand euler -70 0 -60 and head euler 0; mod 117 (the same clip with the head track) read pose 2, the same hand euler and head euler 0 0 60: the borrowed pose is the base and the track is written over it",
+    "at frame.end of the same frame every vector read the game's own value again (all zero for 113, 114 and 115; head euler 0 for 117): the loader puts back what it wrote, so nothing piles up from draw to draw",
+    "screenshots: 112 draws pose 0 (the club held upright in hand B); 113 the club tilted; 114 the club swung down to point at the camera, its end a disc; 115 the head turned to the player's left with the body as in 112; 116 the arms of pose 2; 117 the same with the head turned; idle_after the idle pose with the club on the back",
+    "the club is in hand B in pose 0 of a mod ability, and it follows hand B's vectors (at idle it is holstered and does not, probe pose-write)",
+    "for a mod mode with no borrow the record's time read 0 at the join site, although the detour left the mode time in it: the game writes it for pose 0 before the join; the clip time is taken at the detour's entry",
+    "no WARN or ERROR line from the provider",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "at the join site 0x41F135 a clip's tracks written into the draw record are drawn in the same frame, and the record holds the game's own values again after the draw"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-dev/anim_tracks_proto"]
+input = [
+    "until animtracks: first draw", "wheel down 3",
+    "until animtracks: shot01 idle", "shot 01-idle",
+    "until animtracks: shot02 a_plain", "shot 02-a_plain",
+    "until animtracks: shot03 b_rot30", "shot 03-b_rot30",
+    "until animtracks: shot04 c_arm", "shot 04-c_arm",
+    "until animtracks: shot05 d_head", "shot 05-d_head",
+    "until animtracks: shot06 e_borrow", "shot 06-e_borrow",
+    "until animtracks: shot07 f_both", "shot 07-f_both",
+    "until animtracks: shot08 idle_after", "shot 08-idle_after"
+]
+script = """
+log anim-tracks: task 5.1 of add-ability-animation, the pose override
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

@@ -1,0 +1,17 @@
+# A wider swing of fourth_ability_demo:burst: the same clip with the arm turned twice as far. Not loaded by the game (the loader reads
+# assets/animations/ only). The record mapping/probes/anim-save-then-press.toml copies it over burst.anim.toml while the game runs,
+# as the Animator's Save does, to see that the next press of key 4 draws the saved version.
+duration = "ability"
+blend_in = 60
+blend_out = 120
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+mode = "add"
+keys = [
+  { t = 0.00, v = [0, 0, 0] },
+  { t = 0.35, v = [-120, 0, 0], ease = "ease_out" },
+  { t = 0.50, v = [120, 0, 0], ease = "ease_in" },
+  { t = 1.00, v = [0, 0, 0], ease = "smooth" },
+]

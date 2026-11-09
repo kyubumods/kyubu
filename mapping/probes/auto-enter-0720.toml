@@ -1,0 +1,72 @@
+# Needs a save with the character Tester and the world testworld: it was recorded in the kept sandbox of auto-enter-0720 (KEEP=1 of auto-enter-empty-0720).
+# A plain replay-all starts with an empty Save/, so it fails with "no saved character matches (0 saved)" (native and Wine alike, add-native-replay 5.2).
+# mods-dev/auto_enter 0.1.0 with a save: the mod must leave the title screen and enter the saved world by itself, with no input at all.
+# Replay it with KEEP=1 in a sandbox that holds a save: the --keep sandbox of auto-enter-empty-0720 (character Tester, world testworld,
+# seed 1234), copied to $KMAP_HOME/tmp/replay-auto-enter-0720/wine, its kyubu/logs/latest.log deleted first. The script traces the three
+# game functions the mod relies on.
+id = "auto-enter-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-10-27"
+steps = [
+    "Built mods-dev/auto_enter 0.1.0 (ninja auto_enter); replayed under Wine with KEEP=1 in the kept sandbox of auto-enter-empty-0720, setup menu, no input",
+]
+observations = [
+    "run 1 passed, 8 of 8 (evidence/auto-enter-2026-10-27): with no input the mod listed character 0 Tester and world 0 testworld (seed 1234) and selected them 2.2 s after game_ready; the loader logged 'world entered: testworld' 1.1 s later",
+    "character_select_click, world_select_click and change_world were each called once; change_world's first argument was 0x4D2 (1234) and it returned to 0x48420E, in world_select_click",
+    "selected_character and selected_world read 0 in the world; the first entry of characters is the creature Tester",
+    "also passed under Wine 11 WoW64: with GALLIUM_DRIVER=llvmpipe (run llvm1) the world was entered 2.4 s after game_ready, 64 fps; with d3d12 (run gpu1) 5 s after, 8.6 fps; 8 of 8 held in both",
+]
+
+[[confirms]]
+entry = "character_select_click"
+observed = "called once, by the mod, before world_select_click; the world list was shown after it"
+
+[[confirms]]
+entry = "world_select_click"
+observed = "called once, by the mod; it called change_world from 0x48420E"
+
+[[confirms]]
+entry = "change_world"
+observed = "called once from world_select_click with the saved world's seed (1234) as its first argument; the world was then entered"
+
+[[confirms]]
+entry = "cube::GameController.selected_world"
+observed = "0 (the first saved world) after the mod's selection"
+
+[[confirms]]
+entry = "cube::GameController.characters"
+observed = "loaded from the save at the title: the first entry is the creature Tester (name at data + 0x1158)"
+
+[[confirms]]
+entry = "cube::GameController.selected_character"
+observed = "0 (the first saved character) after the mod's selection"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter"]
+input = [
+]
+script = """
+log autoenter: script up
+trace args 2
+trace add character_select_click
+trace add world_select_click
+trace add change_world
+trace start
+wait world
+log autoenter: world entered
+wait 3
+expect character_select_click calls character_select_click == 1
+expect world_select_click calls world_select_click == 1
+expect change_world calls change_world == 1
+expect change_world arg change_world 1 == 1234
+expect change_world caller change_world @0x48420E
+expect cube::GameController.selected_world value i32 == 0 [@0x76B1C8] + 0x800A10
+expect cube::GameController.selected_character value i32 == 0 [@0x76B1C8] + 0x800A0C
+expect cube::GameController.characters value u32 == 0x74736554 [[[@0x76B1C8] + 0x800984]] + 0x1168
+trace stop
+wait 15
+"""

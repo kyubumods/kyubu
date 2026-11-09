@@ -1,0 +1,33 @@
+# Task 4.4 of add-ability-animation (the fallbacks of the pose provider). The same input with no clip mod: the reference for anim-fallback-preview.
+# Recorded with kyubu_probe, unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay, setup menu, gamepilot clicks.
+id = "anim-fallback-preview-off"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Start in the menu; click Start game, click CREATE in the first character slot, type the name Tester: screenshot of the creation screen's preview (the character is drawn in mode 0)",
+]
+observations = [
+    "Wine replay 2 passed: the reference for anim-fallback-preview (same input, no clip mod; the registry reports '0 clip(s)'). Evidence: evidence/ability-animation-2026-10-07/anim-fallback-preview/without/"
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "the pose provider alone, with no clip mod, leaves the character-creation preview as the game draws it (the reference picture of anim-fallback-preview)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 260
+mods = []
+input = [
+    "wait 8", "click 511 457", "wait 8", "click 691 439", "wait 8", "click 512 737", "wait 2", "type Tester", "wait 3", "key Return", "wait 4",
+    "shot 01-creation",
+    "wait 3",
+]
+script = """
+log anim-fallback-preview-off: task 4.4 of add-ability-animation
+wait 45
+expect - hooks == 0
+log anim-fallback-preview-off: done
+"""

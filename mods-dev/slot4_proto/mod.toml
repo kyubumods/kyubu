@@ -1,0 +1,10 @@
+id = "slot4_proto"
+name = "Slot 4 prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-slot4): a mid hook at 0x48BFDC pushes one ability id onto the player's skill bar through the game's own vector push_back, so the HUD gets a slot 4 and key 4 starts that id. Console commands read the bar, the cooldown map and the game's own answers for the id."
+
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,41 @@
+# Task 3.6 of add-mod-manager (design D3). The dev mod mods-dev/start_menu_row 0.3.0 has manage_mods = true and the console command
+# start_menu_row:restart, which calls the loader's game_restart. The replay calls it at the start menu: the game must start the same Cube.exe
+# with the same command line, quit, and the new process must wait for the old one before it opens latest.log.
+id = "game-restart"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built the loader with game_restart (restart_game in core/host.cpp, KyubuApi 1.2, last member) and the dev mod start_menu_row 0.3.0 with manage_mods and start_menu_row:restart",
+    "Replayed at the start menu under Wine: waited for game_ready, ran start_menu_row:restart on the console, waited for the second process to log that it was restarted",
+]
+observations = [
+    "replay passed under Wine (evidence/game-restart-2026-10-24): start_menu_row:restart returned 0; the first process logged 'game_restart: started process 396 with the same arguments; quitting', then 'phase: shutdown' 470 ms later and 'Kyubu shut down cleanly'",
+    "the second process logged the same command line (--kyubu-dev), 'Restarted by game_restart: the previous process ended after 371 ms', reached game_ready and finished the probe script (the quit flag read 0)",
+    "the game left through its own quit flag: the 8 s fallback (ExitProcess from a thread) did not run",
+    "scripts/wine_sandbox.sh ended the prefix as soon as the first process ended (run 1: the new process was killed 16 ms after it started); it now waits for the prefix's other processes with wineserver -w, for what is left of the time",
+]
+
+[[confirms]]
+entry = "cube::GameController.quit_requested"
+observed = "game_restart wrote 1 here; the game left through its normal exit and the restarted process read 0"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "wait 25",
+    "console start_menu_row:restart",
+    "until Restarted by game_restart",
+    "wait 20",
+    "shot 01-after-restart",
+]
+script = """
+log restart: process up
+wait 40
+expect - value u8 == 0 [@0x7691C8] + 0x198
+log restart: done
+wait 5
+"""

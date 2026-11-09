@@ -1,0 +1,54 @@
+# A loader and mod check, not a game observation: the capture mod's dev-mode file inbox (add-ability-animation task 7.6; design decision 7).
+# A request file in <game>/kyubu/inbox/ holds one console line; the mod polls the folder, removes the file, runs the line through its own
+# `anim` command and writes <name>.reply beside it. Only `anim preview|capture|rig|bake` run: another command is refused. Recorded with
+# kyubu_probe, mods-dev/anim_capture and mods-dev/anim_preview_proto (the clips, and the three request files in requests/), unattended under
+# Wine 9.0 (WSL, Xvfb). The replay's `inbox` step drops each file the way an outside program does: under a temporary name, then renamed.
+id = "anim-inbox"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; 20 s after the world loaded: screenshot 00-idle, then the wheel twelve notches down",
+    "inbox request `anim preview anim_preview_proto:arm 500`, screenshot 01-arm; inbox request `ability rank 1 3` (not an anim command), screenshot 02-refused",
+    "inbox request `anim capture anim_preview_proto:arm 0,500 front`, then 20 s: the capture folder and the reply's `result:` line",
+]
+observations = [
+    "Wine replay 2 passed, 1 of 1 expectations held (run 1 passed too; run 2 only added the copy of the .reply files to the report folder). Evidence: evidence/anim-inbox-2026-10-11/ (00-idle.png, 01-arm.png, 02-refused.png, capture/, inbox/*.reply, latest.log, README.md)",
+    "`a-preview.txt` (`anim preview anim_preview_proto:arm 500`) was consumed within one poll and answered with the preview command's own line in a-preview.reply; 01-arm.png shows the weapon arm raised. The log line `anim_capture: inbox a-preview.txt: ...` names the file and the line",
+    "`b-refused.txt` (`ability rank 1 3`) was consumed, nothing ran, and b-refused.reply and the log say that only `anim preview`, `anim capture`, `anim rig` and `anim bake` run from the inbox",
+    "`c-capture.txt` (`anim capture anim_preview_proto:arm 0,500 front`) started the capture at once and it wrote a folder with 2 frames (sheet.png, pose.json) in 4 s; c-capture.reply holds the start line and, when the job ended, `result: anim capture: done: <folder> (2 frames; sheet.png, pose.json)`",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "with the preview held through animation_preview from a request file, the back buffer shows the player in the clip's pose, and a capture asked for the same way wrote a sheet and pose.json from the draw record"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/anim_capture", "mods-dev/anim_preview_proto"]
+input = [
+    "until anim-inbox: ready",
+    "wheel down 12",
+    "wait 3",
+    "shot 00-idle",
+    "inbox anim_preview_proto requests/preview.txt a-preview.txt",
+    "wait 4",
+    "shot 01-arm",
+    "inbox anim_preview_proto requests/refused.txt b-refused.txt",
+    "wait 4",
+    "shot 02-refused",
+    "inbox anim_preview_proto requests/capture.txt c-capture.txt",
+    "wait 20",
+    "until anim-inbox: done",
+]
+script = """
+log anim-inbox: task 7.6 of add-ability-animation
+wait world
+wait 20
+log anim-inbox: ready
+wait 70
+log anim-inbox: done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

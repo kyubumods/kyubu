@@ -1,0 +1,1052 @@
+# Candidate layouts imported from cuwo (kmap import-cuwo): names, types and serialisation offsets from
+# cuwo/entity.pyx at the pinned commit. The offsets describe the network format; probes confirm them.
+
+[[type]]
+name = "cube::FloatVector3"
+kind = "struct"
+size = 0xC
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+notes = "cuwo reads it with read_vec3"
+
+[[type.field]]
+offset = 0x0
+name = "x"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4
+name = "y"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x8
+name = "z"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type]]
+name = "cube::IntVector3"
+kind = "struct"
+size = 0xC
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+notes = "cuwo reads it with read_ivec3"
+
+[[type.field]]
+offset = 0x0
+name = "x"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4
+name = "y"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x8
+name = "z"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/bytes.pyx"]
+source = "cuwo"
+
+[[type]]
+name = "cube::LongVector3"
+kind = "struct"
+size = 0x18
+status = "verified"
+evidence = ["cuwo:cuwo/bytes.pyx", "probe:creature-units"]
+source = "cuwo"
+notes = "cuwo reads it with read_qvec3. As cube::CreatureData.pos: x east, y north, z up, 65,536 units per block (probe creature-units)"
+
+[[type.field]]
+offset = 0x0
+name = "x"
+type = "int64_t"
+status = "verified"
+evidence = ["cuwo:cuwo/bytes.pyx", "probe:creature-units"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x8
+name = "y"
+type = "int64_t"
+status = "verified"
+evidence = ["cuwo:cuwo/bytes.pyx", "probe:creature-units"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x10
+name = "z"
+type = "int64_t"
+status = "verified"
+evidence = ["cuwo:cuwo/bytes.pyx", "probe:creature-units"]
+source = "cuwo"
+
+[[type]]
+name = "cube::ItemUpgrade"
+kind = "struct"
+size = 0x8
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "cuwo class ItemUpgrade; serialisation layout, not yet confirmed in memory"
+
+[[type.field]]
+offset = 0x0
+name = "x"
+type = "int8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1
+name = "y"
+type = "int8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x2
+name = "z"
+type = "int8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x3
+name = "material"
+type = "int8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4
+name = "level"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type]]
+name = "cube::ItemData"
+kind = "struct"
+size = 0x118
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+notes = "cuwo class ItemData: the size 0x118 and the fields type, sub_type, modifier, rarity, material and level are confirmed in memory (probe inventory-add); minus_modifier, flags and the upgrades are not"
+
+[[type.field]]
+offset = 0x0
+name = "type"
+type = "uint8_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1
+name = "sub_type"
+type = "uint8_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4
+name = "modifier"
+type = "uint32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x8
+name = "minus_modifier"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0xC
+name = "rarity"
+type = "uint8_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0xD
+name = "material"
+type = "uint8_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0xE
+name = "flags"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x10
+name = "level"
+type = "int16_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:inventory-add"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x14
+name = "items"
+type = "cube::ItemUpgrade[32]"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x114
+name = "upgrade_count"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type]]
+name = "cube::AppearanceData"
+kind = "struct"
+size = 0xAC
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "cuwo class AppearanceData; serialisation layout, not yet confirmed in memory"
+
+[[type.field]]
+offset = 0x0
+name = "not_used_1"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1
+name = "not_used_2"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x2
+name = "hair_red"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x3
+name = "hair_green"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4
+name = "hair_blue"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x6
+name = "flags"
+type = "uint16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x8
+name = "scale"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:appearance-size-hit", "manual:projectile box and melee tests read it"]
+source = "cuwo"
+notes = "the creature's size and hit box (Creature+0x80): full x, y, z in blocks, centred on the position. Melee reads x as a circle (0.7 x size + reach) and z for height; projectiles use half the size. A pink slime is 0.8 cubed. Details in notes.md of add-dragon-boss"
+
+[[type.field]]
+offset = 0x14
+name = "head_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x16
+name = "hair_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x18
+name = "hand_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1A
+name = "foot_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1C
+name = "body_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1E
+name = "tail_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x20
+name = "shoulder2_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x22
+name = "wing_model"
+type = "int16_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x24
+name = "head_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x28
+name = "body_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x2C
+name = "hand_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x30
+name = "foot_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x34
+name = "shoulder2_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x38
+name = "weapon_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x3C
+name = "tail_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x40
+name = "shoulder_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x44
+name = "wing_scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x48
+name = "body_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4C
+name = "arm_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x50
+name = "arm_roll"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x54
+name = "arm_yaw"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x58
+name = "feet_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x5C
+name = "wing_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x60
+name = "back_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x64
+name = "body_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x70
+name = "head_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x7C
+name = "hand_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x88
+name = "foot_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x94
+name = "tail_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0xA0
+name = "wing_offset"
+type = "cube::FloatVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type]]
+name = "cube::CreatureData"
+kind = "struct"
+size = 0x1168
+aliases = ["EntityData"]
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:creature-fields"]
+source = "cuwo"
+notes = "cuwo class EntityData; in memory at cube::Creature+0x10 (probe creature-fields). Fields not marked verified are still cuwo's serialisation layout"
+
+[[type.field]]
+offset = 0x0
+name = "pos"
+type = "cube::LongVector3"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx", "probe:creature-units"]
+source = "cuwo"
+notes = "65,536 units per block, 2^24 per zone (256 blocks): pos >> 24 is the zone in the ids of zone creatures; x east, y north, z up. A spawner adds whole blocks times 65,536 (probe:creature-units)"
+
+[[type.field]]
+offset = 0x18
+name = "body_roll"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1C
+name = "body_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "probe:creature-fields saw only noise-sized changes (about 1e-38) while walking, so its meaning is unconfirmed"
+
+[[type.field]]
+offset = 0x20
+name = "body_yaw"
+type = "float"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx", "probe:creature-units"]
+source = "cuwo"
+notes = "degrees, counter-clockwise from +y (north): 0 faces +y, 90 faces -x, 180 faces -y, -90 faces +x; facing vector (-sin yaw, cos yaw); the camera does not follow it (probe:creature-units)"
+
+[[type.field]]
+offset = 0x24
+name = "velocity"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x30
+name = "accel"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "manual:dt times it is the walk push of a step; zeroed by a stun", "probe:creature-root-server"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x3C
+name = "extra_vel"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "manual:the knockback: added to the move step; a hit's push sets it", "probe:creature-root-server"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x48
+name = "look_pitch"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x4C
+name = "physics_flags"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x50
+name = "hostile_type"
+type = "uint8_t"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "besides the player (0), a bush reads 6 (TARGET)"
+
+[[type.field]]
+offset = 0x54
+name = "entity_type"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x58
+name = "current_mode"
+type = "uint8_t"
+status = "verified"
+evidence = ["probe:creature-fields", "probe:ability-force", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "the current ability, a cube::AbilityId; writing an id with mode_start_time 0 makes the creature perform it"
+
+[[type.field]]
+offset = 0x5C
+name = "mode_start_time"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:creature-fields", "probe:ability-force", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "despite cuwo's name, the time spent in the current mode in ms: it counts up and restarts when the mode changes"
+
+[[type.field]]
+offset = 0x60
+name = "hit_counter"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x64
+name = "last_hit_time"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x68
+name = "appearance"
+type = "cube::AppearanceData"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x114
+name = "flags"
+type = "uint16_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:lamp-light", "probe:ability-walk-speed"]
+source = "cuwo"
+notes = "bit 0x200: lit lamp (cleared unless slot 10 holds a lamp, type 0x18); 0x10: gliding (slot 11 a glider, 0x17); 0x40: full walk speed (doubles the walk cap; the player's is cleared while an ability runs); 4: lock-on, facing a target (cuts the cap walking away from it)"
+
+[[type.field]]
+offset = 0x118
+name = "roll_time"
+type = "uint32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-interrupts"]
+source = "cuwo"
+notes = "set to 600 by a dodge roll (W and the middle button, GameController+0xB and +0xA), which also writes 0 to current_mode and takes 0.25 of cube::Creature.stamina (0x4A71FA)"
+
+[[type.field]]
+offset = 0x11C
+name = "stun_time"
+type = "int32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-interrupts"]
+source = "cuwo"
+notes = "ms left of a stun, counted down by the World step and negative at rest; above 0 it holds current_mode at 0 and canUseAbility refuses every id but 101 (probe:ability-costs)"
+
+[[type.field]]
+offset = 0x120
+name = "slowed_time"
+type = "uint32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-interrupts"]
+source = "cuwo"
+notes = "ms left of a slow, counted down to 0 by World::update (0x610654), the timer at Creature+0x130. Written 4000 it ran out in under 5.5 s; it did not end modes 57 or 115 (see the combat atlas)"
+
+[[type.field]]
+offset = 0x124
+name = "make_blue_time"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x128
+name = "speed_up_time"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x12C
+name = "show_patch_time"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x130
+name = "class_type"
+type = "uint8_t"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x131
+name = "specialization"
+type = "uint8_t"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-slot4"]
+source = "cuwo"
+notes = "0 or 1: picks one class slot of the skill bar (index 4 for warrior, ranger and rogue; index 2 and M1 for the mage). The bar build reads it each frame; a write shows on the next frame (probe ability-slot4)"
+
+[[type.field]]
+offset = 0x134
+name = "charged_mp"
+type = "float"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-costs"]
+source = "cuwo"
+notes = "mp reserved by a hold mode (8, 24, 25, 27, 36, 59, 63, 64) while held, capped at mp; the melee case subtracts it from mp on release and zeroes it (cube::World::chargedMpSpendSite)"
+
+[[type.field]]
+offset = 0x138
+name = "not_used_1"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x13C
+name = "not_used_2"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x140
+name = "not_used_3"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x144
+name = "not_used_4"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x148
+name = "not_used_5"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x14C
+name = "not_used_6"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x150
+name = "ray_hit"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:projectile-spawn"]
+source = "cuwo"
+notes = "the aim: where the creature's crosshair ray meets the world, in blocks from pos. The projectile modes shoot along it and only when it isn't zero (9.6). The player's is rewritten from the camera every frame by cube::GameController::update, so a probe's write doesn't last"
+
+[[type.field]]
+offset = 0x15C
+name = "hp"
+type = "float"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x160
+name = "mp"
+type = "float"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx", "probe:ability-costs"]
+source = "cuwo"
+notes = "a fraction from 0 to 1 (the HUD shows it times 100); a warrior's drains back to 0"
+
+[[type.field]]
+offset = 0x164
+name = "block_power"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "1 for a new warrior (probe:ability-costs). The game adds it to mp and charged_mp and then lowers it (0x5958B0, 0x4901BD); what it is is open"
+
+[[type.field]]
+offset = 0x168
+name = "max_hp_multiplier"
+type = "float"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "100 for the player; the maximum HP scales with it (200 gives 525 instead of 265)"
+
+[[type.field]]
+offset = 0x16C
+name = "shoot_speed"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x170
+name = "damage_multiplier"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x174
+name = "armor_multiplier"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x178
+name = "resi_multiplier"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x17C
+name = "not_used7"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x17D
+name = "not_used8"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x180
+name = "level"
+type = "int32_t"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x184
+name = "current_xp"
+type = "int32_t"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x188
+name = "parent_owner"
+type = "uint64_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x190
+name = "unknown_or_not_used1"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x194
+name = "unknown_or_not_used2"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x198
+name = "power_base"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x19C
+name = "unknown_or_not_used4"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1A0
+name = "start_chunk"
+type = "cube::IntVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1AC
+name = "super_weird"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1B0
+name = "spawn_pos"
+type = "cube::LongVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1C8
+name = "not_used19"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1CC
+name = "not_used20"
+type = "cube::IntVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1D8
+name = "consumable"
+type = "cube::ItemData"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x2F0
+name = "equipment"
+type = "cube::ItemData[13]"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+notes = "a new warrior's weapon is in slot 7 (type 3, sub_type 17), rings in 8 and 9, a lamp (type 0x18) in 10; slot 6 is empty. 11 holds the glider or boat (type 0x17), 12 the pet item (0x13). The bar, the modes and the model follow sub_type of slot 7"
+
+[[type.field]]
+offset = 0x1128
+name = "skills"
+type = "uint32_t[11]"
+status = "verified"
+evidence = ["cuwo:cuwo/entity.pyx", "probe:ability-skilltree"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1154
+name = "mana_cubes"
+type = "uint32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/entity.pyx"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x1158
+name = "name"
+type = "char[16]"
+status = "verified"
+evidence = ["probe:creature-fields", "cuwo:cuwo/entity.pyx"]
+source = "cuwo"

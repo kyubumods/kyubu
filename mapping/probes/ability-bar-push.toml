@@ -1,0 +1,55 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 4.2 of add-ability-api (no mod: the loader's own push at
+# cube::GameController::abilityBarBuiltSite), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay
+# with gamepilot, which creates the level-1 human warrior "Tester" and a new world. With only the placeholder installed
+# ([abilities] placeholder is on until task 4.6), the warrior has kyubu:placeholder (111) on slot 4. P below is the
+# player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-bar-push"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "the loader's push appended the slot-4 holder's number (the placeholder, 111) to the five-entry bar; screenshot of the HUD",
+]
+observations = [
+    "Wine replay 1 passed with the task-4.2 loader (the log has \"abilities: the skill bar push is installed at cube::GameController::abilityBarBuiltSite\" and \"the fourth ability slot is available\"): the bar's index 5 (begin + 20) read 111, the placeholder, and class_type read 1",
+    "the same record on the 4.1 loader (no push) failed as it should: index 5 held stale memory (38993920), the bar had five entries; replay 2 of it did not reach game_ready (the log ends at the Direct3D 9 device) and replay 3 ran",
+    "the HUD screenshots with and without the push (01-hud-with, 01-hud-without in the evidence folder) both show the vanilla slot \"4\" as an empty grey box: the icon map has no entry for 111 (tasks 4.5 and 4.6 add the icon), so the bar read is what proves the push; M1, M2 and the three class slots (empty for a level-1 warrior) are as in vanilla",
+]
+
+[[confirms]]
+entry = "cube::GameController::abilityBarBuiltSite"
+observed = "the loader's mid hook installed (no KY_E_UNSAFE) and ran on every frame: [esp+0x10] was the game controller and [esp+0x34] the bar vector"
+
+[[confirms]]
+entry = "cube::GameController.ability_bar"
+observed = "at +0x80080C: the game's five ids, then the placeholder's 111 at index 5 (begin + 20)"
+
+[[confirms]]
+entry = "IntVector::push_back"
+observed = "called by the loader with ECX = the bar and the address of 111 as its one stack argument: the bar grew to six ids and the game kept the sixth"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "read by the push: 1 (warrior) for the character the replay creates"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 120
+mods = []
+input = [
+    "until barpush hud", "wait 2", "shot 01-hud",
+]
+script = """
+log barpush: task 4.2 of add-ability-api, the loader pushes the slot-4 holder
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# the bar: the game builds five ids and the loader appends the placeholder's number (index 5 = begin + 20)
+expect cube::GameController.ability_bar value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+log barpush hud
+wait 8
+log barpush done
+"""

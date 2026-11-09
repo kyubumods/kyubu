@@ -1,0 +1,10 @@
+id = "stats_proto"
+name = "Stat detours prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-stat-detours): defines one ability that claims the warrior's slot 4 (cost 0.5 mp, cooldown 4000 ms at rank 0 and 3500 ms at rank 1, 800 ms long), and console commands that print the game's own answers for it, for the placeholder and for smash."
+
+[scripts]
+client = "scripts/client.lua"

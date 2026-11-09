@@ -1,0 +1,8 @@
+# hello_lua's options (docs/config.md). Players change them in kyubu/config/hello_lua.toml,
+# or with the console: config hello_lua speed 2
+[options.speed]
+type = "float"
+default = 1.0
+min = 0.0
+max = 5.0
+description = "Speed shown by the Hello Lua window's slider."

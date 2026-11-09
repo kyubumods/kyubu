@@ -1,0 +1,51 @@
+# Probe record (live-probes) for add-particle-effects: that a record pushed on the World step's particle list is played like the game's
+# own, and what each of cuwo's five particle types and the acceleration look like. mods-dev/particle_proto calls the game API's
+# particle_spawn every half second for 12 s: a row of the five types with the hit effect's acceleration (0, 0, 10) 8 blocks in front of
+# the player, and a row with no acceleration 4 blocks in front.
+id = "particle-types"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; once the player's height held for 2 s the mod particle_proto started 20 particles of each type 0 to 4 every half second (two rows: accel 0, 0, 10 at 8 blocks, accel 0 at 4 blocks), each type in its own colour",
+    "screenshots 01-early, 02-mid and 03-late of the effects",
+]
+observations = [
+    "(to fill in after the run)",
+]
+
+[[confirms]]
+entry = "step_output_push_particle"
+observed = "(to fill in after the run)"
+
+[[confirms]]
+entry = "cube::ParticleData"
+observed = "(to fill in after the run)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 200
+mods = ["mods-dev/particle_proto"]
+input = [
+    "until particle-ring: ready",
+    "shot 00-idle",
+    "until particle-proto: types",
+    "wait 1",
+    "shot 01-early",
+    "wait 3",
+    "shot 02-mid",
+    "wait 4",
+    "shot 03-late",
+    "until particle-proto: done",
+    "until particle-ring: done",
+]
+script = """
+log particle-ring: start
+wait world
+wait 15
+log particle-ring: ready
+wait 110
+log particle-ring: done
+expect - hooks == 0
+"""

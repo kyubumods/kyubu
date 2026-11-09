@@ -1,0 +1,75 @@
+# Task 10.9a of add-skills-unleashed-multiplayer (design D16): what Server.exe does with a joined player's arrow. The client, made a
+# Sniper by su_rank, summons its bow and shoots one arrow (the game's own shot, sent as packet 9). The server should take the packet
+# in connection_receive_loop (case 9, Net::receiveProjectileSite), queue it on cube::Server's list, and hand it to the broadcast in
+# cube::Server::takeBullets after cube::World::update. The World's projectile step should not run for it: nothing pushes a received
+# projectile into cube::World.projectiles. su_dummy's monster is a melee one, so no other projectile is expected in the window.
+id = "server-projectile-packet-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client (fast_join), both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Sniper at rank 3 (su_rank options); the client held key 4 for 0.8 s, waited for the bow, then held mouse1 for 1.5 s (one arrow)",
+]
+observations = [
+    "run 1 2026-11-08 passed (evidence/projectile-packet-2026-11-08/server-projectile-packet-0720-run1): the client's one arrow reached Net::receiveProjectileSite once, 0.13 s after the server's Sniper saw the shot; cube::Server::takeBullets ran 1240 times, every call from the main loop (0x54A0C7) on one thread",
+    "the World's projectile step (cube::World::projectileUpdateSite) did not run once in the 6 s after the packet, longer than a vanilla arrow lives (5000 ms): the server relays a player's arrow and does not fly it (design D16)",
+]
+
+[[confirms]]
+entry = "Net::receiveProjectileSite"
+observed = "the site passes when the joined client shoots its arrow"
+
+[[confirms]]
+entry = "cube::Server::takeBullets"
+observed = "called from the main loop (returns to 0x54A0C7), after cube::World::update"
+
+[[confirms]]
+entry = "cube::World::projectileUpdateSite"
+observed = "no pass while the player's arrow flies: the server does not fly a received projectile"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization sniper",
+    "console config su_rank ability skills_unleashed:sniper",
+    "console config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "until the run ended",
+    "shot 02-client-summoned",
+    "hold mouse1 1.5",
+    "until server: sniper: arrow over",
+    "shot 03-client-shot",
+]
+log_expect = { latest = [
+    "the bow is held",
+], client = [
+    "su_rank: the character is class 2, specialization 0 (sniper)",
+    "sniper: the arrow",
+] }
+# The window after the packet is a limit, not a wait for a signal: the check is that something does NOT happen, and a vanilla
+# arrow lives at most 5000 ms (cube::World::projectileRemoveSite), so 6 s covers its whole flight.
+script = """
+log server-projectile-packet-0720: task 10.9a of add-skills-unleashed-multiplayer
+trace args 1
+trace add @0x4265B3
+trace add @0x4281D0
+trace add @0x54688D
+trace start
+wait 420 until calls @0x4265B3 >= 1
+wait 6 until calls @0x54688D >= 1
+trace stop
+trace report
+expect Net::receiveProjectileSite calls @0x4265B3 >= 1
+expect cube::Server::takeBullets calls @0x4281D0 >= 1
+expect cube::Server::takeBullets from @0x4281D0 @0x54A0C7
+expect cube::World::projectileUpdateSite calls @0x54688D == 0
+log server-projectile-packet-0720: done
+"""

@@ -1,0 +1,57 @@
+# Recorded with kyubu_probe, mods-dev/ability_api_proto and the Kyubu loader of task 6.1 of add-ability-api (ability_get, ability_cooldown,
+# ability_start and ability_end), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay with gamepilot, which
+# creates the level-1 human warrior "Tester" and a new world. ability_api_proto defines ability_api_proto:burst (number 112, 800 ms,
+# mp_cost 0.3, cooldown 3500 ms at rank 1) for the warrior's slot 4 (`any`) and one console command per API function; each answer is
+# one log line "ability_api_proto: ...". P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-api"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "A: get (in no ability); start the burst through the API at mp 1: its callbacks read get at step 5, then the cooldown and a second start in on_end; the cooldowns; startend: the burst ends itself through ability_end at step 10",
+    "B: start at mp 0.1 (refused for mp), start of smash (vanilla: refused), end with no ability running",
+    "C: the game's smash forced by writing mode 54 and read at once with get, then the cooldowns",
+]
+observations = [
+    "Wine run 4 passed (runs 1 to 3 read the state 15 s after an 800 ms ability had ended: a console command takes about 15 s under software rendering, so run 4 reads inside the ability's callbacks). Evidence: evidence/ability-api-2026-10-05/ (README, log, report, 2 screenshots)",
+    "ability_get: number 0 and an empty id in no ability; number 112, id ability_api_proto:burst and elapsed_ms 80 at step 5 of a run; number 54, id cubeworld:smash, elapsed_ms 0 for the forced smash",
+    "ability_cooldown: 2711 ms in on_end of a full run (3500 less the 800 ms run), 3334 after a run cancelled at 186 ms, 0 fifteen seconds later; smash 5304 after the forced mode; an unknown id fails with 'no ability \"no:such\" (not found)'",
+    "ability_start: ok at mp 1 (on_start, 45 steps, ends done after 809 ms); refused for the cooldown in on_end ('is on cooldown: 2711 ms left'), for mp 0.1 ('costs 0.300 and the creature has 0.100'), and for smash ('54 is not a defined mod ability'); ability_end at step 10 ended it cancelled after 186 ms, and with nothing running it fails 'the creature is in no mod ability'",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the new level-1 warrior: the bar's slot 4 held the burst (112)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 500
+mods = ["mods-dev/ability_api_proto"]
+input = [
+    "until apiprobe A", "console ability_api_proto:get", "shot 01-none", "console ability_api_proto:start", "console ability_api_proto:cd",
+    "console ability_api_proto:startend", "console ability_api_proto:cd",
+    "until apiprobe B", "console ability_api_proto:startlow", "console ability_api_proto:vanilla", "console ability_api_proto:end",
+    "until apiprobe C", "console ability_api_proto:smash", "shot 03-smash", "console ability_api_proto:cd",
+]
+script = """
+log apiprobe: task 6.1 of add-ability-api, the game API for abilities
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# the bar: the five vanilla ids and the burst, number 112 (index 5 = begin + 20)
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log apiprobe A
+wait 150
+log apiprobe B
+wait 100
+log apiprobe C
+wait 60
+watch
+watch clear
+log apiprobe done
+"""

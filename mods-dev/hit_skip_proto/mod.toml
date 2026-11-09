@@ -1,0 +1,9 @@
+id = "hit_skip_proto"
+name = "Hit skip prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe hit-skip-sites): with config flag = 1 it cancels the push, the velocity reset, the slow/lock and the stun that cube::World::applyHit gives a creature (the first of two slimes, the second is a control); it forces a stun and a push on every hit at hitListSite, and parks one creature in front of the player."
+
+[native]
+common = "bin/hit_skip_proto.dll"

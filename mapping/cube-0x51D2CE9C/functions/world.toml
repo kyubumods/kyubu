@@ -1,0 +1,183 @@
+# Cube.exe: the world object, its regions and zones, and the zone loader.
+
+[[function]]
+name = "cube::World::World"
+address = 0x58D370
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::World", "xref:cube::GameController::GameController"]
+source = "kyubu"
+notes = "stores the World vtable; builds its Database, a critical section and the building models; only caller is the GameController constructor"
+
+[[function]]
+name = "cube::World::~World"
+address = 0x592710
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::World", "manual:only caller is vtable slot 0 (the deleting destructor)"]
+source = "kyubu"
+notes = "saves the loaded zones (cube::World::saveZone), then deletes the critical section"
+
+[[function]]
+name = "cube::World::saveZone"
+address = 0x5A3970
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["string:\"zone\"", "xref:cube::Database::setBuffer"]
+source = "kyubu"
+notes = "serialises a changed zone and writes it to the world save under a key built from zone and the zone's coordinates"
+
+[[function]]
+name = "cube::Region::Region"
+address = 0x5C2700
+convention = "thiscall"
+subsystem = "world"
+status = "candidate"
+evidence = ["rtti:cube::Region", "manual:the destructor is 0x5C2900, called from vtable slot 0"]
+source = "kyubu"
+notes = "sizeof 88616 (operator new); created by 0x5D8CD0, which cube::World::generateZone calls and which uses the strings mission and monster"
+
+[[function]]
+name = "cube::World::generateZone"
+address = 0x5E3280
+convention = "thiscall"
+prototype = "void __thiscall cube::World::generateZone(cube::World* this, int32_t zone_x, int32_t zone_y)"
+subsystem = "world"
+status = "verified"
+evidence = ["xref:zone_loader_step", "manual:new cube::Zone, srand(seed + y * 0x10000 + x), fills it; no model table", "probe:model-slots"]
+source = "kyubu"
+aliases = ["ModelResolverC", "model_resolver_c"]
+notes = "1.0.1 model resolver C, rejected in task 8.4: its look-ups index the new Zone own vectors. Makes the regions around it, returns if the zone exists, else builds a cube::Zone seeded from World+0x800188 and fills it. Zone coordinates 0 to 0xFFFF; called by zone_loader_step"
+
+[[function]]
+name = "cube::Zone::Zone"
+address = 0x6229F0
+convention = "thiscall"
+subsystem = "world"
+status = "verified"
+evidence = ["rtti:cube::Zone", "xref:cube::World::generateZone", "probe:model-slots"]
+source = "kyubu"
+notes = "sizeof 200 (operator new); only caller is cube::World::generateZone; the destructor is 0x622C90"
+
+[[function]]
+name = "zone_loader_step"
+address = 0x46AD00
+convention = "fastcall"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:cube::World::openSave", "manual:loads the zones around the player (generateZone), then sleeps 20 ms"]
+source = "kyubu"
+notes = "argument points to the GameController pointer; the World is at GameController+0x2DC, the map at +0x800D3C; no direct caller"
+
+# Task 8.3: the World's simulation step, where creatures are created, stepped and removed.
+
+[[function]]
+name = "cube::World::update"
+address = 0x60AEA0
+convention = "thiscall"
+prototype = "void __thiscall cube::World::update(cube::World* this, int32_t dt_ms, void* step_out, void* step_in)"
+subsystem = "world"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:this is the World; steps its creature map (World+4)", "probe:creature-lifecycle", "probe:game-detours"]
+source = "kyubu"
+notes = "the update calls it in 20 ms steps (dt_ms 20, then the rest); creates creatures (from spawns, bombs, summons), steps them and removes the dead; step_in is 0 on the client"
+
+[[function]]
+name = "cube::World::creatureCreateSite"
+address = 0x60E958
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:mov esi,eax after new(0x1E60) and cube::Creature::Creature", "probe:creature-lifecycle"]
+source = "kyubu"
+notes = "EAX is a creature just built from a zone's creature record (the record's id at +0x48), before it goes into World.creatures"
+
+[[function]]
+name = "cube::World::creatureDespawnSite"
+address = 0x60CD5B
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the living-creature loop's virtual delete (vtable slot 0, push 1)", "probe:creature-lifecycle"]
+source = "kyubu"
+notes = "ECX is a living creature about to be deleted and erased from World.creatures (0x64F6C0), e.g. one left behind"
+
+[[function]]
+name = "cube::World::creatureDeathRemoveSite"
+address = 0x60E04B
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "world"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the dead-creature loop's virtual delete (vtable slot 0, push 1)", "probe:creature-lifecycle"]
+source = "kyubu"
+notes = "ECX is a dead creature (hp <= 0, not a player, 1000 ms or more in its current mode) about to be deleted and erased"
+
+# The terrain's block at a point (read statically on 2026-10-18, task 9.2a of add-skills-unleashed: the Scout's trap needs the
+# ground under a point). The projectile update asks it whether a projectile is inside a solid block (cube::World::projectileSurfaceSite).
+
+[[function]]
+name = "cube::World::getBlock"
+address = 0x430040
+convention = "thiscall"
+prototype = "const uint8_t* __thiscall cube::World::getBlock(cube::World* this, int64_t x, int64_t y, int64_t z, int32_t flag)"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:cube::World::projectileSurfaceSite", "manual:called with the projectile's x, y, z and 0 at 0x62091D"]
+source = "kyubu"
+notes = "the block at a point (world units, floored to blocks); flag 0. Never NULL: an unloaded place gives a static default block. Byte +3 & 0x1F is the kind; 0x43BD20 calls a block solid unless the kind is 0 (air) or 2 (water, a guess). No lock: call it in the World step"
+
+# The client's region generator (read statically on 2026-10-03, task 5.2 of add-level-rework; the Server.exe twin is region_generate 0x50DE10).
+
+[[function]]
+name = "region_generate"
+address = 0x5D8CD0
+convention = "thiscall"
+prototype = "void __thiscall region_generate(cube::World* this, int32_t grid_row, int32_t grid_column)"
+subsystem = "world"
+status = "candidate"
+evidence = ["correlated:server-0x51D2CE9B:region_generate", "xref:cube::World::generateZone", "probe:region-area-levels"]
+source = "kyubu"
+notes = "ret 8; slot World+0xBC + 4*(row*1024 + column). A counter i runs 0-63 and only EVEN i give a mission an area level (at most 32; i/64 into level_from_power_fraction, 1 to 621); (i>>1) odd means a dungeon. The 2026-09-30 note (64 ranks, odd ranks dungeons) was wrong"
+
+[[function]]
+name = "cube::World::regionAreaLevelSite"
+address = 0x5D9701
+convention = "cdecl"
+kind = "site"
+sig_len = 7
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:region_generate", "manual:the area level store", "probe:region-area-levels"]
+source = "kyubu"
+notes = "in region_generate, the 7-byte store into mission+0x24: EAX is the vanilla area level, ESI the even counter i. A mod writes its own level into EAX; the tile copies and eight +p compares (cmp eax, 5/10/15/19) read it later"
+
+[[function]]
+name = "step_output_push_particle"
+address = 0x486940
+convention = "thiscall"
+prototype = "void __thiscall step_output_push_particle(void* list, const cube::ParticleData* particle)"
+subsystem = "world"
+status = "verified"
+evidence = ["xref:cube::World::hitCreature", "xref:cube::World::update", "cuwo:cuwo/packet.py", "manual:list push_back, 0x50-byte nodes"]
+source = "kyubu"
+notes = "(list, particle): copies the 0x48 bytes into a new node of the step output's particle list (at +0x10; the length guard compares with 2^32 / 0x50) and returns nothing; its eight callers are the eight places the game spawns particles (hitCreature once, cube::World::update seven times)"
+
+[[function]]
+name = "cube::World::positionNoiseForce"
+address = 0x5A4B90
+convention = "thiscall"
+prototype = "cube::FloatVector3* __thiscall cube::World::positionNoiseForce(cube::World* this, cube::FloatVector3* out, const cube::LongVector3* position, const cube::FloatVector3* velocity)"
+subsystem = "world"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:one noise lookup (0x5BE020) of the position per component", "probe:ability-walk-speed"]
+source = "kyubu"
+notes = "a force from smooth noise of the position, one lookup per component. Its one caller, the World step, scales it by the step's time and adds it to a creature's velocity (0x6195FE). Wind or a water current is a guess; it is not the walk (run 14 of the probe)"

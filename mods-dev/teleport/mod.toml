@@ -1,0 +1,9 @@
+id = "teleport"
+name = "Teleport"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Developer mod: the console command teleport moves the local player around the map, in single-player or on a server (client side only)."
+
+[native]
+common = "bin/teleport.dll"

@@ -1,0 +1,19 @@
+clip: procedural.anim.toml
+duration: 800 ms
+end: hold
+blend: in 40 ms, out 100 ms
+tracks: 3
+  body pos (add): x 0..0, y 0..0, z -2.62..0 vox
+    generator: spring, from 0 0 0 to 0 0 -2 at 0.25, 3 Hz, damping 0.35 (overshoots and rings)
+    fastest: 23.96 vox/s at 0.34 (270 ms)
+  head rot (add): x -2.16..3.28, y 0..0, z -3.24..4.91 deg
+    generator: osc, centre 0 0 0, amp 4 0 6, 6 Hz, phase 0 deg, decay 5 /s
+    fastest: 268.89 deg/s at 0 (2 ms)
+  hand_r rot (add): x 0..0, y 0..0, z -8..8 deg
+    generator: expr, reads u, charge
+    signals: charge (read from the game; shown with charge 0, speed 0, rank 1; pass --charge, --speed, --rank)
+    fastest: 62.83 deg/s at 0 (2 ms)
+pops: none
+hide: none
+markers:
+  hit at 0.25 (200 ms)

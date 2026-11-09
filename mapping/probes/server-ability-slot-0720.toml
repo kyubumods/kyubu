@@ -1,0 +1,72 @@
+# Recorded with kyubu_probe and the Kyubu loader, unattended under Wine 9.0 (WSL), as server-ability-twins-0720 but with the demo's
+# server side (scripts/server.lua). Task 3.2 of add-skills-unleashed-multiplayer: does Server.exe run a joined player's mod ability
+# (number 112) through the loader's step runner, and are the stat functions the loader detours (ability_cooldown, ability_cost,
+# modeDuration) the ones the server calls?
+id = "server-ability-slot-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-10-27"
+steps = [
+    "Wine replay: Server.exe with fourth_ability_demo (client and server sides), then a client that joins with a new warrior",
+    "traced the dispatch site and the three stat functions",
+    "the rank is set on the console, then the client held key 4 (number 112)",
+]
+observations = [
+    "signal waits, 2026-11-08 (evidence/fast-join-2026-11-08/waits-run1/server-ability-slot-0720), passed in 29 s: the script waits for Net::acceptJoinSite (the join, held after 7 to 8.5 s) instead of 140 s, and for the dispatch site instead of a fixed 40 to 90 s; the dispatch wait holds at once (monsters call it too), so the trace no longer spans the presses: log_expect checks them",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-ability-slot-0720), passed in 185 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "replay 1 (2026-10-27) passed. Evidence: evidence/server-ability-slot-2026-10-27/",
+    "Server.exe loaded fourth_ability_demo with its server script: 'the fourth ability slot is available', the stat detours installed over ability_cooldown, ability_cost and modeDuration (signatures matched), the step runner installed at the dispatch site",
+    "the joined client held key 4 (rank 3 set on the console): the server logged on_start number 112 rank 3 side server, 40 on_step lines at about 20 ms, and the activation ended 'done' after 806 ms. The rank is the server copy's skills[9] as the client sent it",
+    "limit: the probe could not trace ability_cooldown, ability_cost or modeDuration (the loader's own detours are on them), so their calls were not counted; they are verified by signature and the mapping evidence, and the detours caused no fault in 98625 dispatch steps. The cost and cooldown the server applies come from the step runner, not from those functions",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "98625 calls in the run; the mod mode 112 of a joined player reached the step runner hooked here"
+
+[[confirms]]
+entry = "ability_cooldown"
+observed = "the loader detoured it at this address (signature matched) and the server ran for the whole replay; calls not counted"
+
+[[confirms]]
+entry = "ability_cost"
+observed = "the loader detoured it at this address (signature matched) and the server ran for the whole replay; calls not counted"
+
+[[confirms]]
+entry = "cube::Creature::modeDuration"
+observed = "the loader detoured it at this address (signature matched) and the server ran for the whole replay; calls not counted"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 420
+mods = ["mods-examples/fourth_ability_demo", "mods-dev/mp_fill"]
+input = [
+    "shot 01-joined",
+    "until slot: press",
+    "console ability rank fourth_ability_demo:burst 3",
+    "wait 3",
+    "click 820 384",
+    "wait 2",
+    "hold 4 1.5",
+    "wait 3",
+    "hold mouse1 1.5",
+    "wait 3",
+    "shot 02-after",
+]
+script = """
+log server-ability-slot-0720: task 3.2 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace add @0x4257BC
+trace start
+wait 140 until calls @0x4257BC >= 1
+log slot: press
+wait 90 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-ability-slot-0720: done
+"""

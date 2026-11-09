@@ -1,0 +1,6 @@
+id = "mm_disabled"
+name = "Manage: disabled"
+version = "0.9.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Unit test: listed with state disabled when kyubu/config.toml says enabled = false."

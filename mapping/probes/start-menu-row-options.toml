@@ -1,0 +1,37 @@
+# Task 2.4 of add-mod-manager, the options panel half (character creation is in start-menu-row). The dev mod
+# mods-dev/start_menu_row draws its Mods row only from the start menu's draw: after a click on Options the panel hides the
+# menu node, so nothing is drawn and a click at the row's place is not counted.
+id = "start-menu-row-options"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-19"
+steps = [
+    "Replayed at the start menu under Wine at 1024 x 768: clicked Options, then clicked the Mods place on the options panel, then read the mod's counters",
+]
+observations = [
+    "replay 2 passed under Wine: after Options the panel hides the menu; a click at (435, 559), between Apply and OK, was not counted",
+    "two state reads 15 s apart: draws 143 and 143, clicks 0",
+]
+
+[[confirms]]
+entry = "cube::StartMenuWidget::drawEndSite"
+observed = "not reached while the options panel is open: the mod's draw counter stays flat"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "until startrow rest",
+    "move 512 509", "wait 2", "click 512 509", "wait 6", "shot 01-options",
+    "move 435 559", "wait 2", "click 435 559", "wait 6", "shot 02-options-click",
+    "console start_menu_row:state", "console start_menu_row:state",
+]
+script = """
+log startrow: task 2.4 (options) of add-mod-manager
+wait 15
+log startrow rest
+wait 60
+expect - hooks == 0
+"""

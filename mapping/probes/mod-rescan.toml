@@ -1,0 +1,43 @@
+# Task 6.5 of add-mod-manager. A mod copied into mods while the Mods page is open shows as New after the rescan (the focus coming back, here the
+# console aid mod_manager:rescan), counts as a change, APPLY & RESTART loads it, and it is Unverified.
+id = "mod-rescan"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Added src/hand.h and the rescan, the New and Unverified rows and the Open mods folder text to the page (main.cpp)",
+    "Replayed at the start menu under Wine at 1024 x 768: open the page, drop a mod folder into mods with dropmod, rescan, Apply and restart, look at the list",
+]
+observations = [
+    "run 2 passed (evidence/mod-rescan-2026-10-24): the folder dropped in while the page was open is listed as New, Unverified (Not from the catalog. Installed by hand.) at the top, the bar says 1 CHANGE and APPLY & RESTART; after the restart it is Loaded, still Unverified, and the rescan lists 0 new",
+    "the console aid mod_manager:rescan stands for the focus coming back (no window focus under Xvfb)",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook rescans mods and lists the dropped mod as New here"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 600
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_base", "mods-dev/mm_fixture_user"]
+input = [
+    "until modrescan open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 01-list", "console mod_manager:state",
+    "dropmod mm_fixture_user drop mm_fixture_dropped", "console mod_manager:rescan", "wait 5", "click 195 337", "wait 3", "shot 02-new-row", "console mod_manager:state",
+    "click 860 695", "wait 3",
+    "until Restarted by game_restart",
+    "wait 30", "move 512 559", "wait 2", "click 512 559", "wait 8", "click 195 402", "wait 3", "shot 03-after-restart", "console mod_manager:state",
+    "wait 5",
+]
+script = """
+log modrescan: task 6.5 of add-mod-manager
+wait 15
+log modrescan open
+wait 300
+log modrescan done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

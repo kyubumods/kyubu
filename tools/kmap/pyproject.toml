@@ -1,0 +1,17 @@
+# `pip install -e tools/kmap` puts a `kmap` command on PATH; `python tools/kmap` works without installing.
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kmap"
+version = "0.1.0"
+description = "Kyubu mapping workspace: Ghidra project, mapping database, survey, exports"
+requires-python = ">=3.11"
+dependencies = ["pefile"]
+
+[project.scripts]
+kmap = "kmap.cli:main"
+
+[tool.setuptools]
+packages = ["kmap"]

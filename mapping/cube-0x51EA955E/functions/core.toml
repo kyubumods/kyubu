@@ -1,0 +1,204 @@
+# Cube.exe: program entry, main loop, game controller, asset database.
+
+[[function]]
+name = "WinMain"
+address = 0x4C8AE0
+convention = "stdcall"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:WinMainCRTStartup", "manual:only function calling PeekMessageW and GetMessageW", "correlated:cube-0x51D2CE9C:WinMain", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+notes = "the game's WinMain: window, device and main message loop; called from the CRT startup"
+
+[[function]]
+name = "Game::frame"
+address = 0x4C85F0
+convention = "cdecl"
+prototype = "void __cdecl Game::frame(void)"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:WinMain", "correlated:cube-0x51D2CE9C:Game::frame"]
+source = "kyubu"
+notes = "called once per main-loop iteration; calls GameController::update(dt ms), GameController::render, IDirect3DDevice9::Present"
+
+[[function]]
+name = "cube::GameController::GameController"
+address = 0x459C40
+convention = "thiscall"
+subsystem = "core"
+status = "verified"
+evidence = ["rtti:cube::GameController", "xref:ModelLoader::loadAll", "correlated:cube-0x51D2CE9C:cube::GameController::GameController", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+aliases = ["GameController::GameController"]
+notes = "sets vtable 0x6FFDC8; calls ModelLoader::loadAll. Formerly listed as model resolver A (156 computed slot look-ups); task 8.4: those are ModelVector::at on its own widget vectors and ModelLoader::get with constant slots (0x977 on) for the HUD models, not an appearance resolver"
+
+[[function]]
+name = "cube::GameController::update"
+address = 0x488EE0
+convention = "thiscall"
+prototype = "void __thiscall cube::GameController::update(cube::GameController* this, int32_t dt_ms)"
+subsystem = "core"
+status = "verified"
+evidence = ["vtable:cube::GameController:10", "xref:Game::frame", "correlated:cube-0x51D2CE9C:cube::GameController::update"]
+source = "kyubu"
+aliases = ["GameController::update"]
+
+[[function]]
+name = "cube::GameController::render"
+address = 0x4AC260
+convention = "thiscall"
+prototype = "void __thiscall cube::GameController::render(cube::GameController* this)"
+subsystem = "core"
+status = "verified"
+evidence = ["vtable:cube::GameController:11", "xref:Game::frame", "correlated:cube-0x51D2CE9C:cube::GameController::render"]
+source = "kyubu"
+aliases = ["GameController::render"]
+notes = "called from Game::frame before Present"
+
+[[function]]
+name = "cube::Database::Database"
+address = 0x449380
+convention = "thiscall"
+prototype = "cube::Database* __thiscall cube::Database::Database(cube::Database* this)"
+subsystem = "core"
+status = "verified"
+evidence = ["rtti:cube::Database", "correlated:cube-0x51D2CE9C:cube::Database::Database"]
+source = "kyubu"
+aliases = ["Database::Database"]
+notes = "sizeof 8: vtable 0x6FFB1C, sqlite3* at +4"
+
+[[function]]
+name = "cube::Database::~Database"
+address = 0x449390
+convention = "thiscall"
+prototype = "void __thiscall cube::Database::~Database(cube::Database* this)"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:sqlite3_close", "manual:destructor paired with the constructor; closes the sqlite handle", "correlated:cube-0x51D2CE9C:cube::Database::~Database"]
+source = "kyubu"
+aliases = ["Database::~Database"]
+
+[[function]]
+name = "cube::Database::open"
+address = 0x4497B0
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::open(cube::Database* this, const std::string* path)"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:sqlite3_close", "correlated:cube-0x51D2CE9C:cube::Database::open"]
+source = "kyubu"
+aliases = ["Database::open"]
+notes = "closes a previous handle, then opens the file; ModelLoader::loadAll opens data1.db through it; ret 4"
+
+[[function]]
+name = "cube::Database::get"
+address = 0x449810
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::get(cube::Database* this, const std::string* key, void** out_data, uint32_t* out_len)"
+subsystem = "core"
+status = "verified"
+evidence = ["string:\"SELECT value FROM blobs WHERE key = ?\"", "correlated:cube-0x51D2CE9C:cube::Database::get"]
+source = "kyubu"
+aliases = ["Database::get"]
+notes = "data allocated with the game's operator new; ret 0xC"
+
+[[function]]
+name = "cube::Database::getBuffer"
+address = 0x4498D0
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::getBuffer(cube::Database* this, const std::string* key, std::vector<char>* out)"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:cube::Database::get", "manual:the only caller of Database::get; 16 call sites", "correlated:cube-0x51D2CE9C:cube::Database::getBuffer"]
+source = "kyubu"
+aliases = ["Database::getBuffer"]
+notes = "ret 8"
+
+[[function]]
+name = "asset_decode"
+address = 0x4496A0
+convention = "thiscall"
+prototype = "void __thiscall asset_decode(std::vector<char>* buf)"
+subsystem = "core"
+status = "verified"
+evidence = ["manual:byte invert + 44-entry key swap; key table at 0x6FFA68", "correlated:cube-0x51D2CE9C:asset_decode"]
+source = "kyubu"
+notes = "the asset cipher, reimplemented in tools/cwmod/cwdb.py"
+
+[[function]]
+name = "cube::Database::set"
+address = 0x4499F0
+convention = "thiscall"
+subsystem = "core"
+status = "candidate"
+evidence = ["string:\"INSERT INTO blobs(key, value) VALUES(?, ?)\"", "manual:updates the blob when SELECT 1 finds the key, else inserts it", "correlated:cube-0x51D2CE9C:cube::Database::set"]
+source = "kyubu"
+notes = "the write side of cube::Database::get; also uses the string DATABASE WRITE"
+
+[[function]]
+name = "cube::Database::setBuffer"
+address = 0x4499C0
+convention = "thiscall"
+subsystem = "core"
+status = "candidate"
+evidence = ["xref:cube::Database::set", "manual:only calls Database::set; the write side of getBuffer; 15 callers", "correlated:cube-0x51D2CE9C:cube::Database::setBuffer"]
+source = "kyubu"
+notes = "writers include the world list, the world save (zones) and the map save"
+
+# The game's allocator (7.4): no wrapper of its own. Game code calls MSVCR110.dll's operator new and delete through
+# these jmp [IAT] thunks; STL containers inline their own size check (_Xbad_alloc) around the same operator new.
+
+[[function]]
+name = "operator_new"
+address = 0x68D668
+convention = "cdecl"
+prototype = "void* __cdecl operator_new(uint32_t size)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??2@YAPAXI@Z", "correlated:cube-0x51D2CE9C:operator_new"]
+source = "kyubu"
+notes = "jmp [0x6FC3EC]; about 250 callers. Kyubu's game_alloc calls the same export, so blocks move freely between the two"
+
+[[function]]
+name = "operator_delete"
+address = 0x68D66E
+convention = "cdecl"
+prototype = "void __cdecl operator_delete(void* p)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??3@YAXPAX@Z", "correlated:cube-0x51D2CE9C:operator_delete"]
+source = "kyubu"
+notes = "jmp [0x6FC3F0]; about 1,190 callers. Kyubu's game_free calls the same export"
+
+[[function]]
+name = "operator_delete_array"
+address = 0x68D8CE
+convention = "cdecl"
+prototype = "void __cdecl operator_delete_array(void* p)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??_V@YAXPAX@Z", "correlated:cube-0x51D2CE9C:operator_delete_array"]
+source = "kyubu"
+notes = "jmp [0x6FC450]; 20 callers. operator new[] is not imported: arrays come from operator_new"
+
+[[function]]
+name = "cube::FloatVector3::add"
+address = 0x412850
+convention = "thiscall"
+prototype = "cube::FloatVector3* __thiscall cube::FloatVector3::add(cube::FloatVector3* this, const cube::FloatVector3* other)"
+subsystem = "core"
+status = "verified"
+evidence = ["manual:three adds into this, returns this", "xref:cube::World::update", "correlated:cube-0x51D2CE9C:cube::FloatVector3::add"]
+source = "kyubu"
+notes = "this += other, component by component; returns this; 49 calls. The World step adds each frame's velocity change to Creature+0x34 with it (0x61ADA1); draw_creature uses it for the hands"
+
+[[function]]
+name = "cube::FloatVector3::at"
+address = 0x428970
+convention = "thiscall"
+prototype = "float* __thiscall cube::FloatVector3::at(cube::FloatVector3* this, int32_t index)"
+subsystem = "core"
+status = "verified"
+evidence = ["manual:returns this + index * 4", "xref:cube::World::update", "correlated:cube-0x51D2CE9C:cube::FloatVector3::at"]
+source = "kyubu"
+notes = "the address of component index (0 x, 1 y, 2 z). 1,202 calls; the World step writes the capped walk back through it (0x61AAD5, 0x61AAF5). Shared by any array of 4-byte items, so a caller may not hold a FloatVector3"

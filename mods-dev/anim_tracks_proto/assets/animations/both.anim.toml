@@ -1,0 +1,11 @@
+# Both phases: pose 2 as the base, and the head turned over it.
+duration = 800
+
+[borrow]
+mode = 2
+
+[[track]]
+part = "head"
+channel = "rot"
+mode = "set"
+keys = [ { t = 0, v = [0, 0, 60] } ]

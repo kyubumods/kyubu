@@ -1,0 +1,90 @@
+# Task 8.7 of add-skills-unleashed-multiplayer: the Guardian's Taunt on Server.exe with a joined client and a watcher (kmap probe
+# replay, client = "join"). The client, made a Guardian by su_rank, holds key 4; at its clip's `shout` marker it sends
+# `taunt { aim, from }` on skills_unleashed:ability (design D13). The server checks it against its own copy of the player, picks the
+# target from the aim on its own monsters, writes the taunter into the monster's threat map every World step, cuts the monster's hits
+# on the taunter at its hit sites, and tells every client `taunt_on` and `taunt_off` (D14). The client and the watcher draw the tint
+# from the events. su_dummy holds a monster 3 blocks in front.
+id = "server-guardian-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-09"
+steps = [
+    "native replay: Server.exe, a joined client and a watcher, all with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Guardian (su_rank options), log_effects on; the client held key 4 for 0.8 s",
+    "from run 3: the client's hp held at 100000 every frame (mp_fill option hp), so the taunted monster cannot kill the player",
+    "from run 6: the loader drops Server.exe's second push of each hitCreature hit on a player (server_hits)",
+]
+observations = [
+    "run 1, 2026-11-09 (evidence/guardian-mp-2026-11-09/server-guardian-0720-run1), passed: the server took the taunt 551 ms into its run and taunted su_dummy's monster (rank 3, 35 s); the client and the watcher drew it from `taunt_on`; it ended `taunter_gone` 24 s later on all three; the last `until` waited for a client line in the server's log and was dropped from the record",
+    "run 2 (run2), passed: taunt taken 566 ms into the run; 0.5 s later the server cut the monster's first hit on the player, 10.4 to 6.8 (damage_factor 0.65); the player died under the monster 24 s after the shout (the new log says `the player is dead`), so the taunt ended `taunter_gone`; the client and the watcher drew the start and the end",
+    "run 3 (run3), passed, with the client's hp held (mp_fill option hp 100000): the game clamps the hp to maxHP (330) every frame, so mp_fill logged every frame; the taunt ran its 35 s and ended `expired` on the server and both clients",
+    "run 4 (run4), failed on the record: the player was id 2 (`by player 1 ended` missing); every cut is now logged and mp_fill logs a hit's damage (from the highest hp found)",
+    "run 5 (run5), passed: taunt at 555 ms, `expired` 35.0 s later on the server, the client and the watcher; 24 hits cut on the server (5.72 to 19.99 after the cut); each one lowered the client's hp by 2.000 times the server's damage (1.998 to 2.002, same frame), and the hits after the end are as large (31.4, 21.1): a hit on a player reaches its client twice, whatever the mod does (Server.exe's hit list and hitForwardSite, not yet traced)",
+    "the doubling's path, read in Server.exe afterwards (no new run): hitCreature puts the hit in the step's hit list (hitListSite 0x4D1699), then, on the server (World+0xB4 = 0), calls applyHit on it, which queues a hit on a player a second time (hitForwardSite 0x4CEB2C); the client applies both copies. Vanilla code, so every hit from hitCreature on a joined player counts twice",
+    "run 6 (run6), passed, with the loader's server_hits fix: `server hits: installed` and the first dropped copy logged on the server; 24 hits cut, and each lowered the client's hp by exactly the server's damage (1.000 times, 24 of 24); the two hits after the taunt's end (10.86, 14.76) are not doubled either",
+    "limits: the path is read in the code, not traced at run time (run 6 shows the fix works); hits made outside hitCreature are not checked; no let-go end is seen here, only in test_parity_guardian.cpp",
+]
+
+[[confirms]]
+entry = "cube::Hit.target_id"
+observed = "the server's cut log read the taunted monster and the taunting player at the Hit's +0x0 and +0x8, the ids of its taunt_on"
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Taunt runs"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization guardian",
+    "console config su_rank ability skills_unleashed:guardian",
+    "console config skills_unleashed log_effects true",
+    "console config mp_fill hp 100000",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "until server: guardian: taunt of creature",
+    "shot 02-client-taunt",
+    "until watcher guardian: the server: creature",
+    "shot watcher 02-taunted",
+    "until ended (expired)",
+    "shot 03-client-after",
+]
+# The server: the taunt taken and its end (the monster's own hits on the player, if it makes any, are cut there and not checked
+# here). The client: the shout sent, the server's start and end. The watcher: the server's start. `until` reads the server's log.
+log_expect = { latest = [
+    "skills_unleashed: server: guardian: taunt of creature",
+    "ended (expired)",
+    "skills_unleashed: server: guardian: a hit of creature",
+    "server hits: installed at",
+    "was listed once, not twice",
+], client = [
+    "su_rank: the character is class 1, specialization 1 (guardian)",
+    "skills_unleashed: guardian: shout at rank",
+    "the taunt is sent to the server",
+    "skills_unleashed: guardian: the server: creature",
+    "skills_unleashed: guardian: the server: the taunt of creature",
+    "mp_fill: hp fell by",
+], watcher = [
+    "skills_unleashed: guardian: the server: creature",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs end on the client's end line.
+script = """
+log server-guardian-0720: task 8.7 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-guardian-0720: done
+"""

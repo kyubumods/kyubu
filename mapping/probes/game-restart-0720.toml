@@ -1,0 +1,40 @@
+# Task 4.2 of add-native-replay: game-restart ported to the 07-20 build and run natively. The dev mod mods-dev/start_menu_row 0.3.0 has
+# the console command start_menu_row:restart, which calls the loader's game_restart. The game starts a second Cube.exe, quits, and the new
+# process (not started by the runner) has to end with the run: it is in the runner's Job Object.
+id = "game-restart-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-11-06"
+steps = [
+    "Ported game-restart to 07-20: the quit flag is GameController+0x1A0 (07-02: +0x198)",
+    "Replayed natively (headless) at the start menu: waited for game_ready, ran start_menu_row:restart on the console, waited for the second process to log that it was restarted",
+]
+observations = [
+    "replay passed natively (evidence/native-replay-2026-11-06/runner-4.2/game-restart): start_menu_row:restart started a second Cube.exe, which logged 'Restarted by game_restart: the previous process ended after 563 ms', reached game_ready and finished the probe script",
+    "the quit flag read 0 in the restarted process (GameController+0x1A0)",
+    "the restarted process was not started by the runner: the runner's Job Object ended it with the run",
+]
+
+[[confirms]]
+entry = "cube::GameController.quit_requested"
+observed = "game_restart wrote 1 here on 07-20 (offset 0x1A0); the game left through its normal exit and the restarted process read 0"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "wait 25",
+    "console start_menu_row:restart",
+    "until Restarted by game_restart",
+    "wait 20",
+    "shot 01-after-restart",
+]
+script = """
+log restart: process up
+wait 40
+expect - value u8 == 0 [cube::game_controller] + 0x1A0
+log restart: done
+wait 5
+"""

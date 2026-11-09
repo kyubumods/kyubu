@@ -1,0 +1,8 @@
+id = "cat_lib"
+name = "cat_lib"
+version = "1.0.0"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Kyubu tests"]
+description = "Test catalog mod."
+trust = "restricted"

@@ -1,0 +1,102 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world (seed 1234). Task 3.1 of add-entity-spawner: the functions the game's run-time creature paths share. It traces
+# the creature constructor and the map function through whole-function detours (a run through is evidence for their
+# thiscall prototypes), the max hp and appearance functions and the reset function through the plain tracer, and the
+# call of maxHp inside the zone create path, standing for 5 s and walking for 80 s (creatures ahead are built from
+# their zone records, the ones left behind removed).
+# Only the zone path runs here; the pet, bomb and summon paths, and so the id rule for run-time ids, are checked by
+# the spawn probes of 3.2.
+id = "creature-recipe"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-29"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Detoured cube::Creature::Creature (1 stack argument) and creature_map_slot (1); traced maxHp, the appearance function, reset and the maxHp call inside the create path",
+    "Standing for 5 s, then walking (W) for 80 s while tracing and watching the size of the World's creature map",
+]
+observations = [
+    "the detoured constructor and map function ran through the walk without a fault: thiscall, one stack argument each",
+    "the constructor was called 29 times: 28 from the zone create site (ret 0x60E958), one from 0x487867 (0x487770's temporary creature)",
+    "creature_map_slot: 550 calls; 28 from 0x60E97D (the create site) with this = the World's map (World+4); the others with other maps (the first replay: from 0x42F47B, 0x42D9E2, 0x59446D, 0x594494 and 0x59F2A9, maps inside creatures): a generic 64-bit-keyed map function",
+    "creature_appearance_for_type: 227 calls, all from the zone generators (0x5EBD64, 0x5D6409) on a worker thread, style (arg 3) 0 in every recorded call; the create site itself never calls it",
+    "cube::Creature::maxHp: about 1,000 calls a second, from the World step's per-creature loops (0x6103E6, 0x61780E and others), and once per built zone creature (the instruction after the call at 0x60ED32 passed)",
+    "cube::Creature::reset: 0 calls while standing and walking (zone streaming does not use it)",
+    "the map held 17 creatures at the start of the walk and the create site ran 28 times, the instruction after its maxHp call 28 times; zone creature ids are positive",
+]
+
+[[confirms]]
+entry = "cube::Creature::Creature"
+observed = "detoured with one stack argument: 29 calls in the walk, 28 from the zone create site and one from 0x487867, no fault"
+
+[[confirms]]
+entry = "creature_map_slot"
+observed = "detoured with one stack argument: 550 calls; 28 from the create site with this = World+4, the rest with the maps inside creatures"
+
+[[confirms]]
+entry = "cube::Creature::maxHp"
+observed = "about 79,500 calls in 80 s (from 0x6103E6), from the World step's per-creature loops; the create path passed once per built creature (site 0x60ED37, after the call)"
+
+[[confirms]]
+entry = "creature_appearance_for_type"
+observed = "227 calls from the zone generators on a worker thread, style 0 each; not called from the create site"
+
+[[confirms]]
+entry = "cube::Creature::reset"
+observed = "0 calls while standing and walking"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+input = [
+    "until 3.1: start", "shot 01-start",
+    "until 3.1: walk",
+    "hold w 40", "shot 02-walk-40", "hold w 40", "shot 03-walk-80",
+]
+script = """
+log creature recipe (task 3.1 of add-entity-spawner): the functions that build a run-time creature
+wait world
+wait 15
+trace args 3
+trace detour 1 cube::Creature::Creature
+trace detour 1 creature_map_slot
+trace add cube::Creature::maxHp
+trace add creature_appearance_for_type
+trace add cube::Creature::reset
+trace add @0x60ED37
+inspect creatures [@0x7691C8] + 0x2DC
+# phase 1, standing: nothing is built, and the World step only reads max hp
+trace start
+log 3.1: start
+wait 5
+trace stop
+trace report
+expect cube::Creature::Creature calls cube::Creature::Creature == 0
+expect creature_map_slot calls creature_map_slot == 0
+expect cube::Creature::maxHp calls cube::Creature::maxHp > 100
+expect - hooks == 0
+# phase 2, walking: creatures ahead are built from their zones' records and put in the map
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 3.1: walk
+wait 80
+trace stop
+watch
+trace report
+inspect creatures
+expect cube::Creature::Creature calls cube::Creature::Creature > 5
+expect cube::Creature::Creature from cube::Creature::Creature @0x60E958
+expect cube::Creature::Creature from cube::Creature::Creature @0x487867
+expect creature_map_slot calls creature_map_slot > 100
+expect creature_map_slot from creature_map_slot @0x60E97D this [@0x7691C8] + 0x2E0
+expect cube::Creature::maxHp from cube::Creature::maxHp @0x6103E6
+expect cube::Creature::maxHp calls @0x60ED37 within 2 of cube::Creature::Creature
+expect creature_appearance_for_type calls creature_appearance_for_type > 20
+expect creature_appearance_for_type from creature_appearance_for_type @0x5EBD64
+expect creature_appearance_for_type arg creature_appearance_for_type 3 == 0
+expect cube::Creature::reset calls cube::Creature::reset == 0
+watch clear
+expect - hooks == 0
+"""

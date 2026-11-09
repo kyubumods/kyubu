@@ -1,0 +1,6 @@
+duration = 400
+
+[[track]]
+part = "elbow"
+channel = "rot"
+keys = [ { t = 0, v = [0, 0, 0] } ]

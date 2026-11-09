@@ -1,0 +1,233 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Field-finder searches and traces around the uses of abilities (task 9.4): where mp, charged_mp, cooldowns and
+# stamina are charged and limited. All the sites are inside cube::World::update.
+# - A real M2 press (gamepilot holds the right button): 59 is a hold mode, so charged_mp builds up while it is held
+#   (cube::World::mpChargeSite) and the melee case spends it on release (cube::World::chargedMpSpendSite, mp -=
+#   charged_mp). ability_cost(59) is 0, so the fixed-cost site must not fire.
+# - A forced weapon attack (4, ability_cost 0.1): the melee case takes the fixed cost on the mode's first step
+#   (cube::World::abilityCostSite) and keeps it in cube::Creature.spent_mp.
+# - A forced cyclone (86, one of the 15 ids with a cooldown): its cooldown is stored in cube::Creature.ability_cooldowns.
+# - A stun (data.stun_time) makes canUseAbility refuse: a press does not start the ability.
+# - Stamina (cube::Creature.stamina, outside data): set low, the World step refills it and the HUD shows its bar.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-costs"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced the four cost and cooldown sites, abilityStartSite, ability_cost and ability_cooldown (2 args each)",
+    "Idle control: traced 5 s with nothing pressed, mp set to 1 and watched",
+    "Phase 1: a finder search over P's data; snapshot, then one when charged mp is spent; gamepilot held M2 1.5 s",
+    "Phase 2: forced mode 4 with mp 1; finder snapshots before and after",
+    "Phase 3: forced cyclone (86) and read the cooldown map's size",
+    "Phase 4: stun_time 15000; gamepilot held M2 1.5 s; then stun_time 0",
+    "Phase 5: stamina set to 0.2; finder snapshots 3 s apart; a screenshot of the HUD",
+]
+observations = [
+    "Wine replay 1 passed, 22 of 22 checks held; screenshots 01-after-release, 02-stunned, 03-stamina",
+    "idle 5 s: no charge or spend; mp (set to 1) drained by itself to 0.736: a warrior's rage loses about 0.05 a second",
+    "M2 held 1.5 s: start site at 4.28 s, ability_cooldown(59) 4.45 s, charge site 88 passes 4.5-6.1 s (59 is held)",
+    "on release: ability_cooldown(60) and the spend site at 6.15 s, once; charged_mp 0 -> 0.9916 (capped at mp) -> 0",
+    "the finder (idle snapshot vs the one at the spend) kept 6 fields, charged_mp among them; mp read 0 after the spend",
+    "fixed-cost site 0 passes for 59/60; ability_cost(59, -1) is called each frame from canUseAbility (0x43EE6B)",
+    "forced 4: cost site once, ability_cooldown(4); mp 1 -> 0.8417 in 1 s (0.1 cost + drain); spent_mp 0.1",
+    "forced 86: ability_cooldown(86) from 0x616E13; the cooldown map then held 6 entries",
+    "stun_time 15000: 733 left after 14 s (counts ms); the press started nothing; no ability_cost calls at all",
+    "while stunned the step reset the mode each step: cooldownStartSite and ability_cooldown(0) 730 times",
+    "stun_time is negative at rest (-63929, then -96170): it keeps counting down",
+    "stamina set to 0.2 read 0.4991 3 s later (0.0001 per ms); the HUD showed its STAMINA bar",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.charged_mp"
+observed = "rises while M2 is held, then drops to 0 when the attack is released"
+
+[[confirms]]
+entry = "cube::CreatureData.mp"
+observed = "a forced weapon attack (4) lowers it by its ability_cost"
+
+[[confirms]]
+entry = "cube::World::mpChargeSite"
+observed = "passes while M2 is held, never idle"
+
+[[confirms]]
+entry = "cube::World::chargedMpSpendSite"
+observed = "passes when the held M2 is released, never idle"
+
+[[confirms]]
+entry = "cube::World::abilityCostSite"
+observed = "passes for the forced 4 (cost 0.1), not for 59 or 60 (cost 0)"
+
+[[confirms]]
+entry = "cube::Creature.spent_mp"
+observed = "holds 0.1 after the forced 4"
+
+[[confirms]]
+entry = "cube::World::cooldownStartSite"
+observed = "passes on each mode start"
+
+[[confirms]]
+entry = "cube::Creature.ability_cooldowns"
+observed = "gains an entry per new mode"
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "fires once for the M2 press, not at all for a press while stunned"
+
+[[confirms]]
+entry = "cube::Creature.stamina"
+observed = "set to 0.2, the World step refills it; the HUD shows the stamina bar"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 330
+input = [
+    "until 9.4 hold M2",
+    "wait 1",
+    "hold mouse3 1.5",
+    "wait 1",
+    "shot 01-after-release",
+    "until 9.4 stunned",
+    "wait 1",
+    "hold mouse3 1.5",
+    "shot 02-stunned",
+    "until 9.4 stamina",
+    "wait 1",
+    "shot 03-stamina",
+]
+script = """
+log ability costs (task 9.4): mp, charged_mp, cooldowns and stamina around the uses of abilities
+wait world
+wait 15
+inspect player [@0x7691C8]
+trace args 2
+trace add @0x619064
+trace add @0x611ECA
+trace add @0x611E74
+trace add @0x616DE7
+trace add @0x49BF68
+trace add ability_cost
+trace add ability_cooldown
+# idle control: nothing pressed; no creature charges or spends mp near a new character
+inspect set data.mp 1
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+watch charged f32 [[@0x7691C8] + 0x8006C8] + 0x144
+trace start
+wait 5
+trace stop
+trace report
+watch
+watch clear
+expect cube::World::mpChargeSite calls @0x619064 == 0
+expect cube::World::chargedMpSpendSite calls @0x611ECA == 0
+expect cube::CreatureData.charged_mp value f32 == 0 [[@0x7691C8] + 0x8006C8] + 0x144
+inspect std::map [[@0x7691C8] + 0x8006C8] + 0x139C
+inspect player [@0x7691C8]
+# phase 1: a real M2 press. 59 is a hold mode: while it is held, charged_mp grows (capped at mp); on release the
+# melee case spends it. A search over the player's data: one snapshot now, one as the charged mp is spent (0x611ED2)
+inspect set data.mp 1
+find new f32 cube::CreatureData [[@0x7691C8] + 0x8006C8] + 0x10
+find snap
+find hook @0x611ED2
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+watch charged f32 [[@0x7691C8] + 0x8006C8] + 0x144
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+trace start
+log 9.4 hold M2
+wait 2
+inspect set data.mp 1
+wait 2
+inspect set data.mp 1
+wait 2
+inspect set data.mp 1
+wait 2
+inspect set data.mp 1
+wait 2
+inspect set data.mp 1
+wait 2
+inspect set data.mp 1
+wait 4
+trace stop
+trace report
+find hook off
+find increased
+find list 12
+watch
+watch clear
+expect cube::CreatureData.charged_mp found 0x134
+expect cube::World::mpChargeSite calls @0x619064 > 0
+expect cube::World::chargedMpSpendSite calls @0x611ECA >= 1
+expect cube::World::abilityCostSite calls @0x611E74 == 0
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 1
+expect cube::World::cooldownStartSite calls @0x616DE7 >= 2
+expect cube::CreatureData.charged_mp value f32 == 0 [[@0x7691C8] + 0x8006C8] + 0x144
+# phase 2: a fixed cost. Mode 4 (a weapon attack) costs 0.1: forced with mp 1, the melee case takes it on the mode's
+# first step and keeps it in spent_mp
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.mp 1
+find clear
+find new f32 cube::CreatureData [[@0x7691C8] + 0x8006C8] + 0x10
+find snap
+trace start
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 1
+find snap
+trace stop
+trace report
+find decreased
+find list 12
+expect cube::World::abilityCostSite calls @0x611E74 >= 1
+expect cube::CreatureData.mp found 0x160
+expect cube::Creature.spent_mp value f32 > 0.099 [[@0x7691C8] + 0x8006C8] + 0x13B4
+expect cube::Creature.spent_mp value f32 < 0.101 [[@0x7691C8] + 0x8006C8] + 0x13B4
+# phase 3: a cooldown. Cyclone (86) has one (ability_cooldown(86) is not 0); the step stores it in the map
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace start
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+inspect std::map [[@0x7691C8] + 0x8006C8] + 0x139C
+expect cube::World::cooldownStartSite calls @0x616DE7 >= 1
+expect cube::Creature.ability_cooldowns value u32 >= 4 [[@0x7691C8] + 0x8006C8] + 0x13A0
+inspect player [@0x7691C8]
+wait 2
+# phase 4: a limit. While stun_time is above 0, canUseAbility refuses every id: the press starts nothing
+inspect set data.stun_time 15000
+trace start
+log 9.4 stunned
+wait 14
+trace stop
+trace report
+inspect set data.stun_time 0
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 0
+expect cube::World::mpChargeSite calls @0x619064 == 0
+wait 2
+# phase 5: stamina, outside data. Set low, it refills by itself (0.0001 per ms on the ground)
+find clear
+inspect set stamina 0.2
+find new f32 cube::Creature [[@0x7691C8] + 0x8006C8]
+find snap
+log 9.4 stamina
+wait 3
+find snap
+find increased
+find list 12
+expect cube::Creature.stamina found 0x1194
+expect cube::Creature.stamina value f32 > 0.3 [[@0x7691C8] + 0x8006C8] + 0x1194
+expect cube::Creature.stamina value f32 < 1 [[@0x7691C8] + 0x8006C8] + 0x1194
+find clear
+wait 8
+expect - hooks == 0
+"""

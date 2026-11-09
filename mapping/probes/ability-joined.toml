@@ -1,0 +1,74 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 7.1 of add-ability-api, unattended under Wine 9.0 (WSL, Xvfb, software rendering): the
+# creature-server setup. kmap probe replay starts Server.exe with the probe, then a Kyubu-loaded Cube.exe (no probe) in the same prefix that
+# joins 127.0.0.1 with a new character (Tester, warrior). That client has mods-examples/fourth_ability_demo (it claims the warrior's slot 4 as
+# number 112, 800 ms) and mods-dev/mp_fill (sets its mp to 1 on every frame: a level-1 warrior's rage is 0, and the game refuses the key
+# without it). The input holds key 4 on the client; the script on the server watches the mode byte of the server's copy of the player.
+id = "ability-joined"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: Server.exe with --kyubu-dev, then Cube.exe joined 127.0.0.1 with a new character (Tester, warrior), both with the demo mod",
+    "Traced the World step once to capture the server's World, then read the joined player's server-side cube::Creature through it",
+    "Watched the player's mode byte (Creature+0x68) on the server while the client held key 4 for 1.5 s",
+]
+observations = [
+    "Wine run 2 passed (run 1 failed: the script traced cube::World::update, which the loader hooks on the server, so it got no World; run 2 takes the World from the cube::Server tick at 0x427FF0). Evidence: evidence/ability-joined-2026-10-05/. 8 expectation checks held",
+    "the client connected (client.log: connected to 127.0.0.1:12345); the server's World held 18 creatures, the joined player was id 1, a warrior (class_type 1)",
+    "key 4 held 1.5 s on the client: client.log has `on_start fourth_ability_demo:burst number 112 rank 1 side client`, then `ends done ... after 43 step(s), 810 ms` and `on_end done after 43 steps, 810 ms`; 02-after.png shows slot 4 greyed with the cooldown",
+    "the server's copy of the player: Creature+0x68 (current_mode) sampled every 10 ms, 3950 samples, first 0, last 0, 2 changes, highest 112: it went to the ability's number and back to 0",
+    "the server skipped both mods (`skipped, no code for the sides of this host`: the demo has only a client side) and ran no ability code; its log has no warning or error beyond the known 'not mapped for Server.exe' lines",
+]
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "18 creatures in the server's World with a client joined"
+
+[[confirms]]
+entry = "cube::Creature.id"
+observed = "the joined player is id 1 at the map's leftmost node"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 (warrior) for the joined new character"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 420
+mods = ["mods-examples/fourth_ability_demo", "mods-dev/mp_fill"]
+input = [
+    "shot 01-joined",
+    "until 7.1: press",
+    "wait 5",
+    "hold 4 1.5",
+    "wait 2",
+    "shot 02-after",
+]
+script = """
+log ability-joined: task 7.1 of add-ability-api, a joined client uses slot 4
+# the World of the server, from the cube::Server tick (0x427FF0, ECX = the Server, World at +4; the loader hooks World::update itself) (the client connects about 95 s after the server is ready and loads for 30 s)
+trace args 3
+trace add @0x427FF0
+trace start
+wait 140
+trace stop
+trace report
+inspect creatures [ecx(@0x427FF0) + 4]
+expect cube::World.creatures creatures > 5 [ecx(@0x427FF0) + 4]
+# the joined player is the map's leftmost node, id 1, a warrior
+expect cube::Creature.id value u32 == 1 [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x8
+expect cube::CreatureData.class_type value u8 == 1 [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x140
+expect - value u8 == 0 [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x68
+watch mode u8 [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x68
+log 7.1: press
+wait 40
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18]
+expect - watch mode changed
+expect - watch mode reached 112
+expect - value u8 == 0 [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x68
+watch
+watch clear
+log ability-joined: done
+"""

@@ -1,0 +1,110 @@
+# Recorded with kyubu_probe, the entity_spawner mod (prototype, spawn_raw) and the Kyubu 1.0.1 loader, unattended under
+# Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world (seed 1234). Task 3.5 of add-entity-spawner (M5): the unit of
+# cube::CreatureData.pos and the facing convention of body_yaw. The mod's `spawner facing` puts four HUMAN_MALEs in a row 10
+# blocks north of the player with body_yaw 0, 90, 180 and -90 (west to east); `spawner ruler` puts green slimes in rows
+# at whole-block offsets (65,536 units each, cuwo's unit) that the terrain's cubes measure; the script then turns the
+# player itself (body_yaw 0, 90, -90) for a screenshot of each.
+id = "creature-units"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-29"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "`console entity_spawner:spawner facing` (four HUMAN_MALEs, hostile_type 2, at x -6 -2 2 6 and y +10 blocks from the player, body_yaw 0 90 180 -90), a screenshot 35 s after the console step, and 90 s after the phase's log line the script checked the last one's body_yaw",
+    "`console entity_spawner:spawner ruler` (the mod first removes the earlier phase; five green slimes 7 blocks north at x -4 -2 0 2 4, four more at x +7 and y 4 8 12 16, all body_yaw 180), a screenshot 35 s after the console step",
+    "three phases that set the player's own data.body_yaw to 0, 90 and -90 (the script writes it again every 10 s for 50 s), a screenshot 15 s after each phase's log line (in the first one after `console spawner HUMAN_MALE`, a human 4 blocks ahead of the player), and a check of the yaw the game left in it",
+]
+observations = [
+    "Wine replay 2 passed, 5 of 5 checks held; screenshots facing, ruler, player-yaw-0, player-yaw-90 and player-yaw-m90 (evidence folder entity-spawner-3.5-2026-09-29)",
+    "facing, spawned creatures: the four HUMAN_MALEs read body_yaw 0, 90, 180 and -90 back from the map and kept them (the last one read -90 in the check). Seen from the camera (which looks along +y, screen right = +x): yaw 0 shows the back of the head (it faces +y, away from the camera), 90 a profile facing left (-x), 180 the face (it faces -y, toward the camera), -90 a profile facing right (+x). So a creature faces (-sin yaw, cos yaw): yaw is degrees counter-clockwise from +y (north) seen from above, with +x east",
+    "facing, the player itself: written body_yaw 0, 90 and -90 stayed (the game does not rewrite it while the player stands still) and the model turned as the spawned humans did: 0 shows its back, 90 its face to the left, -90 its face to the right; its original -180 (spawned at -179.95) shows its face to the camera",
+    "ahead: with the player at yaw 0, the mod's `spawner HUMAN_MALE` (position = player + distance * (-sin yaw, cos yaw), the fixed formula; the first version used (cos, sin) and put a creature east at yaw 0) put one 4.00 blocks north (dx 0.00, dy 4.00 in the log), and the screenshot shows it right ahead, its back to the camera, with the game's tag HUMAN over it",
+    "units: the mod adds whole blocks times 65,536 to the player's pos and the creatures read back exactly those values (dx -6, -2, 2, 6 and dy 10 in the log; z = the player's + 65,536), and the map draws them where the camera geometry puts them: the five slimes 2 blocks apart at 7 blocks north stand at equal 140 px steps in the screenshot, next to the terrain's cubes (the row at x -4 to 4 and the line at x 7). Seen in the same run: the player's pos.x and pos.y (550,300,873,650 and 550,301,073,408) are in zone 0x8020, 0x8020 by pos >> 24, the zone of the ids of the zone creatures around it (0x8020801F07, 0x8020802000: (zone x << 24) | (zone y << 8) | index), so 2^24 units are one zone (cuwo: 256 blocks of 65,536); the start position is exactly 128 blocks into its zone in y, and the standing player's z is 14,095,482 = 215.08 blocks. The screenshots only show that the geometry is regular; that one block is 65,536 rests on cuwo's constants and this zone arithmetic",
+    "the first run is kept beside it (`...-run1`, not the record): `spawner facing` printed nothing because the default type name HUMAN is not an enum name (HUMAN_MALE); its player shots and ruler are the same as here",
+    "what the replay itself does to the player: after the first console step the player's body_yaw reads 90 in both runs (it was -179.95 before, and it had moved about 4 blocks west in run 1), the gamepilot's typing moves it; the mod reads the yaw fresh for each spawn, as it must",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.pos"
+observed = "spawned creatures placed at the player's pos plus whole blocks times 65,536 read back exactly and were drawn where the camera geometry puts them (equal steps for equal offsets); pos >> 24 is the zone of the zone creatures' ids, so 65,536 units per block and 2^24 per zone fit cuwo's constants"
+
+[[confirms]]
+entry = "cube::CreatureData.body_yaw"
+observed = "degrees, counter-clockwise from +y (north) seen from above: 0 faces +y, 90 faces -x, 180 faces -y, -90 faces +x, on spawned creatures and on the player (written and drawn); the facing vector is (-sin yaw, cos yaw)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 3.5: facing", "console entity_spawner:spawner facing", "wait 35", "shot facing",
+    "until 3.5: ruler", "console entity_spawner:spawner ruler", "wait 35", "shot ruler",
+    "until 3.5: player yaw 0", "console entity_spawner:spawner HUMAN_MALE", "wait 35", "shot player-yaw-0",
+    "until 3.5: player yaw 90", "wait 15", "shot player-yaw-90",
+    "until 3.5: player yaw -90", "wait 15", "shot player-yaw-m90",
+]
+script = """
+log creature units and facing (task 3.5 of add-entity-spawner): known offsets and known yaws to look at
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+inspect player [@0x7691C8]
+# facing: `spawner facing` puts four HUMAN_MALEs 10 blocks north of the player at x -6 -2 2 6 with body_yaw 0 90 180 -90; the console step runs 20 to 40 s late under Wine, the shot 35 s after it
+log 3.5: facing
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+# the creature with the lowest id (the map's leftmost node) is the one spawned last: the one at x +6, body_yaw -90 (data at Creature + 0x10, body_yaw at +0x20)
+expect cube::CreatureData.body_yaw value f32 == -90 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x30
+# ruler: five slimes in a row 7 blocks north, 2 blocks apart, and four in a line 7 blocks east of the player, 4 blocks apart
+log 3.5: ruler
+wait 90
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::CreatureData.body_yaw value f32 == 180 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x30
+# the player itself: body_yaw 0, 90 and -90 written for 50 s each (it was about -180 and faced the camera); with yaw 0 `spawner HUMAN_MALE` puts a human 4 blocks ahead of it (the mod's facing vector is (-sin yaw, cos yaw), so north)
+inspect player [@0x7691C8]
+log 3.5: player yaw 0
+inspect set data.body_yaw 0
+wait 10
+inspect set data.body_yaw 0
+wait 10
+inspect set data.body_yaw 0
+wait 10
+inspect set data.body_yaw 0
+wait 10
+inspect set data.body_yaw 0
+wait 10
+expect cube::CreatureData.body_yaw value f32 == 0 [[@0x7691C8] + 0x8006C8] + 0x30
+inspect player [@0x7691C8]
+log 3.5: player yaw 90
+inspect set data.body_yaw 90
+wait 10
+inspect set data.body_yaw 90
+wait 10
+inspect set data.body_yaw 90
+wait 10
+inspect set data.body_yaw 90
+wait 10
+inspect set data.body_yaw 90
+wait 10
+expect cube::CreatureData.body_yaw value f32 == 90 [[@0x7691C8] + 0x8006C8] + 0x30
+inspect player [@0x7691C8]
+log 3.5: player yaw -90
+inspect set data.body_yaw -90
+wait 10
+inspect set data.body_yaw -90
+wait 10
+inspect set data.body_yaw -90
+wait 10
+inspect set data.body_yaw -90
+wait 10
+inspect set data.body_yaw -90
+wait 10
+expect cube::CreatureData.body_yaw value f32 == -90 [[@0x7691C8] + 0x8006C8] + 0x30
+inspect player [@0x7691C8]
+log 3.5: end
+wait 5
+"""

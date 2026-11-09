@@ -1,0 +1,5 @@
+# Options players can change in kyubu/config/my_lua_mod.toml (docs/config.md).
+[options.show_window]
+type = "bool"
+default = true
+description = "Open the My Lua Mod window when the game starts."

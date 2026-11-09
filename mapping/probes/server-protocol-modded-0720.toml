@@ -1,0 +1,79 @@
+# 07-20 copy of server-protocol-modded (2026-10-26): the 07-02 record ported to Cube World Alpha 2013-07-20 (addresses translated);
+# its observations are this build's own replays. The comment below is the 07-02 record's.
+# Recorded with kyubu_probe and the Kyubu 1.1 loader in development (MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop): kmap probe replay starts Server.exe WITH the level_rework mod (no mods_on: the client has it too), then a Kyubu-loaded
+# Cube.exe with the mod that joins 127.0.0.1 with a new character (client = "join"). Task 8.3 of add-level-rework: the server's half of
+# the protocol patch (design D7, mid hook at Net::acceptVersionSite) and the server's level check (S8, creature_update_level_site).
+# The probe cannot trace the two sites the mod hooks (0x42575E, 0x416107): the mod's own log lines show them, the join branch
+# (Net::acceptJoinSite) and the refusal branch are traced. After the join the script writes level 105 into the server's copy of the
+# player, so that the next creature update of that client reaches the level check with a level outside 1 to 100.
+id = "server-protocol-modded-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-10-26"
+steps = [
+    "Wine replay: Server.exe and a joined Cube.exe both with level_rework; the script waits 110 s for the join",
+    "traced the join branch and the wrong-version reply of server_accept_loop, and cube::World::update's World for the player's creature",
+    "wrote level 105 into the server's copy of the player and waited for the next update of that client",
+]
+observations = [
+    "ported from the 07-02 record on 2026-10-26 (addresses translated); the 07-20 replay results follow",
+    "replay 1 (2026-10-26) passed under Wine: a modded client joined; acceptJoinSite ran once, the wrong-version reply never (evidence/retarget-0720-2026-10-26/replays/server-protocol-modded-0720-1.md)",
+]
+
+[[confirms]]
+entry = "Net::acceptJoinSite"
+observed = "1 call in run 10: the modded client joined a modded server (version 0x4B4C0001 turned into 3 by the mod's hook)"
+
+[[confirms]]
+entry = "Net::acceptWrongVersionReplySite"
+observed = "0 calls in run 10: the modded server did not refuse the modded client"
+
+[[confirms]]
+entry = "Net::acceptVersionSite"
+observed = "hooked by the mod, so not traced: the mod's log line shows the version it read and what it did"
+
+[[confirms]]
+entry = "creature_update_level_site"
+observed = "hooked by the mod, so not traced; moved to 0x4160C5 in 8.3 (the old address followed another field); the mod's log shows the level read (1 for a new character) and the refusal of 105"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+mods = ["mods-gameplay/level_rework"]
+seconds = 300
+input = [
+    "until 8.3: joined",
+    "shot 01-joined",
+    "until 8.3: level check done",
+    "wait 8",
+    "shot 02-after-level-105",
+    "wait 20",
+    "shot 03-later",
+]
+script = """
+log level_rework on both sides: the server takes the modded client (task 8.3 of add-level-rework)
+trace args 4
+trace add @0x428230
+trace add @0x4257BC
+trace add @0x42577E
+trace start
+wait 110
+trace stop
+trace report
+expect Net::acceptJoinSite calls @0x4257BC >= 1
+expect Net::acceptWrongVersionReplySite calls @0x42577E == 0
+log 8.3: joined
+inspect creatures [ecx(@0x428230) + 4]
+inspect cube::Creature [[[[ecx(@0x428230) + 4] + 4]] + 0x18]
+log 8.3: level 105
+inspect set data.level 105
+wait 15
+log 8.3: level check done
+wait 30
+log 8.3: after the disconnect
+inspect creatures [ecx(@0x428230) + 4]
+wait 2
+expect - hooks == 0
+"""

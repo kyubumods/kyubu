@@ -1,0 +1,8 @@
+id = "fx_parity"
+name = "Fixture: Lua API parity"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+description = "Calls every native API function through its Lua binding and checks the side rules (task 8.2 / 9.2)."
+[scripts]
+common = "scripts/common.lua"

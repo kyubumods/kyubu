@@ -1,0 +1,200 @@
+# Cube.exe: world and map save databases (Save/).
+
+[[function]]
+name = "cube::World::openSave"
+address = 0x5A3C00
+convention = "thiscall"
+prototype = "void __thiscall cube::World::openSave(cube::World* this, uint32_t seed, std::string* name)"
+subsystem = "saves"
+status = "verified"
+evidence = ["xref:cube::Database::open", "manual:builds the path Save/world_<name>.db", "xref:cube::World::World", "manual:all 3 callers pass a World as this (GameController+0x2DC, its own)"]
+source = "kyubu"
+aliases = ["World::openSave"]
+notes = "resolved in 7.5: the owner is cube::World. ret 8; the seed (GameController+0x800A48, or 123 from World::World) and the world's name (GameController+0x800A4C). Stores the seed at World+0x800164 and seeds rand"
+
+[[function]]
+name = "cube::WorldMap::openSave"
+address = 0x5FA670
+convention = "thiscall"
+prototype = "void __thiscall cube::WorldMap::openSave(cube::WorldMap* this)"
+subsystem = "saves"
+status = "verified"
+evidence = ["xref:cube::Database::open", "manual:builds the path Save/map_<name>.db", "xref:zone_loader_step", "probe:world-map-save"]
+source = "kyubu"
+aliases = ["Map::openSave"]
+notes = "resolved in 7.5: renamed from Map::openSave. Its only caller passes GameController+0x800D3C, where the controller's constructor builds the cube::WorldMap. ret, no stack arguments. Calls world_map_close first"
+
+[[function]]
+name = "delete_world_saves"
+address = 0x482200
+convention = "fastcall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["string:\"Save\\world_\"","xref:cube::Database::setBuffer"]
+source = "kyubu"
+notes = "deletes Save/world_<name>.db and Save/map_<name>.db with DeleteFileA, drops the world from the list, rewrites the list in worlds.db"
+
+# The character save (Save/characters.db) and the zone save format (read statically on 2026-09-30; the blob
+# layout was checked byte for byte against a real save, see the saves atlas page).
+
+[[function]]
+name = "save_character"
+address = 0x487770
+convention = "thiscall"
+prototype = "void __thiscall save_character(cube::GameController* this, int32_t slot, cube::Creature* player)"
+subsystem = "saves"
+status = "verified"
+evidence = ["xref:cube::Database::setBuffer", "manual:writes characters.db (GameController+0x1001000) under the slot", "probe:character-slot-played-0", "probe:character-slot-played-1"]
+source = "kyubu"
+notes = "stores the player's position in the world's entry of the position map, copies the player into a temporary creature under the World's lock, serializes, compresses and stores it under the decimal slot number. The 60 s autosave runs it on a worker thread: a Lua detour froze the game (saves atlas)"
+
+[[function]]
+name = "cube::GameController::saveCopiedSite"
+address = 0x487918
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:save_character", "manual:after the World's unlock, before character_serialize", "probe:weapon-swap"]
+source = "kyubu"
+notes = "in save_character, between the copy and its serialization: EBX is the temporary cube::Creature that will be written (a change of it is saved and never seen in the game), [EBP+0xC] the player it was copied from and [EBP+8] the slot. The World's lock is released here"
+
+[[function]]
+name = "character_serialize"
+address = 0x44DE20
+convention = "thiscall"
+prototype = "void __thiscall character_serialize(void* writer, cube::Creature* creature)"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:save_character", "manual:writes a fixed list of fields; parsed a real 64,595-byte blob with it"]
+source = "kyubu"
+notes = "format 1: version, pos, body angles, hp, xp, level, class, specialization, Creature+0x1198/+0x119C, 13 equipment items, name, 20 style bytes, inventory tabs, +0x1304/+0x1308, known formulas, per-world position map, last world, mana cubes, 11 skills. No other CreatureData field"
+
+[[function]]
+name = "save_writer_init"
+address = 0x44AE50
+convention = "thiscall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:save_character", "manual:stores the output buffer and the format version 1"]
+source = "kyubu"
+notes = "the writer passed to character_serialize and zone_serialize: +0 the byte buffer, +4 the version written first (1), +8 zero"
+
+[[function]]
+name = "save_buffer_compress"
+address = 0x449A70
+convention = "fastcall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:save_character", "manual:replaces the buffer with its compressed copy (0x449B00)"]
+source = "kyubu"
+notes = "the stored character blobs are zlib streams (78 9C); the load path decompresses with 0x449B90"
+
+[[function]]
+name = "load_character"
+address = 0x480B80
+convention = "thiscall"
+prototype = "void __thiscall load_character(cube::GameController* this, int32_t slot, cube::Creature* creature)"
+subsystem = "saves"
+status = "verified"
+evidence = ["probe:character-slot-load", "probe:character-level-clamp", "probe:character-slot-played-0", "probe:character-slot-played-1", "xref:cube::Database::getBuffer", "manual:reads a characters.db slot, decompresses it, deserializes it", "manual:ret 8; three callers, read in 7.1"]
+source = "kyubu"
+notes = "reads characters.db under the world lock, decompresses and fills the creature through character_deserialize. No row: returns, creature untouched. Also fills the list creatures; the player is the one equal to the controller +0x8006C8. Callers: constructor, onMouseUp, select click"
+
+[[function]]
+name = "character_deserialize"
+address = 0x44C3C0
+convention = "thiscall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["probe:character-slot-load", "xref:load_character", "manual:reads the character_serialize format back into a creature"]
+source = "kyubu"
+notes = "every per-world position map entry is inserted as read (key = world seed and name), with no filter or cap, by character_world_map_index (call at 0x44CEC5, returns to 0x44CECA); zone_loader_step later looks up only the exact key of the world being entered. The map is the one at (Creature+0x1D28)+0x1C"
+
+[[function]]
+name = "delete_character"
+address = 0x481BC0
+convention = "fastcall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:cube::Database::setBuffer", "manual:rewrites num, deletes the slot's key, renames each later key down"]
+source = "kyubu"
+notes = "the selected slot is GameController+0x800A04. Later blobs are moved to the key one lower as they are, without re-serializing them; then the character list widgets are rebuilt (0x49D810)"
+
+[[function]]
+name = "create_character"
+address = 0x482670
+convention = "fastcall"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:save_character", "string:\"edit\""]
+source = "kyubu"
+notes = "builds a cube::Creature for the new character (name from the edit field), stores it with save_character and rewrites num in characters.db; every character blob is therefore written by character_serialize"
+
+[[function]]
+name = "zone_serialize"
+address = 0x44E9D0
+convention = "thiscall"
+prototype = "void __thiscall zone_serialize(void* writer, void* zone)"
+subsystem = "saves"
+status = "candidate"
+evidence = ["xref:cube::World::saveZone", "manual:writes ground items, 20-byte records, 2 u32 per spawn, object bytes"]
+source = "kyubu"
+notes = "version, then the items on the ground (ItemData, pos and 5 fields, when the zone has changed), 20-byte records, two u32 per spawn (spawn +0x38, +0x3C) and one byte per 0x188-byte object (+0x30). Spawn levels are not saved: world generation recreates them from the seed"
+
+[[function]]
+name = "world_list_save"
+address = 0x487AF0
+convention = "thiscall"
+subsystem = "saves"
+status = "guess"
+evidence = ["xref:cube::Database::setBuffer", "manual:writes worlds.db (GameController+0x1001008)"]
+source = "kyubu"
+notes = "only its database was read; probably writes num and the world list"
+
+[[function]]
+name = "create_world"
+address = 0x482A00
+convention = "fastcall"
+subsystem = "saves"
+status = "guess"
+evidence = ["xref:world_list_save", "string:\"edit\""]
+source = "kyubu"
+notes = "builds a cube::WorldInfo from the edit fields, calls world_list_save and writes worlds.db; only skimmed"
+
+# The per-world position map and the character list (read statically in task 7.1 of add-level-rework, 2026-10-04).
+
+[[function]]
+name = "character_world_map_index"
+address = 0x44B9F0
+convention = "thiscall"
+prototype = "void* __thiscall character_world_map_index(void* this, void* key)"
+subsystem = "saves"
+status = "candidate"
+evidence = ["probe:character-slot-load", "probe:character-marker", "xref:character_deserialize", "xref:save_character", "manual:ret 4; a find-or-insert on the std::map, the lookup is 0x44BE10"]
+source = "kyubu"
+notes = "operator[] of the per-world position map (this = (Creature+0x1D28)+0x1C). Key: u32 seed, std::string at +4 (an inline 12-char key works). Node: key +0x10, 24-byte value +0x30. Inserts a zeroed value. Callers: character_deserialize, save_character, 0x46BA2F"
+
+[[function]]
+name = "character_select_click"
+address = 0x484340
+convention = "thiscall"
+prototype = "void __thiscall character_select_click(cube::GameController* this)"
+subsystem = "saves"
+status = "candidate"
+evidence = ["probe:character-slot-load", "probe:character-vanilla-refusal", "manual:ret, no stack arguments; registered as a callback at 0x465AA6", "manual:calls load_character(selected slot, player)"]
+source = "kyubu"
+notes = "the click on SELECT/CREATE in the character list. With a valid slot (+0x800A04) it loads the slot into the player (+0x8006C8), unchecked; else it blanks the player. A hook that returns without calling it leaves the list on screen"
+
+[[function]]
+name = "character_list_selected"
+address = 0x488080
+convention = "thiscall"
+prototype = "cube::Creature* __thiscall character_list_selected(cube::GameController* this)"
+subsystem = "saves"
+status = "candidate"
+evidence = ["manual:returns list[+0x800A04], or null when the index is out of range", "xref:character_select_click"]
+source = "kyubu"
+notes = "the character list is a vector of cube::Creature* at GameController+0x80097C (end at +0x800980), one per slot. Its only caller is 0x605B17"
+

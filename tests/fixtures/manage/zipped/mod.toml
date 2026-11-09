@@ -1,0 +1,9 @@
+id = "mm_zipped"
+name = "Manage: zipped"
+version = "2.0.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Unit test: the same rules for a .zip in mods\\."
+
+[dependencies]
+mm_loaded = ">=1.0"

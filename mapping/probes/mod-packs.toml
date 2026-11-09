@@ -1,0 +1,52 @@
+# Task 8.1 of add-mod-manager. Install / Modpacks: the test pack's plan before and after cat_alpha 1.1.0 is installed. The pack pins
+# cat_alpha 1.0.0, so with 1.1.0 installed the plan must say "will change 1.1.0 -> 1.0.0", never keep or offer the latest.
+id = "mod-packs"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-25"
+steps = [
+    "Added src/packs.h (the pack plan, its lines and the settings count) and the MODS / MODPACKS sub-tabs of Install to the page (page.h, list.h, main.cpp)",
+    "Replayed at the start menu under Wine at 1024 x 768: open the page, fetch the good test catalog, open Install / Modpacks and the pack, then download cat_alpha 1.1.0 from Install / Mods, Apply and restart, and look at the pack again",
+]
+observations = [
+    "run 1 passed (evidence/mod-packs-2026-10-25/run1): Install shows the MODS and MODPACKS sub-tabs; MODPACKS lists 1 MODPACK, the row Test pack with 3 MODS and 1.0.0",
+    "with nothing of the pack installed the plan reads cat_alpha, cat_beta and cat_lib will download 1.0.0 (sizes), Kyubu Probe and Fixture Catalog will be disabled, 1 or more settings change; ModManager is not listed",
+    "the pack's Actions menu has one grey row, Apply modpack (task 8.2 makes it work)",
+    "after cat_alpha 1.1.0 was downloaded and APPLY & RESTART installed it (pending.toml: installed cat_alpha 1.1.0, cat_lib 1.0.0), the log reads pack plan cat_pack: ok, download cat_alpha 1.1.0>1.0.0, download cat_beta 1.0.0, keep cat_lib 1.0.0, disable kyubu_probe, disable mm_fixture_catalog, settings 1+; the shot shows cat_lib INSTALLED 1.0.0 in green",
+    "the restarted window is about 792 x 592 under Xvfb, so the last shot is cut on the right; mod-packs-pinned shows the version change at full size",
+    "run 1 also showed plan lines and the defaults line running past the column; packs.h now wraps them (checked in mod-packs-pinned run 2)",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook builds the MODS and MODPACKS sub-tabs and draws the pack plan"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 700
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog"]
+input = [
+    "until modpacks open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 3", "click 647 142", "wait 3", "click 300 330", "wait 3", "shot 01-pack-fresh", "console mod_manager:state",
+    "click 731 228", "wait 3", "shot 02-pack-menu", "click 300 600", "wait 2",
+    "click 465 142", "wait 3", "click 300 330", "wait 3", "click 731 228", "wait 3", "click 700 290", "wait 10", "shot 03-alpha-queued",
+    "click 860 695", "wait 3",
+    "until Restarted by game_restart",
+    "wait 30", "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 3", "click 647 142", "wait 3", "click 300 330", "wait 3", "shot 04-pack-downgrade", "console mod_manager:state",
+    "wait 5",
+]
+script = """
+log modpacks: task 8.1 of add-mod-manager
+wait 15
+log modpacks open
+wait 320
+log modpacks done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

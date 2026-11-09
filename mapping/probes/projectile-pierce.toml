@@ -1,0 +1,129 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/pierce_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on the
+# Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester"
+# and a new world. The script makes the player a ranger with a bow (class_type 2, sub_type 6 on the right weapon slot), and the
+# mod lines three creatures up in front of the player (+y, 8, 16 and 24 blocks). Phase 1 (specialization 0): the game's own bow,
+# M2 held. Phase 2 (specialization 1): the mod turns M1 into the held charge and the release into one straight arrow that is to
+# go through all three, hit each once and end at a surface (task 8.2c of add-skills-unleashed).
+id = "projectile-pierce"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2 (a ranger), sub_type 6 on the right weapon slot, specialization 0; the mod lined three creatures up at 8, 16 and 24 blocks in front; set mp 1 and held the right button (mouse3) 1.5 s: the game's own bow",
+    "Wrote specialization 1 and mp 1; held the left button (mouse1) 1.5 s: the mod's arrow (M1 held as the charge, the release changed to mode 23, kind 1, skill 0, 1.5 times the speed)",
+    "Wrote specialization 7 and mp 1; held the left button 1.5 s: the same arrow at 0.04 times the speed, for two pictures; the mod also draws a tagged arrow as kind 0 with a white model of its own",
+]
+observations = [
+    "Wine replay 4 passed, 4 of 4 checks held (replay 1: 5 of 5 without the pictures; replay 2 and 3: the pictures before the draw hooks were on the right sites; evidence evidence/skills-unleashed-sniper-2026-10-12/projectile-pierce-1, -2, -3 and -4)",
+    "the game's own M2 (mode 25 released into 55, four arrows, kind 0, skill 1) hit the creature at 16 blocks four times (8 to 12 each) and nothing behind it; arrows of kind 0 stop at the first creature they meet",
+    "the mod's arrow: kind 1, skill 0, velocity (0, 149.3, 14.7), damage 27.5 to 28.2 at a charge of 0.88 to 0.89 mp; it hit two of the three lined-up creatures once each (27.2 and 25.2 after armour), went on, met a surface 131 blocks out after 50 steps and ended there; the arrow ran 40 to 50 steps of 20 ms",
+    "a creature 8 blocks out that the slow arrow (4 blocks a second) hit 1.8 s after it was shot was not hit by the fast one in two runs: not understood",
+    "the slow arrow hit that creature and then the one at 16 blocks (52 and 53 damage with the charge 0.97): a hit for each creature, again once",
+    "kind 1 is drawn with another model and unturned (the render loop jumps on the kind at 0x4B81A2); with the kind written 0 for the length of the draw and ModelLoader::get giving slot 840 the mod's white arrow (28 voxels, 3 x 16 x 3), a thin white shape tilted along the flight was seen at the creature in the first picture (01-slow-arrow.png of replay 4, enlarged in crop-01-slow-arrow.png); it is small at 1024 x 768",
+    "the stop-flag clear, the hitCreature detour (14 arguments) and the surface write ran without a fault in four replays",
+    "Wine replay 5 (the arrow's model written at projectileArrowModelSite in place of the Lua detour of ModelLoader::get) passed, 4 of 4 checks held; evidence evidence/skills-unleashed-sniper-fixes-2026-10-12/projectile-pierce-5",
+    "replay 5: at the site EAX was 0x0230E490, the same pointer ModelLoader::get gave for slot 840 with GameController+0x2F8 as its loader; the mod wrote its own model there (0x0601DF50, slot 2569) for its arrow only. The arrow hit two creatures in line once each (68.9 and 31.9) and ended at a surface",
+]
+
+[[confirms]]
+entry = "cube::GameController::projectileArrowModelSite"
+observed = "reached in the draw of an arrow made kind 0 at projectileDrawKindSite, with EAX the Model* of slot 840; another Model* written to EAX was the one drawn for that arrow"
+
+[[confirms]]
+entry = "cube::World::projectileUpdateSite"
+observed = "341 passes in the run; EDI is the projectile (a hook there read its age and position, and knew the arrow the loop was on)"
+
+[[confirms]]
+entry = "cube::World::projectileRemoveSite"
+observed = "6 passes: the end of each arrow of the run, at a surface or at the age limit"
+
+[[confirms]]
+entry = "cube::World::bowShotSite"
+observed = "2 passes (the mod's two arrows); kind 1 and skill 0 written there flew straight and hit through hitCreature"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "a Lua detour with 14 stack words returned 0 for a creature the arrow had hit and passed the call on otherwise; the projectile is the 13th word at the arrow's call site"
+
+[[confirms]]
+entry = "cube::GameController::bowReleaseSite"
+observed = "mode 25 -> 23 (one arrow) with 23 written there, in place of 55 (four)"
+
+[[confirms]]
+entry = "cube::World::projectileStopSite"
+observed = "the stop byte at [EBP-0x2B64] written 0 there let the arrow go on: two creatures hit, then a surface"
+
+[[confirms]]
+entry = "cube::World::projectileSurfaceSite"
+observed = "kind 0 written there ended the kind 1 arrow as an arrow at the surface (log line, removal, no explosion hits)"
+
+[[confirms]]
+entry = "cube::GameController::projectileDrawKindSite"
+observed = "ESI is the projectile; kind 0 written there for a tagged arrow drew it turned along its flight with the arrow model slot (840), which the mod's detour of ModelLoader::get swapped for its white model"
+
+[[confirms]]
+entry = "cube::GameController::projectileDrawEndSite"
+observed = "the kind written at the start was put back here, once for each tagged arrow drawn; no other projectile was changed"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+mods = ["mods-dev/pierce_proto"]
+input = [
+    "until pierce own bow",
+    "hold mouse3 1.5",
+    "until pierce straight",
+    "hold mouse1 1.5",
+    "until pierce slow",
+    "hold mouse1 1.5",
+    "until pierce slow look",
+    "shot 01-slow-arrow",
+    "wait 2",
+    "shot 02-slow-arrow-later",
+]
+script = """
+log projectile-pierce: task 8.2c of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch plist u32 [@0x7691C8] + 0x2F4
+inspect set data.class_type 2
+inspect set data.specialization 0
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set sub_type 6
+wait 4
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace args 3
+trace add @0x615E03
+trace add @0x61F31D
+trace add @0x61F5B8
+trace start
+log pierce own bow
+wait 8
+inspect set data.current_mode 0
+inspect set data.specialization 1
+inspect set data.mp 1
+wait 2
+log pierce straight
+wait 14
+inspect set data.current_mode 0
+inspect set data.specialization 7
+inspect set data.mp 1
+log pierce slow
+wait 5
+log pierce slow look
+wait 8
+trace stop
+trace report
+watch
+expect cube::World::bowShotSite calls @0x615E03 >= 1
+expect cube::World::projectileUpdateSite calls @0x61F31D > 0
+expect cube::World::projectileRemoveSite calls @0x61F5B8 > 0
+watch clear
+wait 3
+expect - hooks == 0
+"""

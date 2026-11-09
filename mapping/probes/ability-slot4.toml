@@ -1,0 +1,161 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1
+# human warrior "Tester" and a new world. slot4_proto hooks 0x48BFDC (after the learned gate in
+# cube::GameController::update) and appends 115 to the five-entry skill bar with the game's push_back (0x5BE230);
+# gamepilot holds key 4. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-slot4"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "slot4_proto pushed 115 as the sixth bar entry on every frame; screenshot of the HUD",
+    "Phase 1: set mp to 1, held key 4 for 2 s, then mouse 1 for 1 s; the tracer watched 0x49BF68 and ability_cooldown",
+    "Phase 2: wrote class_type 1 to 4 with specialization 0 and 1 through the inspector, read the bar after each",
+]
+observations = [
+    "Wine replay 3 passed (replay 1 faulted the mod: three function addresses were passed to rva_to_addr as RVAs; replay 2 was killed by another replay in the same Wine prefix)",
+    "the mid hook at 0x48BFDC installed (no KY_E_UNSAFE) and ran every frame; with a bar of exactly 5 ids, push_back (0x5BE230) appended 115 and the game kept it: the bar read [57, 59, 54, 86, 102, 115] and the HUD drew a sixth widget labelled 4 (01-hud-slot4), with a blank grey icon: the icon map has no entry for 115",
+    "the learned gate zeroes the three class slots of a level-1 warrior (bar [57, 59, 0, 0, 0, 115]); the mod set skills[6..8] (Creature+0x1150) to 1 so the class abilities stayed",
+    "key 4 set GameController+9 to 1 for the frames it was held; the first frame wrote 115 to current_mode (mode 0 -> 115, mp 0.943 of a forced 1, so no cost was taken: ability_cost(115) is 0) and canUseAbility(115) was true before, during and after",
+    "the start site 0x49BF68 fired 19 times in 2 s of held key, one per frame (1.1 to 2.9 s after the trace start): modeInterruptible is true for 115 (modeDuration 0), so a held key restarts the mode every frame; ability_cooldown was called 20 times",
+    "the body in mode 115 turns away from the camera with the club raised (02-pressed): an unknown mode has a pose; the HUD slot did not grey",
+    "the mode did not end by itself in the 3.1 s from the press to the next change, 1.2 s of them after the key was released; a mouse 1 hold then made mode 57 (M1), replacing 115 (mode time 0). When 115 ends alone was not isolated (task 2.2)",
+    "the cooldown map (Creature+0x139C) has an entry 115 with value 0 from the first frame after the mod called canUseAbility(115) (the call itself probably inserts it); the press changed nothing in it",
+    "bar after writing class_type 1..4 and specialization 0 and 1 (index 2, 3, 4 = the three class slots): warrior [54, 86, 102] and [54, 86, 101]; ranger [21, 50, 99] and [21, 50, 100]; mage [88, 103, 49] and [34, 103, 49] with index 0 (M1) 40 and 42; rogue [48, 79, 97] and [48, 79, 96]. Index 1 stayed 59 (M2) except in the warrior creation preview",
+    "so specialization is read by the bar build as +0x141 and decides one class slot (index 4 for warrior, ranger and rogue; index 2 and M1 for the mage), and class_type picks the three ids; both writes took effect on the next frame",
+]
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "fires on each frame key 4 is held, with current_mode set to 115 (the mod's id on a sixth bar entry); 19 calls in 2 s"
+
+[[confirms]]
+entry = "cube::CreatureData.current_mode"
+observed = "went 0 -> 115 on the first frame of the key-4 press and stayed 115 for at least 3 s; mouse 1 then replaced it with 57"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "written 1 to 4 through the inspector: the bar's three class slots follow it on the next frame"
+
+[[confirms]]
+entry = "cube::CreatureData.specialization"
+observed = "written 0 and 1: one class slot changes for each class (warrior 102/101, ranger 99/100, rogue 97/96, mage 88/34 and M1 40/42)"
+
+[[confirms]]
+entry = "cube::ClassType"
+observed = "1, 2, 3, 4 give the warrior, ranger, mage and rogue bars (the values match the enum)"
+
+[[confirms]]
+entry = "cube::Specialization"
+observed = "0 and 1 give the two bars of each class (values 0 and 1 per class, as the enum says)"
+
+[[confirms]]
+entry = "cube::GameController::abilityBarBuiltSite"
+observed = "slot4_proto's mid hook at 0x48BFDC installed (no KY_E_UNSAFE) and ran every frame; [esp+0x10] was the game controller and [esp+0x34] the bar vector"
+
+[[confirms]]
+entry = "cube::GameController.ability_bar"
+observed = "at +0x80080C: five ids before the push and 115 at index 5 (begin + 20) after it; the class_type and specialization writes changed indices 2 to 4"
+
+[[confirms]]
+entry = "IntVector::push_back"
+observed = "called with ECX = the bar and the address of 115 as its one stack argument: the bar grew to six ids and the game kept the sixth (5 min 21 s in probe ability-bar-soak), no fault"
+
+[[confirms]]
+entry = "IntVector::clear"
+observed = "not called by the mod; its effect shows in the bar: five ids at the hook every frame, so the game empties the bar before it rebuilds it and the pushed 115 never accumulates"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/slot4_proto"]
+input = [
+    "until slot4 hud", "wait 2", "shot 01-hud-slot4",
+    "until slot4 press", "hold 4 2", "shot 02-pressed", "hold mouse1 1", "shot 03-mouse1", "wait 6", "shot 04-later",
+]
+script = """
+log slot4: task 2.1 of add-ability-api, id 115 pushed as slot 4 by mods-dev/slot4_proto
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch time u32 [[@0x7691C8] + 0x8006C8] + 0x6C
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+# the bar: the game builds five ids and the mod appends 115 (index 5 = begin + 20)
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+log slot4 hud
+wait 12
+# phase 1: hold key 4 (gamepilot) with mp at 1; the tracer watches the start site and the cooldown call
+trace args 2
+trace add @0x49BF68
+trace add ability_cooldown
+trace start
+inspect set data.mp 1
+log slot4 press
+wait 20
+wait 14
+trace stop
+trace report
+expect cube::GameController::abilityStartSite calls @0x49BF68 >= 1
+watch
+watch clear
+# phase 2: end the mode, then class_type 1 to 4 with specialization 0 and 1; the mod logs the bar after each write
+inspect set data.current_mode 0
+wait 3
+inspect set data.class_type 1
+inspect set data.specialization 0
+wait 2
+expect cube::ClassType value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 2
+inspect set data.specialization 0
+wait 2
+expect cube::ClassType value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 3
+inspect set data.specialization 0
+wait 2
+expect cube::ClassType value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 4
+inspect set data.specialization 0
+wait 2
+expect cube::ClassType value u8 == 4 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 1
+inspect set data.specialization 1
+wait 2
+expect cube::ClassType value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 2
+inspect set data.specialization 1
+wait 2
+expect cube::ClassType value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 3
+inspect set data.specialization 1
+wait 2
+expect cube::ClassType value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 4
+inspect set data.specialization 1
+wait 2
+expect cube::ClassType value u8 == 4 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::Specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.specialization value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x141
+inspect set data.class_type 1
+inspect set data.specialization 0
+wait 2
+log slot4 done
+"""

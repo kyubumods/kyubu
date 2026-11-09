@@ -1,0 +1,10 @@
+id = "mm_fixture_opts"
+name = "Fixture Options"
+version = "1.0.0"
+kyubu = "^1.2"
+sides = ["client"]
+authors = ["Ana"]
+description = "One option of each kind, for the settings form."
+
+[scripts]
+common = "scripts/common.lua"

@@ -1,0 +1,51 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world, with
+# level_rework (mods-gameplay) and the developer mod give_item. Task 6.6 of add-level-rework: with the item scale installed, the information box
+# of a mod item (stored 2000 + N) reads "+N" and "POWER N", and the stats of a level-2 and a level-3 item differ. P is the player's cube::Creature.
+id = "item-scale"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with level_rework and give_item installed; waited 15 s there",
+    "give_item:give put four weapons (type 3, sub_type 17, rarity 2) into the bags, with the stored levels 2002, 2003, 2061 and 500",
+    "the input opened the inventory (i), moved the cursor over the four given weapons (the step `move`, a hover) and took a screenshot of each information box",
+]
+observations = [
+    "Wine replay 1 passed (1 of 1 expectation, no fault). The log shows \"item scale installed\" (53 mod symbols loaded). The information boxes (evidence item-scale-2026-10-04): stored 2002 reads \"GREATMACE +2\", \"POWER 2\", DMG 11.6, HP 7.2, CRIT 1.8%; stored 2003 reads \"+3\", \"POWER 3\", DMG 11.8, HP 7.4, CRIT 1.8% (a different tier from level 2); stored 2061 reads \"+61\", \"POWER 61\", DMG 39.3, HP 24.6, CRIT 6.1%; stored 500 (a vanilla item) reads \"+97\", \"POWER 97\", DMG 81.9. The equipped level-1 weapon reads DMG 8, HP 5, CRIT 1.3%",
+    "the stat scale hooks routed: item sites 0x4C70BB (item_hp), 0x4C7827, 0x438B9A (a sheet item rating); item/8 sites 0x4C7B81, 0x4C6BCC; the sheet partner 0x438BC6 (first use of each is logged once). The sheet's weapon rating stays 100% with the level-1 weapon equipped",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-gameplay/level_rework", "mods-dev/give_item"]
+input = [
+    "until is: start",
+    "console give_item:give 3 17 2002 2", "wait 3",
+    "console give_item:give 3 17 2003 2", "wait 3",
+    "console give_item:give 3 17 2061 2", "wait 3",
+    "console give_item:give 3 17 500 2", "wait 3",
+    "key i", "wait 8", "shot 01-equipment",
+    "move 483 172", "wait 4", "shot 02-level-2",
+    "move 529 172", "wait 4", "shot 03-level-3",
+    "move 575 172", "wait 4", "shot 04-level-61",
+    "move 621 172", "wait 4", "shot 05-stored-500",
+    "until is: done",
+]
+script = """
+log item scale of level_rework (task 6.6 of add-level-rework)
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log is: start
+wait 80
+log is: done
+wait 5
+"""

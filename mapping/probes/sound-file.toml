@@ -1,0 +1,46 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/sound_file_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on the
+# Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester"
+# and a new world. The mod ships assets/sounds/su_bow_test.wav (a 0.25 s sine) and, for a ranger of specialization 3, loads and
+# plays it through the sound engine's own two calls, three times at rising pitch (task 8.2f of add-skills-unleashed). Whether it
+# is heard is for the user; the replay shows the engine accepts the name and returns a handle.
+id = "sound-file"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2, then specialization 3: the mod makes six calls through the sound engine's loadSound and play slots, one every 12 frames: a name that is nowhere, a vanilla one (hit.wav), then its own su_bow_test.wav four times at pitches 1.0, 1.25, 1.5 and 1.0",
+    "Traced play_sound (with the mod's calls going to the engine directly, not through it)",
+]
+observations = [
+    "Wine replay 3 passed, 2 of 2 checks held (replay 1 gave `overrides 1 vanilla key(s)` for the mod's file, handle 3; replay 2 ran out of its 120 s; evidence evidence/skills-unleashed-sniper-2026-10-12/sound-file-3)",
+    "loadSound of su_nowhere.wav gave 0; of hit.wav 4 (5 in replay 2); of su_bow_test.wav 5 (6 in replay 2), the same value on the three calls after: the engine keeps a sound by name, and the number depends on what the game had loaded already",
+    "no call faulted and the game went on; whether the file is heard is for the user",
+]
+
+[[confirms]]
+entry = "play_sound"
+observed = "its own two engine calls (vtable slot 7 to load a name, slot 6 to play the handle) were made with a name of the mod's file from a mid hook in the game's update: a handle came back for the mod's file and 0 for an unknown name"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 200
+mods = ["mods-dev/sound_file_proto"]
+input = []
+script = """
+log sound-file: task 8.2f of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+trace args 5
+trace add play_sound
+trace start
+inspect set data.class_type 2
+inspect set data.specialization 3
+wait 40
+trace stop
+trace report
+expect play_sound calls play_sound >= 0
+expect - hooks == 0
+"""

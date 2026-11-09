@@ -1,0 +1,10 @@
+id = "mm_fixture_off"
+name = "Fixture Disabled"
+version = "2.0.0"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Ana"]
+description = "Turned off in config.toml by the replay."
+
+[scripts]
+common = "scripts/common.lua"

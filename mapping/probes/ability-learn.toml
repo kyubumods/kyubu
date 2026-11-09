@@ -1,0 +1,65 @@
+# Recorded with kyubu_probe, mods-examples/fourth_ability_demo, mods-dev/skill_ranks_proto and the Kyubu loader of task 8.2 of
+# add-ability-api (learning the fourth ability in the skill tree), unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world, with CONFIG=<a config.toml
+# that holds `[abilities] skill_tree = true`> (the env var of wine_sandbox.sh passes through kmap probe replay). The demo claims the
+# warrior's slot 4 with `any` as number 112 (max_rank 3). skill_ranks_proto only writes rank 5 into skills 6 to 8 while the skill
+# panel is closed; the loader's skill-tree hook shows button 9 and gives it smash's icon. P below is the player's cube::Creature,
+# [[@0x7691C8] + 0x8006C8]; skills[9] is at P + 0x115C.
+id = "ability-learn"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there; the level was written to 30 (58 skill points)",
+    "the key X opened the skill panel; screenshot (01-panel): the fourth ability's button at the end of the ability row, with an icon, rank 0",
+    "clicked button 9 with the mouse held down, twice; screenshot (02-click)",
+    "clicked LEARN; screenshot (03-learned); closed the panel with the key X; screenshot of the bar (04-bar)",
+]
+observations = [
+    "Wine replay 1 passed (4 of 4 expectations held; first run). Evidence: evidence/ability-learn-2026-10-05/ (config.toml, report, log, 4 screenshots)",
+    "with `skill_tree = true` the log has `the skill tree hook is installed at cube::GameController::skillButton9HideSite`; 1.7 s after the panel opened (the key X) it has `skill button 9 shows the icon of ability 54 (for ability 112)`: the hook showed the button and filled the node the panel had made, with no help from a mod (skill_ranks_proto writes only ranks 6 to 8)",
+    "before LEARN: skills[9] was 0 and the bar's index 5 was not 112 (slot 4 empty); 3 clicks (two holds) took the working rank to 3 and LEARN applied it: skills[9] 0 to 3 (1 change in 16310 samples), Points 18/58 (03-learned.png: the fourth button after the three ability buttons, smash's icon, rank 3)",
+    "after LEARN the bar's index 5 read 112 and the log has `ability 112 shows the icon of ability 54`; closing the panel left slot \"4\" with the icon (04-bar.png, greyed: the mp is 0 in this replay)",
+]
+
+[[confirms]]
+entry = "cube::GameController::skillButton9HideSite"
+observed = "the loader's mid hook showed button 9 while the panel was open and the demo's ability held slot 4"
+
+[[confirms]]
+entry = "cube::GameController.skill_icons"
+observed = "the loader copied the ability icon map's smash node into key 9's null node"
+
+[[confirms]]
+entry = "cube::CreatureData.skills"
+observed = "skills[9] went 0 to the learned rank when LEARN applied the working copy, and the bar followed it"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-examples/fourth_ability_demo", "mods-dev/skill_ranks_proto"]
+input = [
+    "until learn A", "key x", "wait 6", "shot 01-panel",
+    "click 244 272", "hold mouse1 2", "wait 6", "shot 02-click", "hold mouse1 2", "wait 6",
+    "click 106 537", "hold mouse1 2", "wait 8", "shot 03-learned",
+    "key x", "wait 6", "shot 04-bar",
+]
+script = """
+log learn: task 8.2 of add-ability-api, learning the fourth ability in the skill tree
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.level 30
+watch player9 u32 [[@0x7691C8] + 0x8006C8] + 0x115C
+wait 3
+log learn A
+wait 12
+# not learned yet: the demo's number 112 is not on the bar (index 5 = begin + 20)
+expect cube::CreatureData.skills value u32 == 0 [[@0x7691C8] + 0x8006C8] + 0x115C
+expect - value i32 != 112 [[@0x7691C8] + 0x80080C] + 20
+wait 150
+expect cube::CreatureData.skills watch player9 increased
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log learn done
+"""

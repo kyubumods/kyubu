@@ -1,0 +1,168 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. The tracer counts passes through the per-frame ability dispatch in cube::World::update (a switch on
+# current_mode - 1 at 0x610745, run for each creature in each World step) and through two of its cases, while two
+# different abilities run on the player, each started by forcing it (as in the probe ability-force): the warrior's
+# M2 (59), whose case is 0x6144BC (ids 24, 25, 27, 36, 59, 63, 64), and cyclone (86), whose case is 0x610CA3 (the
+# shared case of the melee modes, including 57 and 60). Inside that case cyclone takes the branch that times the
+# mode with ability_duration (the branch at 0x611620).
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; the World is [@0x7691C8] + 0x2DC.
+id = "ability-dispatch"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Read the World's +0xB4 byte and the creature at +0xB8, which the dispatch's cases compare with",
+    "Traced the dispatch site 0x610745, the case entries 0x6144BC and 0x610CA3, cyclone's branch 0x611620, ability_duration",
+    "Idle control: traced 5 s with nothing forced",
+    "Phase 1: forced 59 (current_mode 59, mode time 0) once a second for 12 s; a screenshot",
+    "Phase 2: forced cyclone (86) every 2 s for 12 s; a screenshot",
+]
+observations = [
+    "Wine replay 2 passed, all checks held; replay 1 saw the same and failed one wrong guess (below)",
+    "single-player: World+0xB4 is 0 and World+0xB8 is the player (vtable 0x6FC8CC, id 1)",
+    "idle 5 s: the dispatch site passed 4777 times (every creature, every step); no block ran",
+    "forced 59: 11186 dispatch passes; the 59 block (0x6144BC) 109 times, the melee case 539 (the follow-up 60)",
+    "at a block's entry ECX is the creature's address with the mode as its low byte: 0x..3B (59), 0x..3C (60)",
+    "cyclone's branch 0x611620 never ran during 59/60; the watch saw the mode go from 0 to 59/60",
+    "forced 86: the melee case 639 times with ECX 0x..56 (86), its branch 0x611620 639 times, the 59 block 0",
+    "ability_duration: 3106 calls during 86 (2735 during 59/60 in replay 1), all with the player as ECX, ~5 a step",
+    "replay 1 guessed every ability_duration call returns to 0x611652: 6 of 32 did (0x611490, 0x6114BA, 0x611516, 0x611D8C)",
+    "screenshots of both phases: 01-forced-59 and 02-forced-86",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "passed for each creature in each World step; forced 59 and 86 went to their own cases"
+
+[[confirms]]
+entry = "ability_duration"
+observed = "called on each step by the dispatch's melee case with the player as ECX, while 60 or cyclone (86) ran"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+input = [
+    "until 9.3 show 59",
+    "wait 3",
+    "shot 01-forced-59",
+    "until 9.3 show 86",
+    "wait 3",
+    "shot 02-forced-86",
+]
+script = """
+log ability dispatch (task 9.3): two forced abilities traced through the per-frame switch in cube::World::update
+wait world
+wait 15
+inspect player [@0x7691C8]
+# the cases run a creature's ability when World+0xB4 is 0 and the creature is not a player (hostile_type != 0), or
+# when the creature is the World's +0xB8: in single-player +0xB4 is 0 and +0xB8 is the player (id 1)
+expect - value u8 == 0 [@0x7691C8] + 0x390
+expect - value u32 == 1 [[@0x7691C8] + 0x394] + 8
+expect - value u32 == 7325900 [[@0x7691C8] + 0x394]
+trace args 2
+trace add @0x610745
+trace add @0x6144BC
+trace add @0x610CA3
+trace add @0x611620
+trace add ability_duration
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+# idle control: nothing forced; the dispatch runs for every creature, the 59 case for none
+trace start
+wait 5
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x610745 > 50
+expect - calls @0x6144BC == 0
+# phase 1: the warrior's M2 (59), forced once a second. 59 lasts one World step, then the game moves on to 60 (the
+# melee case), so the 59 case passes about once per force
+inspect set data.mp 1
+trace start
+log 9.3 show 59
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+watch
+expect cube::World::abilityDispatchSite calls @0x610745 > 100
+expect cube::World::abilityDispatchSite calls @0x6144BC >= 10
+expect cube::World::abilityDispatchSite calls @0x610CA3 > 12
+expect - calls @0x611620 == 0
+watch clear
+# let 60 end: set the mode back to 0
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 3
+# phase 2: cyclone (86), forced every 2 s; its case is the melee case, where 86 (with 5, 11, 30-33, 72 and 91) takes
+# the branch at 0x611620 that times its effect with ability_duration; the 60 of phase 1 never took it
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+trace start
+log 9.3 show 86
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+watch
+watch clear
+expect cube::World::abilityDispatchSite calls @0x610CA3 > 100
+expect cube::World::abilityDispatchSite calls @0x6144BC == 0
+expect ability_duration calls ability_duration >= 10
+expect cube::World::abilityDispatchSite calls @0x611620 > 50
+expect ability_duration value u32 == 7325900 ecx(ability_duration)
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+expect - hooks == 0
+"""

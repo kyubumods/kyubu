@@ -1,0 +1,84 @@
+# Task 2.2 of add-mod-manager: after `kmap export`, the start menu's entries resolve by name from this checkout's
+# symbol maps (every `trace add` below goes through resolve_symbol), and the two widget calls the draw uses
+# (cursor, width) are called from it. The engine's cursor is read while the pointer rests on Start Game.
+id = "start-menu-symbols"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-19"
+steps = [
+    "Read plasma::Widget::getCursor (0x627DD0) and getWidth (0x626650) and the engine's cursor fields with REA (Ghidra) and objdump, then ran kmap export",
+    "Replayed at the start menu under Wine: traced the draw, its end site, getFont, drawText, getCursor and getWidth by name, with the cursor over Start Game",
+]
+observations = [
+    "replay 1 passed under Wine at 1024 x 768: all six names resolved from the symbol maps and were traced; the draw and its end site ran 119 times in 20 s",
+    "getFont, getCursor, getWidth and the last drawText returned into cube::StartMenuWidget::draw at 0x582201, 0x582256, 0x582290 and 0x582947, once per draw",
+    "with the pointer moved to (512, 459), plasma::D3D9Engine.cursor_x and cursor_y read 512 and 459: client pixels, the same frame as the move",
+]
+
+[[confirms]]
+entry = "cube::StartMenuWidget::draw"
+observed = "resolved by name and called every frame at the start menu"
+
+[[confirms]]
+entry = "cube::StartMenuWidget::drawEndSite"
+observed = "resolved by name; reached as often as the draw"
+
+[[confirms]]
+entry = "plasma::FontEngine::getFont"
+observed = "resolved by name; called from the draw once per frame"
+
+[[confirms]]
+entry = "plasma::ScalableFont::drawText"
+observed = "resolved by name; called from the draw's last row"
+
+[[confirms]]
+entry = "plasma::Widget::getCursor"
+observed = "resolved by name; called from the draw"
+
+[[confirms]]
+entry = "plasma::Widget::getWidth"
+observed = "resolved by name; called from the draw"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.cursor_x"
+observed = "the cursor's client x while it rests on Start Game"
+
+[[confirms]]
+entry = "plasma::D3D9Engine.cursor_y"
+observed = "the cursor's client y while it rests on Start Game"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 150
+mods = []
+input = [
+    "until startmenu rest",
+    "move 512 459", "wait 6", "shot 01-start",
+]
+script = """
+log startmenu: task 2.2 of add-mod-manager
+wait 15
+trace add cube::StartMenuWidget::draw
+trace add cube::StartMenuWidget::drawEndSite
+trace add plasma::FontEngine::getFont
+trace add plasma::ScalableFont::drawText
+trace add plasma::Widget::getCursor
+trace add plasma::Widget::getWidth
+trace start
+log startmenu rest
+wait 20
+expect plasma::D3D9Engine.cursor_x value f32 >= 480 [[@0x7691C8] + 0x800708] + 0xD4
+expect plasma::D3D9Engine.cursor_x value f32 <= 540 [[@0x7691C8] + 0x800708] + 0xD4
+expect plasma::D3D9Engine.cursor_y value f32 >= 430 [[@0x7691C8] + 0x800708] + 0xD8
+expect plasma::D3D9Engine.cursor_y value f32 <= 500 [[@0x7691C8] + 0x800708] + 0xD8
+trace stop
+trace report
+expect cube::StartMenuWidget::draw calls cube::StartMenuWidget::draw > 100
+expect cube::StartMenuWidget::drawEndSite calls cube::StartMenuWidget::drawEndSite within 2 of cube::StartMenuWidget::draw
+expect plasma::FontEngine::getFont from plasma::FontEngine::getFont @0x582201
+expect plasma::ScalableFont::drawText from plasma::ScalableFont::drawText @0x582947
+expect plasma::Widget::getCursor from plasma::Widget::getCursor @0x582256
+expect plasma::Widget::getWidth from plasma::Widget::getWidth @0x582290
+expect - hooks == 0
+"""

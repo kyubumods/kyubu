@@ -1,0 +1,69 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with level_rework (mods-gameplay). Task 6.8 of add-level-rework: the character sheet's ratings with a mod item equipped.
+# P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its right weapon is equipment slot 7, P + 0xAA8.
+id = "item-sheet"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with level_rework installed; waited 15 s there",
+    "the script set the level word of the equipped right weapon (P + 0xAA8 + 0x10) to 2002, 2061 and 500 in turn, and the input opened the inventory (i), whose left side is the character sheet, and took a screenshot after each",
+]
+observations = [
+    "Wine replay 4 passed, no fault (the final record; replays 1 to 3 found the exp2 error described below). The right weapon's level word (P + 0xAA8 + 0x10) was set in turn to 21, 100, 500, 1981, 2002 and 2061 with the inventory open, and the character sheet beside it was photographed (evidence item-sheet-2026-10-04/run4)",
+    "weapon rating, the item's stat scale over the creature level's (level 1: scale 1; the starting weapon has rarity 0): level 1 100%, stored 21 283%, stored 100 562%, stored 500 736%, stored 1981 784%, mod level 2 (2002) 102%, mod level 61 (2061) 348%. Each equals 2^(3*(M-1)/100) for M = 1, 51, 84, 97, 100, 2 and 61: the power of the vanilla level (the rule of the spec) or the mod level. HP follows (265, 274.1, 288.1, 296.8, 299.2, 265.1, 277.4), CRIT and the other ratings too",
+    "replays 1 to 3 read 724% for stored 500 and 769% for stored 1981 (HP 296.2 and 298.4), and the mod's own log read 3.4759 for mod level 61 instead of 3.4822: std::exp2 of the MinGW i686 runtime is off by up to 2% (exp2(2.88) = 7.3759 against 7.3615, exp2(1.8) = 3.4747 against 3.4822). level_rework now uses std::pow(2.0, x) in item_stat_factor, item_stat_scale and creature_stat_scale; the formula test cannot see the error (it runs with another runtime build), only the game does",
+    "the partner of a creature above level 1 is seen in item-adaption (the player at level 14, a stored 2010 weapon of rarity 2): WEAPON RATING 130% = 2^(3*9/100) * 2^(2/4) / 2^(3*13/100) = 1.30, so the six sheet partners take the creature's level on the mod's scale",
+]
+
+[[confirms]]
+entry = "stat_scale"
+observed = "through the mod's hook: stored levels 21, 100, 500, 1981 (vanilla) and 2002, 2061 (mod) give 2^(3*(M-1)/100) with M the power or the mod level, seen as the character sheet's weapon rating (283, 562, 736, 784, 102, 348%)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until is: start",
+    "key i", "wait 8", "shot 01-level-1",
+    "until is: set21", "wait 8", "shot 02-stored-21",
+    "until is: set100", "wait 8", "shot 03-stored-100",
+    "until is: set500", "wait 8", "shot 04-stored-500",
+    "until is: set1981", "wait 8", "shot 05-stored-1981",
+    "until is: set2002", "wait 8", "shot 06-level-2",
+    "until is: set2061", "wait 8", "shot 07-level-61",
+    "until is: done",
+]
+script = """
+log item sheet of level_rework (task 6.8 of add-level-rework)
+wait world
+wait 15
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+expect - value i16 == 1 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0x10
+log is: start
+wait 30
+inspect set level 21
+log is: set21
+wait 22
+inspect set level 100
+log is: set100
+wait 22
+inspect set level 500
+log is: set500
+wait 22
+inspect set level 1981
+log is: set1981
+wait 22
+inspect set level 2002
+log is: set2002
+wait 22
+inspect set level 2061
+expect - value i16 == 2061 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0x10
+log is: set2061
+wait 22
+log is: done
+wait 5
+"""

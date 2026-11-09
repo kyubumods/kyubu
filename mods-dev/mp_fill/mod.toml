@@ -1,0 +1,10 @@
+id = "mp_fill"
+name = "mp fill"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-joined): sets the local player's mp (a warrior's rage) to 1 on every frame, so that a replay without kyubu_probe on the client can use an ability by pressing its key. Option hp holds the player's hp."
+
+[scripts]
+client = "scripts/client.lua"

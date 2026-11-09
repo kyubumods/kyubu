@@ -1,0 +1,13 @@
+build*/
+dist/
+__pycache__/
+*.pyc
+# Derived from the game's code: never commit (tools/check_public_files.py, docs/mapping/setup.md)
+*.gpr
+*.rep/
+*.gzf
+*.gdt
+decomp/
+tools/kcat/kcat.toml
+# The design notes are kept private
+openspec/

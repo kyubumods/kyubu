@@ -1,0 +1,169 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. No button is pressed: the script writes an ability id to the player's current_mode and clears
+# mode_start_time (the time spent in the mode, despite cuwo's name) through the inspector, and the game runs the
+# ability from there.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its cube::CreatureData starts at P + 0x10.
+id = "ability-force"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Idle control: watched current_mode for 5 s with nothing pressed",
+    "Phase 1: traced abilityStartSite and ability_cooldown; set data.current_mode 59 and data.mode_start_time 0",
+    "Phase 2: forced 59 once a second for 12 s while gamepilot took a screenshot",
+    "Phase 3: forced cyclone (86), an ability that is not on a new warrior's skill bar",
+]
+observations = [
+    "Wine replay 3 passed, all checks held; replays 1 and 2 saw the same and failed one wrong guess each (below)",
+    "idle control: current_mode stayed 0 for 5 s (about 490 samples) with nothing pressed",
+    "forced 59: the next World step called ability_cooldown(59, -1) from 0x616E13, the step after it (60, -1)",
+    "the game set the follow-up 60 by itself; the warrior swings the club as on a press (01-forced-59)",
+    "replay 1's screenshot of the same phase caught a yellow glow instead, another moment of the ability",
+    "60 has no timed end (modeDuration 0): it held for 8 s, the mode time counting up to about 7900 ms",
+    "replay 1 guessed the mode would return to 0 (a real press ended 60 on release); replay 2's watch missed the 59",
+    "the input site 0x49BF68 never fired: the write alone started the ability",
+    "forced 86 (cyclone, not learnt by a level-1 warrior): it held, the warrior spins (02-forced-86)",
+    "each rewrite of 86 with the time at 0 started its cooldown again (ability_cooldown(86) every 2 s)",
+    "mp fell from 1 to about 0.47 in 8 s; a warrior's rage drains anyway, so the cost is not shown to be charged",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.current_mode"
+observed = "writing an ability id to it (with the mode time at 0) makes the player perform that ability"
+
+[[confirms]]
+entry = "cube::CreatureData.mode_start_time"
+observed = "cleared together with current_mode it starts the mode; it then counts up in ms"
+
+[[confirms]]
+entry = "cube::AbilityId"
+observed = "59, 60 and 86 (CYCLONE) are live mode ids: each written or reached is run and gets its own cooldown"
+
+[[confirms]]
+entry = "ability_cooldown"
+observed = "a forced mode starts its cooldown like a pressed one: once per new mode from cube::World::update"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+input = [
+    "until 9.2 show",
+    "wait 3",
+    "shot 01-forced-59",
+    "until 9.2 cyclone",
+    "wait 1",
+    "shot 02-forced-86",
+]
+script = """
+log forcing an ability (task 9.2): an ability id written to current_mode with the mode time cleared
+wait world
+wait 15
+inspect player [@0x7691C8]
+# idle control: nothing pressed, the mode stays 0
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 5
+watch
+expect - watch mode unchanged
+expect cube::CreatureData.current_mode value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+watch clear
+# phase 1, the forcing-an-ability scenario: the warrior's right-button ability (59), forced once. Both writes happen
+# in the same frame (script lines run until the next wait)
+trace args 2
+trace add @0x49BF68
+trace add ability_cooldown
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch time u32 [[@0x7691C8] + 0x8006C8] + 0x6C
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+inspect set data.mp 1
+trace start
+log 9.2 force 59
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 0.3
+expect cube::CreatureData.current_mode value u8 >= 59 [[@0x7691C8] + 0x8006C8] + 0x68
+expect cube::CreatureData.mode_start_time value u32 < 5000 [[@0x7691C8] + 0x8006C8] + 0x6C
+wait 7.7
+trace stop
+trace report
+watch
+# the game ran the forced mode by itself, with no input path involved: 59 lasts one step, then the game sets its
+# follow-up 60, which has no timed end (modeDuration gives 0) and holds while no button is pressed (replay 1). The
+# trace report shows ability_cooldown(59) then (60); a watch of the mode can miss 59 (replay 2)
+expect cube::CreatureData.current_mode value u8 == 60 [[@0x7691C8] + 0x8006C8] + 0x68
+expect cube::CreatureData.mode_start_time watch time changed
+expect - calls @0x49BF68 == 0
+expect ability_cooldown calls ability_cooldown >= 2
+expect ability_cooldown caller ability_cooldown 0x616E13
+watch clear
+# phase 2, for the screenshot: gamepilot reacts to a log line within about 9 s, so keep forcing for 12 s
+log 9.2 show
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+wait 8
+# phase 3: cyclone (86), which a level-1 warrior has not learnt; forced the same way, and again each second
+trace start
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+log 9.2 cyclone
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 0.3
+expect cube::CreatureData.current_mode value u8 == 86 [[@0x7691C8] + 0x8006C8] + 0x68
+wait 1.7
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 8
+trace stop
+trace report
+watch
+watch clear
+expect - calls @0x49BF68 == 0
+expect ability_cooldown calls ability_cooldown >= 1
+"""

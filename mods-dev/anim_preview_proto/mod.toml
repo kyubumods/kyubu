@@ -1,0 +1,6 @@
+id = "anim_preview_proto"
+name = "Animation preview (proto)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe anim-preview): two clips and no script, so that nothing else moves the player while `anim preview` is tried. `hidden` borrows pose 2 with the head and the weapons hidden (phase 1); `arm` sends the weapon arm far out over the clip (phase 2)."

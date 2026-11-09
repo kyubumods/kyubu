@@ -1,0 +1,18 @@
+# One option of each type, for the config_* parity checks.
+[options.flag]
+type = "bool"
+default = true
+
+[options.count]
+type = "int"
+default = 3
+min = 0
+max = 10
+
+[options.scale]
+type = "float"
+default = 1.5
+
+[options.name]
+type = "string"
+default = "fx"

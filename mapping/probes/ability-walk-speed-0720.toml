@@ -1,0 +1,84 @@
+# 07-20 copy of ability-walk-speed (2026-10-26): the 07-02 record ported to Cube World Alpha 2013-07-20 (addresses translated);
+# its observations are this build's own replays. The comment below is the 07-02 record's.
+# 2026-11-06 (add-native-replay 5.2): the "reached 999" checks, which failed by design, are now "changed", so the record passes and the
+# report keeps the samples; the walk direction follows the camera yaw (Wine: peak (9.8, -6.4); native, camera not turned: (0, +11.8)).
+# add-skills-unleashed, Water Mage (2026-10-19): the user wants no slow while the chains are cast. The mod's code applies none, so this asks
+# whether the game itself scales the player's walk while a mod ability's mode runs. mods-dev/charge_proto defines a mod ability on the
+# warrior's slot 4 that stays in mode 112 while key 4 is held. The probe holds W alone (the baseline) and then W with 4, and logs the
+# player's walk velocity (Creature + 0x34, x and y, blocks a second) and the mode, so the speeds can be compared. From run 7,
+# mods-dev/velwrite_probe rides along: each run's version is described at its top (the last one checks the fix by the mapped sites).
+id = "ability-walk-speed-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-10-26"
+steps = [
+    "Start in dev mode with charge_proto; make a character and a world; set the rank of charge_proto:circle to 3 on the console",
+    "Hold W for 3 s with no ability: the velocity the walk reaches (the baseline)",
+    "Hold W and 4 together for 3 s: the velocity while the mode is 112; is it lower than the baseline",
+]
+observations = [
+    "ported from the 07-02 record on 2026-10-26 (addresses translated); the 07-20 replay results follow",
+    "replay 1 (2026-10-26) under Wine, a measuring run (its \"reached 999\" checks never hold by design): on foot the walk peaks at (9.845, -6.44), as on 07-02 (run 6: 9.84, -6.44); in mode 112 at (9.79, -6.41) (evidence/retarget-0720-2026-10-26/replays/ability-walk-speed-0720-1.md)",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the new level-1 warrior: key 4 is the probe mod's ability"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/charge_proto", "mods-dev/velwrite_probe"]
+input = [
+    "until walkspeed ready",
+    "console ability rank charge_proto:circle 3",
+    "wait 3",
+    "click 820 384",
+    "wait 1",
+    "until walkspeed phase A",
+    "hold w 4",
+    "until walkspeed phase B",
+    "hold w+4 4",
+    "wait 3",
+]
+script = """
+log walkspeed: Water Mage cast slow, the walk velocity with and without a mod ability's mode
+wait world
+wait 20
+inspect player [@0x76B1C8]
+expect cube::CreatureData.class_type value u8 == 1 [[@0x76B1C8] + 0x8006D0] + 0x140
+log walkspeed ready
+wait 25
+watch ax f32 [[@0x76B1C8] + 0x8006D0] + 0x34
+watch ay f32 [[@0x76B1C8] + 0x8006D0] + 0x38
+watch cx f32 [[@0x76B1C8] + 0x8006D0] + 0x40
+watch cy f32 [[@0x76B1C8] + 0x8006D0] + 0x44
+log walkspeed phase A
+wait 2
+log dumpA
+inspect player [@0x76B1C8]
+wait 18
+expect - watch ax changed
+expect - watch ay changed
+expect - watch cx changed
+expect - watch cy changed
+watch clear
+watch bx f32 [[@0x76B1C8] + 0x8006D0] + 0x34
+watch by f32 [[@0x76B1C8] + 0x8006D0] + 0x38
+watch dx f32 [[@0x76B1C8] + 0x8006D0] + 0x40
+watch dy f32 [[@0x76B1C8] + 0x8006D0] + 0x44
+watch bmode u8 [[@0x76B1C8] + 0x8006D0] + 0x68
+log walkspeed phase B
+wait 2
+log dumpB
+inspect player [@0x76B1C8]
+wait 23
+expect - watch bx changed
+expect - watch by changed
+expect - watch dx changed
+expect - watch dy changed
+expect - watch bmode reached 112
+watch clear
+log walkspeed done
+"""

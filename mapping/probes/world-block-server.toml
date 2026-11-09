@@ -1,0 +1,78 @@
+# Task 10.1 of add-skills-unleashed-multiplayer (design D9): kyubu.game.world_block on Server.exe, with a joined Cube.exe (kmap probe
+# replay, client = "join"). The dev mod mods-dev/world_block_proto, on both games, reads the same 81 columns round the joined player
+# (the grid point is the player's position rounded down to 64 blocks) with world_block, compares every block with the game's own
+# cube::World::getBlock, and logs the top of each column: the server's line and the client's must be equal.
+id = "world-block-server"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with world_block_proto",
+    "the server waits until the zones round the joined player are generated (a try a second), then reads 9 by 9 columns, z 255 down to -16",
+    "the client does the same on its own World; the two tops lines are compared",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/world-block-server), passed in 15 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 2, 2026-11-08 (evidence/world-block-2026-11-08/world-block-server-run2), passed: the server and the joined client both read 81 columns at grid point 8396928, 8396928, z 255 down to -16: 22032 blocks each, 0 differ from each host's own cube::World::getBlock, 0 columns unknown, and the 81 tops are equal on the two hosts (81 to 88, sum 6684)",
+    "the server answered unknown for all 81 columns on its first 2 tries (a second apart), before its zone thread had generated the zones round the joined player; then all were known",
+    "run 1 (world-block-server-run1): passed with a window of 24 blocks above the player to 40 below; the server's copy of the player stood at z 45 and the client at z 81, so the windows differed (server tops capped at 69, the client's 81 to 88). The fixed window of run 2 reads the same blocks on both",
+    "the joined client's server-side script ran too (the server VM in a joined Cube.exe) and logged the same tops",
+    "not covered: a zone the server removes while a rule reads it, block changes, more than one player",
+]
+
+[[confirms]]
+entry = "cube::World.regions"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Region.zones"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Zone.fields"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Field.base_z"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Field.blocks"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Field.size"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::Block.type"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[[confirms]]
+entry = "cube::World::getBlock"
+observed = "the server's world_block gave the same blocks as Server.exe's getBlock (22032, 0 differ) and as the joined client's world_block (81 tops equal)"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 300
+mods = ["mods-dev/world_block_proto"]
+input = [
+    "until world_block_proto: server: done",
+    "shot 01-client",
+]
+log_expect = { latest = [
+    "world_block_proto: server: terrain true",
+    ": 0 columns unknown",
+    "compared, 0 differ",
+    "world_block_proto: server: done",
+], client = [
+    "world_block_proto: client: terrain true",
+    "world_block_proto: client: done",
+] }
+script = """
+log world-block-server: task 10.1 of add-skills-unleashed-multiplayer
+expect - hooks == 0
+"""

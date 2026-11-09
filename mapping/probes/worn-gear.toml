@@ -1,0 +1,51 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, as item-levels-dungeon, with the worn-gear hook of task 6.9 of
+# add-level-rework in level_rework: the gear that the creatures of a level-61 dungeon wear is made level 61 (stored 2061).
+id = "worn-gear"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport and level_rework; waited 20 s there",
+    "the input turned dev_commands on, went to the nearest level-61 dungeon (`teleport:tp dungeon 61`), landed, and ran `level_rework:levels creatures`",
+]
+observations = [
+    "Wine replay 1 passed, no fault, with the first build of the hook: the mod logged `worn gear of a level 64 creature: 1 item(s) made level 64` and then `item level reroll 2064 -> 2062 (range 59 to 64)` (the creature set-up's downward re-roll now works on a mod item), and in the level-61 dungeon four re-rolls `2061 -> 2056, 2061, 2059, 2061 (range 56 to 61)`. Before the hook these items were vanilla levels that the mod's re-roll hook passes to the game and never logs",
+    "runs 2 to 6 (second build, one log line per level, and a counting build) were reported FAILED: `tp: done` or `tp: start` never appeared. Another session was running replays in the same Wine prefix and display at the time. Run 3's log has `worn gear of a level 61 creature: 1 item(s) made level 61` and the same for 62, 64 and 70. The build that ships (it counts and prints the count in `levels creatures`) has no passing replay yet",
+    "not shown: the power of a real drop, a kill of a worn-gear creature, and what the gear does to a creature's damage and armor (a manual check, see the handoff)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61",
+    "wait 50", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 60", "shot 02-landed",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "until tp: done",
+]
+script = """
+log worn gear in a dungeon (task 6.9 of add-level-rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log tp: start
+wait 330
+log tp: done
+wait 5
+expect - hooks == 0
+"""

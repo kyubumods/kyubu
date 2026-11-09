@@ -1,0 +1,74 @@
+# Recorded with kyubu_probe, mods-dev/skill9_proto (full trust) and the Kyubu loader, unattended under Wine 9.0 (task 8.1 of
+# add-ability-api, M9): can the skill tree show a fourth ability? The game builds 11 skill buttons (skills 0 to 10) and lays
+# buttons 6, 7, 8 and 9 out as one row. The per-button loop of cube::GameController::update (0x48E6B0 to 0x48ECDC) takes the icon
+# of buttons 6, 7 and 8 from ability_icons by class, and the icon of every other button from a second std::map<int, T*> at
+# GameController+0x800820, through IntMap::operator[] (0x4044D0), keyed by the button's index; a null value draws nothing.
+# G below is the game controller, [@0x7691C8]; the player is [G + 0x8006C8], the skill panel's working copy [G + 0x800904].
+id = "ability-skilltree"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the level-1 human warrior Tester and a new world; the level was written to 30 (58 skill points)",
+    "skill9_proto wrote rank 5 into skills 6, 7 and 8 (button 9's prerequisite is skill 8 at rank 5); the key X opened the skill panel; screenshot (01-baseline)",
+    "14 s later skill9_proto copied button 0's icon pointer into the node the panel made for key 9 of the skill-icon map, and from then on set button 9's visible flag to 1 in a mid hook at 0x48ED13, after the game's own hide call; screenshot (02-icon9)",
+    "clicked button 9 with the mouse held down: three clicks over two holds; screenshot (03-click)",
+    "clicked LEARN; screenshot (04-learned); closed and reopened the panel (05-reopened) and closed it again (06-closed)",
+]
+observations = [
+    "Wine replay 7 passed (2 of 2 held); runs 1 to 6 were the work that led to it: the console left open over the panel (runs 1 and 2), the ranks zeroed by the menu-to-world switch (run 2), the game rewriting button 9's flag to 0 on every frame (runs 3 and 4), the clicks landing 26 px low (run 5), a hover tooltip and the LEARN and CANCEL buttons first seen in run 6",
+    "the skill tree shows 3 ability buttons (6, 7 and 8) in vanilla, as the screenshots of the skill-points record also show. The panel has 11 buttons, 0 to 10. While the panel is open the visible flags read 11111111100: buttons 0 to 8 shown, 9 and 10 hidden",
+    "the skill-icon map (GameController+0x800820) held 6 nodes (keys 0 to 5) before the panel opened and 8 after (size 8): the panel's own look-up inserted null nodes for keys 9 and 10, so buttons 9 and 10 do go through the map lookup that draws nothing for a null value",
+    "a non-null icon pointer in key 9's node was not enough (run 2: node 0x13D56A18, no fourth icon). The game rewrote the flag to 0 after every write made at frame.begin (runs 3 and 4: the flags read before my write were 11111111100 each frame). Writing 1 from a mid hook at 0x48ED13, right after the game's hide call, made the flags read 11111111110 and the fourth icon appear at the end of the ability row (02-icon9.png, the copied icon is pet taming's), with its rank counter 0",
+    "with the ranks of skills 6, 7 and 8 at 5, clicks on button 9 took its working rank (SkillWidget+0x160+9*4) from 0 to 1, 2 and 3 and the Points text from 15/58 to 17/58: the click handler (0x47BE74 to 0x47BEE4) already allows index 9, with skill 8 at rank 5 as its prerequisite (static), and a rank of skill 9 counts against the points like any other. The sum in the click handler covers all 11 working ranks",
+    "the hover tooltip of button 9 (03-click.png) opened with the level line (LVL 2, NEXT LEVEL) and no name or description: the text lookup of 0x4A58D0 has no entry for skill 9",
+    "LEARN (the panel's apply, 0x47CD43 to 0x47CDB1) copied the 11 working ranks to the creature: Creature.skills[9] went 0 to 3 (watch player9: 1 change, last 3), Points 18/58, and after the panel was closed and opened again the fourth button showed rank 3 (05-reopened.png). No respec price was taken for raised ranks",
+    "the bar's learned gate (0x48BFC0) reads only skills 6 to 8 (static), so a rank in skills[9] changes nothing on the skill bar by itself",
+]
+
+[[confirms]]
+entry = "cube::GameController.skills_open"
+observed = "1 while the skill panel was open after the key X, 0 after it was closed"
+
+[[confirms]]
+entry = "cube::GameController.skill_icons"
+observed = "size 8 with the panel open (keys 0 to 5 from the constructor, null nodes for 9 and 10 inserted by the panel's look-up); the node of key 9 given an icon pointer drew that icon on button 9"
+
+[[confirms]]
+entry = "cube::GameController.skill_buttons"
+observed = "11 buttons; each button's visible flag read through node +0x3C, +0x68 and +0x94 was 11111111100 with the panel open and 00000000000 when it was closed; button 9's flag, rewritten to 1 after the game's hide, made it draw"
+
+[[confirms]]
+entry = "cube::GameController::skillButton9HideSite"
+observed = "a mid hook at 0x48ED13 ran every frame; writing 1 into button 9's flag there kept the flag 1 (11111111110) and the button drawn; writing it before the game's update did not"
+
+[[confirms]]
+entry = "cube::CreatureData.skills"
+observed = "skills[9] went 0 to 3 when LEARN applied the working copy; skills[6] to [8] were 5 as written"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/skill9_proto"]
+input = [
+    "until tree A", "key x", "wait 14", "shot 01-baseline", "wait 14", "shot 02-icon9",
+    "click 244 272", "hold mouse1 2", "wait 6", "shot 03-click", "hold mouse1 2", "wait 6",
+    "click 106 537", "hold mouse1 2", "wait 8", "shot 04-learned",
+    "key x", "wait 6", "key x", "wait 26", "shot 05-reopened", "key x", "wait 6", "shot 06-closed",
+]
+script = """
+log tree: task 8.1 of add-ability-api, the skill tree and a fourth ability
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.level 30
+watch working9 u32 [[@0x7691C8] + 0x800904] + 0x184
+watch player9 u32 [[@0x7691C8] + 0x8006C8] + 0x115C
+wait 3
+log tree A
+wait 170
+expect - watch working9 reached 1
+expect - watch player9 increased
+log tree done
+"""

@@ -1,0 +1,71 @@
+# 07-20 copy of mod-row (2026-10-26): the 07-02 record ported to Cube World Alpha 2013-07-20 (addresses translated);
+# its observations are this build's own replays. The comment below is the 07-02 record's.
+# Task 5.4 of add-mod-manager. ModManager (not the dev mod) puts Mods between Options and Exit: it rewrites the Exit label literal to
+# Mods and draws Exit at y 180 of the widget with the game's two drawText calls through text.h; hover 3 is Mods, 4 is Exit.
+# The input hovers every row, clicks Mods on the title screen, then enters character creation and clicks the Mods place there.
+id = "mod-row-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-26"
+steps = [
+    "Moved the row of the dev mod start_menu_row into ModManager (src/row.h places the moved Exit row; short windows put it in the bottom-left corner)",
+    "Replayed at the start menu under Wine at 1024 x 768: hovered each row, clicked Mods (y 559), closed the Mods page with BACK (120, 53), entered character creation and clicked the Mods place",
+]
+observations = [
+    "ported from the 07-02 record on 2026-10-26 (addresses translated); the 07-20 replay results follow",
+    "replay 1 (2026-10-26) failed only in its second half: the Mods click now opens ModManager's page (it only counted the click when the 07-02 record was made), and the input clicked Start Game with the page still open (04-after-mods-click, 05-creation); hover and the first state checks held (evidence/retarget-0720-2026-10-26/replays/mod-row-0720-1.md)",
+    "replay 2 (2026-10-26), with BACK added after the Mods click, passed under Wine: hover reached 0, 1, 3 and 4; after the Mods click the title stayed and the quit flag at GameController + 0x1A0 was 0; in character creation the title node was hidden and the creation node shown; no probe hooks left (evidence/retarget-0720-2026-10-26/replays/mod-row-0720-2.md)",
+]
+
+[[confirms]]
+entry = "cube::StartMenuWidget::drawEndSite"
+observed = "ModManager's mid hook here draws Exit at y 180 in the game's font and outline, through text.h"
+
+[[confirms]]
+entry = "cube::StartMenuWidget.hover"
+observed = "0 and 1 over Start Game and Options, 3 over the Mods row (the game's third row with its label rewritten), 4 over the moved Exit row"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-gameplay/mod_manager"]
+input = [
+    "until modrow sweep",
+    "move 512 459", "wait 4", "shot 01-start-hover",
+    "move 512 509", "wait 4",
+    "move 512 559", "wait 4", "shot 02-mods-hover",
+    "move 512 609", "wait 4", "shot 03-exit-hover",
+    "until modrow click",
+    "move 512 559", "wait 2", "click 512 559", "wait 6", "shot 04-after-mods-click",
+    "console mod_manager:state",
+    "move 120 53", "wait 2", "click 120 53", "wait 4", "shot 04b-after-back",
+    "until modrow creation",
+    "move 511 457", "wait 2", "click 511 457", "wait 6", "shot 05-creation",
+    "move 512 559", "wait 2", "click 512 559", "wait 6", "shot 06-creation-click",
+    "console mod_manager:state", "console mod_manager:state",
+]
+script = """
+log modrow: task 5.4 of add-mod-manager
+wait 15
+watch hover i32 [[@0x76B1C8] + 0x80091C] + 0x160
+log modrow sweep
+wait 45
+expect cube::StartMenuWidget.hover watch hover reached 0
+expect cube::StartMenuWidget.hover watch hover reached 1
+expect cube::StartMenuWidget.hover watch hover reached 3
+expect cube::StartMenuWidget.hover watch hover reached 4
+watch clear
+log modrow click
+wait 20
+expect - value i32 == 1 [[[[@0x76B1C8] + 0x800874] + 0x3C] + 0x94]
+expect - value i32 == 0 [[[[@0x76B1C8] + 0x800888] + 0x3C] + 0x94]
+expect - value u8 == 0 [@0x76B1C8] + 0x1A0
+log modrow creation
+wait 25
+expect - value i32 == 0 [[[[@0x76B1C8] + 0x800874] + 0x3C] + 0x94]
+expect - value i32 == 1 [[[[@0x76B1C8] + 0x800888] + 0x3C] + 0x94]
+log modrow done
+wait 45
+expect - hooks == 0
+"""

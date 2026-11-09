@@ -1,0 +1,10 @@
+id = "mm_fixture_base"
+name = "Fixture Base"
+version = "1.2.0"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Ana", "Ben"]
+description = "A loaded mod that another fixture needs. Its description is long on purpose, so that the details wrap it over several lines and a small window has to scroll them."
+
+[scripts]
+common = "scripts/common.lua"

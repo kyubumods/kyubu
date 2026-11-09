@@ -1,0 +1,17 @@
+# fourth_ability_demo:burst. The weapon arm winds up, strikes and comes back over the ability's 800 ms. A track only, with no
+# [borrow]: the game's neutral pose is the base. The rotation is about x alone, because the order of a hand's three angles is
+# not read yet (docs/animations.md, "Frame and order").
+duration = "ability"
+blend_in = 60
+blend_out = 120
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+mode = "add"
+keys = [
+  { t = 0.00, v = [0, 0, 0] },
+  { t = 0.35, v = [-60, 0, 0], ease = "ease_out" },
+  { t = 0.50, v = [60, 0, 0], ease = "ease_in" },
+  { t = 1.00, v = [0, 0, 0], ease = "smooth" },
+]

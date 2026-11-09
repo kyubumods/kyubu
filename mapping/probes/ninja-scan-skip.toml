@@ -1,0 +1,68 @@
+# Recorded 2026-10-19 for tasks 11.2a and 11.2b of add-skills-unleashed (the Ninja's true stealth), unattended under Wine (WSL, Xvfb):
+# replays 1 and 2 passed. Run 1 had no phase C2 (the threat written once only); run 2 is the record below. Evidence:
+# kyubu-mapping/evidence/ninja-stealth-2026-10-19/run1 and run2.
+# One run covers both proposed probes ninja-scan-skip and ninja-stealth-hold: the dev mod mods-dev/stealth_proto drops the slimes'
+# threat on the player (-1), keeps the player out of the first-target scan at cube::CombatBehavior::targetScanSite and writes the
+# player's stealth (Creature+0x1190) 1.0 each World step, on a timeline: A control, B drop only, C drop + cut + hold, D all off.
+id = "ninja-scan-skip"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-19"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there",
+    "the player gets max hp x10000 and hp 20000; `spawner GREEN_SLIME 5 monster` puts five slimes with the zone's combat behaviour in front of the player, who stands still",
+    "`stealth_proto:run` is one console step: A 12 s control, B 14 s threat -1 for the player only, C 14 s threat -1 once + the scan cut + stealth held at 1.0, C2 16 s the same with the threat -1 written every step, D 16 s all off; each second the mod logs every slime (distance, top threat, its threat for the player), the player's stealth at the start of its step and the counters (scan passes, the player as candidate, skips, hits on the player, draws of the player in render's later pass)",
+    "shots in each phase",
+]
+observations = [
+    "run 2, report passed: 1 expectation held (hitDamageSite: the player's hp fell); the rest from the mod's log lines; all five hooks installed by name",
+    "B and C, threat -1 written once: within 150 ms (the next hit line) every slime's entry for the player read 0.01 again and its top id was the player; the slimes kept hitting (run 1: 557 to 817 hits in C's 20 s). The scan was not the writer (the cut skipped every pass) and applyHit's victim-map write was not either (the player never hit): what writes 0.01 is open",
+    "C2, threat -1 written every World step + the cut + the hold: hits on the player went 626, 629 and then stayed 629 for 15 s; every slime read top id 0, threat -1 for the player, and stood still (the same distance each second); the scan ran 94,000 times with the player as candidate 4,271 times, all 4,271 skipped",
+    "D, all released: within a second hits resumed (629, 635, 647, 660, ...), the slimes' entries were 0.01 again",
+    "stealth held: read at the start of each player step it was 0.99 (one step drains 0.01 standing still), 0 or 0.10 after a hit on the player (applyHit lowers the victim's), and back to 0.99 the step after the next write; after release it read 0 within a second (hits were landing)",
+    "look: while held, the player's model went through render's later pass every frame (171 draws at draw_b and draw_c, about 6 a second, none before or after) and shows pale white (shots 04 to 06 against 02)",
+]
+
+[[confirms]]
+entry = "cube::CombatBehavior::targetScanSite"
+observed = "EBX was the player in 4,271 passes of C2, all skipped; a huge XMM2 written there kept every slime from picking the player (top id 0 for 15 s while it stood 1.6 to 5 blocks away)"
+
+[[confirms]]
+entry = "cube::Creature::topThreat"
+observed = "a map whose only entry is -1 gives no target: the slimes' top id read 0 and they stood still; the entry must be written every step, a single write was 0.01 again within 150 ms"
+
+[[confirms]]
+entry = "cube::Creature.stealth"
+observed = "1.0 written at the start of the player's step read 0.99 at the next; while above 0 the player is drawn in render's later pass, pale white; a hit on the player sets it near 0"
+
+[[confirms]]
+entry = "cube::World::hitDamageSite"
+observed = "ESI was the player for 1,600 slime hits; the counts per phase show the hits stop in C2 and resume in D"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 360
+mods = ["mods-dev/stealth_proto", "mods-examples/entity_spawner"]
+input = [
+    "until ns: A", "console entity_spawner:spawner GREEN_SLIME 5 monster", "wait 5",
+    "until ns: B", "console stealth_proto:run",
+    "wait 6", "shot 02-control", "wait 12", "shot 03-drop", "wait 12", "shot 04-stealth", "wait 14", "shot 05-stealth-kept",
+    "wait 10", "shot 06-stealth-kept-late", "wait 10", "shot 07-off", "wait 12", "shot 08-off-late",
+]
+script = """
+log ninja-scan-skip: stealth_proto, the Ninja's true stealth (threat -1, scan cut, stealth held)
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log ns: A
+wait 30
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log ns: B
+wait 120
+expect cube::World::hitDamageSite watch php decreased
+log ns: done
+"""

@@ -1,0 +1,46 @@
+# A loader check, not a game observation: the console commands `anim list`, `anim show`, `anim sample` and `anim reload` of
+# add-ability-animation task 3.7. Recorded with kyubu_probe and mods-dev/anim_clips_proto, unattended under Wine 9.0 (WSL, Xvfb,
+# software rendering): kmap probe replay, setup menu, console and modfile input steps.
+id = "anim-console"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Start in the menu with anim_clips_proto (clips slam, jab and a broken one); type anim list, anim show and anim sample for slam, and the same with an unknown id",
+    "Copy a new clip file over the mod's folder, type anim reload and anim list",
+]
+observations = [
+    "Wine run 2 passed (run 1 stopped at 120 s after the fifth command: each console step takes about 15 to 25 s, so `seconds` is 260). Evidence: evidence/ability-animation-2026-10-07/anim-console/. `anim` alone printed the usage line; `anim list` the header with the count and 12 characters of the hash, then one line per clip with id, duration, track count and file (the broken file is not listed); `anim show` and `anim sample` printed what `kanim describe` and `kanim sample` print; `anim sample <id> 2` and `anim show <unknown id>` each printed one line of error. After the new file was copied in, `anim reload` printed the scan's errors for the file that is still bad and `3 clip(s)`, and `anim list` showed the new clip. Every line is in the log with the prefix `anim:`",
+]
+
+[[confirms]]
+entry = "cube::GameController::render"
+observed = "called in the menu: the loader's frame.begin, where the console is drawn and the dev poll runs, comes from the same loop"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 260
+mods = ["mods-dev/anim_clips_proto"]
+input = [
+    "wait 15",
+    "console anim",
+    "console anim list",
+    "console anim show anim_clips_proto:slam",
+    "console anim sample anim_clips_proto:slam 0,0.5,1",
+    "console anim sample anim_clips_proto:slam 2",
+    "console anim show anim_clips_proto:nope",
+    "modfile anim_clips_proto edits/new.anim.toml assets/animations/fresh.anim.toml",
+    "console anim reload",
+    "console anim list",
+    "wait 3",
+]
+script = """
+log anim-console: task 3.7 of add-ability-animation, the anim console commands
+trace add cube::GameController::render
+trace start
+wait 5
+trace stop
+expect cube::GameController::render calls cube::GameController::render > 10
+expect - hooks == 0
+"""

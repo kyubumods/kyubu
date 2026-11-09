@@ -1,0 +1,3 @@
+[options.radius]
+type = "int"
+default = "big"

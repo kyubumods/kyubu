@@ -1,0 +1,108 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 4.2 of add-level-rework: the mod level_rework hooks every strength site of the creature stat functions (a mid hook
+# after each cvtdq2ps that writes old_float(N) into XMM2, or XMM0 at the two hitCreature sites) and replaces creature_power.
+# The dev mod equip_gate_probe calls the game's own creature_power and maxHp on zeroed stand-in warriors of chosen levels (its
+# command equip_gate_probe:strength); the values are read from the log, since a function's result is not an expectation. The
+# kill window shows the hooked sites running in play beside the tracer. P is the player's cube::Creature,
+# [[@0x7691C8] + 0x8006C8].
+id = "level-strength"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mods equip_gate_probe and level_rework (mods-gameplay) installed beside kyubu_probe; waited 15 s there",
+    "Window S: the input ran `equip_gate_probe:strength` in the console: creature_power for the levels 1 to 100 and maxHp for the levels 1, 2, 3, 21, 22, 51, 100, 981 and 1981, each on a stand-in (a copy of the player with another level for maxHp); 100 s",
+    "Window K: the sites of maxHp, armor, creature_damage and creature_crit traced while the player killed a level-10 creature (the kill-xp setup, a forced cyclone), with the mod's hooks installed on the same sites",
+]
+observations = [
+    "Wine replay 2 passed: 5 of 5 expectations held; no fault. The mod logged `strength sites hooked (14 level terms, creature_power replaced)` at load (the 12 creature-stat sites and the two hitCreature sites, plus the creature_power replacement)",
+    "creature_power: with the mod, the dev mod called the game's creature_power on a stand-in for each level 1 to 100 and it returned N every time (0 mismatches). A vanilla run of the same command (no mod; a throw-away record, since deleted, and its log is in the evidence folder) returned the vanilla power of the level instead: 97 of 100 differ (level 2 gave 5, level 51 gave 72, level 100 gave 84)",
+    "maxHp, on a stand-in that is a copy of the level-1 player with another level, vanilla (no mod) against the mod: level 1 265.000 / 265.005; level 2 292.063 / 270.469; level 3 319.103 / 276.047; level 21 740.391 / 399.095; level 22 759.278 / 407.375; level 51 1153.253 / 740.406; level 100 1471.505 / 2042.237; level 981 2000.269 / 2042.237 (the mod clamps it to 100); level 1981 2042.194 / 2042.237",
+    "scenario `Level 51 equals vanilla level 21`: mod level 51 gave 740.406 and vanilla level 21 gave 740.391, a relative difference of 2.06e-5. Scenario `Level 100 equals vanilla level 1981`: 2042.237 against 2042.194, 2.07e-5. Both are inside the 0.01% of the spec and match the 2.1e-5 of the formula test. Scenario `Levels between vanilla powers`: the mod's level 3 (276.047) lies strictly between vanilla levels 1 (265.000) and 2 (292.063). Level 1 differs from vanilla by 2.04e-5 (old_float(1) is 1.0002)",
+    "window K: one kill of a level-10 creature ran the maxHp site (9,542 passes, the HUD and the World step), the armor site, the creature_damage base site and the creature_crit site (1 call each) while the mod's mid hooks were on the same instructions: the tracer and the mod's hooks coexist and the game went on",
+    "not reached, so these hooks have no probe evidence of their own: the two flag branches of creature_damage and of creature_projectile_damage, creature_damage_alt, the resistance and projectile damage and tempo sites (the hooks are installed with them, their level-terms entries are unchanged), and the two hitCreature sites (the level-difference chance needs a target with +0x12C below -3000, not reached in 3.3 either)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "cube::Creature::maxHpLevelSite"
+observed = "reached 9,542 times in one window with the mod hooking it: no fault. The mod writes old_float(N): a stand-in of level 51 had max HP 740.406 against the vanilla level 21's 740.391 (probe level-strength)"
+
+[[confirms]]
+entry = "creature_power"
+observed = "replaced by level_rework: called on stand-in creatures of levels 1 to 100 it returned N every time; the vanilla function (no mod) returned 5 for level 2 and 84 for level 100"
+
+[[confirms]]
+entry = "cube::Creature::armorLevelSite"
+observed = "reached once (a kill) with the mod hooking it: no fault"
+
+[[confirms]]
+entry = "creature_damage_level_site"
+observed = "reached once (a kill) with the mod hooking it: no fault"
+
+[[confirms]]
+entry = "creature_crit_level_site"
+observed = "reached once (a kill) with the mod hooking it: no fault"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/equip_gate_probe", "mods-gameplay/level_rework"]
+input = [
+    "until ls: S ready",
+    "console equip_gate_probe:strength",
+]
+script = """
+log level strength of level_rework (task 4.2 of add-level-rework): the strength sites and creature_power
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log ls: S ready
+wait 100
+log ls: S done
+trace add @0x4453CF
+trace add @0x43D89F
+trace add @0x43E52D
+trace add @0x43F2FF
+trace start
+log ls: K kill
+# kill A2: level 10, hp 1, armour factor 0, then the forced cyclone
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 0
+inspect set data.mp 1
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect cube::Creature::maxHpLevelSite calls @0x4453CF >= 1
+expect cube::Creature::armorLevelSite calls @0x43D89F >= 1
+expect creature_damage_level_site calls @0x43E52D >= 1
+expect creature_crit_level_site calls @0x43F2FF >= 1
+"""

@@ -1,0 +1,1 @@
+bad.anim.toml:8: track[0].keys[1].t: `t` is 1.5; it must be from 0 to 1

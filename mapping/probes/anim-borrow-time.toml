@@ -1,0 +1,41 @@
+# Task 4.3 of add-ability-animation (time, D5): mods-dev/anim_borrow_proto defines a fourth mod ability (115) whose clip has duration "ability" (800 ms), borrows pose 2 and
+# hides the hair from 0.3 to 0.7. The mod forces the local player into it with the mode time pinned so the draw reads about 17, 52 and 95 % of the ability; the
+# screenshots show the hair, no hair, the hair, and the log gives the pose id and the time the draw reads. The first six phases of the mod run first (task 4.2's), unshot.
+id = "anim-borrow-time"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 80 s after the first draw of the player, then ran its first six phases (task 4.2's) without a screenshot",
+    "camera zoomed out with 3 wheel ticks; three more phases of 6 s (mod ability 115 pinned so the draw reads about 17, 52 and 95 % of its 800 ms), a screenshot 3 s into each",
+]
+observations = [
+    "Wine replay 3 passed (evidence/ability-animation-2026-10-07/anim-borrow-time-run3/: three screenshots, latest.log); the join site read pose 2 with record times 139, 419 and 763 ms for the pins 0, 273 and 620, so 17 %, 52 % and 95 % of the 800 ms ability",
+    "the screenshots show the hair at 17 %, no hair at 52 % (the clip hides it from 0.3 to 0.7) and the hair again at 95 %; the pose itself moves between the three, so the clock reaches the game as the mode time",
+    "the record always reads about 139 to 156 ms more than the creature's pinned time (the game's step on top, as in anim-borrow), so 0 % cannot be drawn: 17 % is the earliest; and the ability's end is a limit: pin 673 (record time about 815) drew pose 0 and time 0, because the ability had ended and the game put the creature back in mode 0 (run1-pin673)",
+    "a first try hid the weapons instead (run2-weapons): at 95 % the club was out of sight too, because pose 2 moves it behind the body, so the group of a strip must be one the pose cannot cover; the hair is",
+    "no WARN or ERROR line from the provider",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "the borrowed pose's clock and the clip's fraction follow the mode time: a clip with duration \"ability\" hides its hair between 0.3 and 0.7 of the ability"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-dev/anim_borrow_proto"]
+input = [
+    "until animborrow: first draw", "wheel down 3",
+    "until animborrow: shot07 strip00", "shot 07-strip00",
+    "until animborrow: shot08 strip50", "shot 08-strip50",
+    "until animborrow: shot09 strip100", "shot 09-strip100"
+]
+script = """
+log anim-borrow-time: task 4.3 of add-ability-animation, the clip's time
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

@@ -1,0 +1,14 @@
+# Task 8.3 of add-ability-animation: the weapon hand turns by 90 degrees for a full charge, the head tips with the ground speed (a
+# stand-still reads 0) and rolls by the rank (the preview has no ability: 1). A literal duration, because the preview has no ability.
+duration = 2000
+end = "hold"
+
+[[track]]
+part = "weapon_r"
+channel = "rot"
+expr = ["charge * 90", "0", "0"]
+
+[[track]]
+part = "head"
+channel = "rot"
+expr = ["min(speed, 20)", "0", "rank"]

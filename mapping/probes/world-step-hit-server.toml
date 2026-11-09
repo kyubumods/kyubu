@@ -1,0 +1,69 @@
+# Task 10.2 of add-skills-unleashed-multiplayer (design D11): sim.world_step and kyubu.game.hit on Server.exe, with a joined Cube.exe
+# (kmap probe replay, client = "join"). The dev mod mods-dev/world_step_proto (server side only, so the join gate does not change)
+# counts the server's World steps, then three times puts a monster in front of the joined player and hits it with kyubu.game.hit, a
+# stun of 300, 400 and 500 ms, and reads the stun timer back. The joined client runs the same script in its server VM: it must get no
+# sim.world_step there (its World is the client's).
+id = "world-step-hit-server"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with world_step_proto (server side)",
+    "the server counts sim.world_step and checks dt and the two pointers of each",
+    "from the 500th step, three hits 150 steps apart on one monster put 3 blocks in front of the joined player: damage 1, stun 300, 400, 500 ms, knock up 4",
+    "after the first hit, a kyubu.game.hit from sim.tick (outside a step)",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/world-step-hit-server), passed in 23 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 2, 2026-11-08 (evidence/world-step-2026-11-08/world-step-hit-server-run2), passed: Server.exe got sim.world_step on its server side from the start, 2600 steps by the end with dt about 21 ms; one step had a dt out of 1 to 1000 (the first, timed from the start)",
+    "once the client had joined, three kyubu.game.hit calls 150 steps apart on monster 550301081602, put 3 blocks in front of the joined player: each landed true, and the stun timer read right after was 300, 400 and 500",
+    "the monster's hp stayed 141.42: damage 1 is below its armor",
+    "the call from sim.tick was refused: nil, not inside a World step",
+    "the joined client ran the same script in its server VM: it subscribed, and got no sim.world_step (its World is the client's), so no hit came from there",
+    "run 1 tried its three hits before the client had joined (no player) and failed; the dev mod now waits for a player and a monster before it counts a try",
+    "not covered: the damage number on the joined client, the knockback, a dodge or a block",
+]
+
+[[confirms]]
+entry = "cube::World::worldStepSite"
+observed = "sim.world_step came once per Server.exe World step with the World, a non-zero output and zone set (2600 steps)"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "three calls through it landed true on a monster in front of the joined player"
+
+[[confirms]]
+entry = "cube::World::hitListSite"
+observed = "the stun timer after each hit equalled the asked 300, 400, 500 ms"
+
+[[confirms]]
+entry = "cube::Hit.stun_duration"
+observed = "the stun timer after each hit equalled the asked 300, 400, 500 ms"
+
+[[confirms]]
+entry = "cube::Hit.hit_dir"
+observed = "written with the stun at the list site; its effect, the knockback, was not measured"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 300
+mods = ["mods-dev/world_step_proto"]
+input = [
+    "until world_step_proto: server: done",
+    "shot 01-client",
+]
+log_expect = { latest = [
+    "world_step_proto: server: sim.world_step ",
+    "world_step_proto: server: steps 500, dt total ",
+    "landed true (nil), stun 300 asked 300",
+    "world_step_proto: server: outside a step: nil, ",
+    "not inside a World step",
+    "world_step_proto: server: done: 3 of 3 hits with the exact stun",
+] }
+script = """
+log world-step-hit-server: task 10.2 of add-skills-unleashed-multiplayer
+expect - hooks == 0
+"""

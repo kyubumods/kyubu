@@ -1,0 +1,11 @@
+id = "cat_pack"
+name = "Test pack"
+version = "1.0.0"
+kyubu = "^1.2"
+authors = ["Kyubu tests"]
+description = "Pins the older cat_alpha."
+[mods]
+cat_alpha = "1.0.0"
+cat_beta = "1.0.0"
+[config.cat_alpha]
+strength = 8

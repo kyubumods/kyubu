@@ -1,0 +1,7 @@
+id = "fx_missing_dep"
+name = "Fixture: missing dependency"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+[dependencies]
+nonexistent = ">=1.0"

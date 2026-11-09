@@ -1,0 +1,23 @@
+# Server.exe: model loading, found by signature from Cube.exe (what the server uses the models for is open).
+
+[[function]]
+name = "ModelLoader::loadAll"
+address = 0x431880
+convention = "thiscall"
+prototype = "void __thiscall ModelLoader::loadAll(ModelLoader* this, const std::string* base_path)"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:ModelLoader::loadAll"]
+source = "kyubu"
+notes = "found by signature from Cube.exe"
+
+[[function]]
+name = "Model::load"
+address = 0x42FEA0
+convention = "thiscall"
+prototype = "bool __thiscall Model::load(Model* this, const std::string* key, cube::Database* db, bool flag)"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:Model::load"]
+source = "kyubu"
+notes = "found by signature from Cube.exe"

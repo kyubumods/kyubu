@@ -1,0 +1,37 @@
+# Task 5.3 of add-ability-animation (safety): the clips with tracks of mods-dev/anim_tracks_proto are drawn on the local player for about five
+# minutes. The mod loops its eight phases (LOOP), so the join site writes tracks for most of the run. The log is read afterwards: no ERROR,
+# no WARN from the provider beyond the line the first cycle already gives, and the script finished, so the game was still up at the end.
+id = "anim-soak"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: new world with the character Tester (human male warrior); the mod waits 80 s after the first draw of the player, then loops its eight phases",
+    "the replay waits 400 s after the first draw; no screenshots, no input",
+]
+observations = [
+    "Wine replay 1 passed (evidence/ability-animation-2026-10-07/anim-soak-run1/: report.md, latest.log). The game ran 492 s from the provider's install (22:14:20 to 22:22:32): the mod's first draw, 80 s of warm-up, then about six minutes of tracks in eight cycles of eight phases (66 phase lines)",
+    "the log has no ERROR; one WARN, 'mode 118 animates tail, which this creature does not draw: the track is skipped', the line of 5.2, once for the run; the script finished after its 400 s wait, so the game was still up at the end",
+    "Wine replay 2 passed after the Hold change of 5.3's follow-up (evidence/ability-animation-2026-10-07/anim-soak-run2/): the same 492 s, 66 phase lines, the same one WARN and no ERROR; no clip set was replaced during the run, so no freed line",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a clip's tracks drawn on the local player through about six minutes of phase cycles, with no ERROR from the provider, and the game still running at the end"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 660
+mods = ["mods-dev/anim_tracks_proto"]
+input = [
+    "until animtracks: first draw", "wait 400"
+]
+script = """
+log anim-soak: task 5.3 of add-ability-animation, the tracks for five minutes
+wait world
+wait 20
+wait 400
+expect - hooks == 0
+log anim-soak: done
+"""

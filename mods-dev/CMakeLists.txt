@@ -1,0 +1,20 @@
+# Developer mods: shipped in the SDK, not in the player release.
+set(KP ${CMAKE_CURRENT_SOURCE_DIR}/kyubu_probe/src)
+set(KYUBU_PROBE_CORE ${KP}/util.cpp ${KP}/finder.cpp ${KP}/inspector.cpp ${KP}/tracer.cpp ${KP}/probe.cpp
+    PARENT_SCOPE)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} kyubu_probe ${KP}/main.cpp ${KP}/util.cpp ${KP}/finder.cpp
+                 ${KP}/inspector.cpp ${KP}/tracer.cpp ${KP}/probe.cpp)
+target_include_directories(kyubu_probe PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/kyubu_probe/include)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} teleport teleport/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} give_item give_item/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} auto_enter auto_enter/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} start_menu_row start_menu_row/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} model_draw_proto model_draw_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} death_burst_proto death_burst_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} hit_skip_proto hit_skip_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} creature_flags_proto creature_flags_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} size_box_proto size_box_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} ground_height_proto ground_height_proto/src/main.cpp)
+kyubu_native_mod(dev-mods ${CMAKE_CURRENT_SOURCE_DIR} anim_capture anim_capture/src/main.cpp)
+# the sheet is written as a PNG with miniz (task 7.3)
+target_link_libraries(anim_capture PRIVATE miniz)

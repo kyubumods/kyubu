@@ -1,0 +1,43 @@
+# Task 7.2 of add-ability-animation (A10, the part matrices) and the first half of 7.4's `anim rig` (the model of each slot).
+# mods-dev/rig_read_proto hooks draw_creature (0x4129C0) as a function hook and reads the draw record (Creature + 0x1498) after the original
+# returns: the 17 matrices at rec + 0xEC .. +0x4EC (0x40 bytes each), the model slots rec + 0xBC..0xE8 resolved to indexes of the model
+# table (ModelLoader = GameController + 0x2F8, vector begin at +4), and the creature's appearance ids. A mid hook at the join site
+# (0x41F135) writes one vector of the record per phase, a rest phase between each, 4 s into each phase the matrices are dumped.
+id = "rig-read"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-10"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 25 s after the first draw of the player",
+    "21 phases of 6 s (a rest phase between the writes): head euler x, y, z of 30, head position z 5, body euler x 30, body position z 5, root euler z 30, root offset x 10, hand A and hand B euler x 30",
+]
+observations = [
+    "Wine replay 1 passed, 1 of 1 expectations held (evidence/rig-read-2026-10-10/: latest.log, rigread.txt, analysis scripts): the function hook on draw_creature and the mid hook at 0x41F135 both installed; 21 phases ran, one sample of 17 matrices each",
+    "the draw record's model slots resolved to indexes of the model table: head 1246, hair 1252, body 1, hands 430, feet 432, the weapon slot at +0xDC 1995, each equal to the appearance id read at Creature + 0x8C..0x94; wings, tail, shoulder2, shoulders and neck are empty for this player",
+    "the matrices are at rec + 0xEC + 0x40 k: k 0 root, 1 trunk hub, 2 body, 3 head, 4 hair, 7 the holstered weapon, 9 hand A, 10 hand B (mirrored), 15 and 16 the feet; slots 5, 6, 8, 11 to 14 stay zero for this player",
+    "a head euler x, y or z of 30 changed only matrices 3 and 4 (head and hair), by that angle; head position z 5 moved only 3 and 4; a body euler x of 30 turned 0, 1, 2, 7, 9 and 10 and moved (did not turn) 3 and 4; body position z 5 moved 0, 1, 2, 3, 4, 7, 9 and 10 and not the feet; root euler z 30 turned all but the zero slots, feet included; hand A or B euler x 30 changed only matrix 9 or 10",
+    "rotation pivots, from the matrix of each part before and after: the head about a point 2 voxels above the trunk hub (and half a voxel behind), the body about the hub, a hand about its own centre; the head's translation under a body rotation of 30 degrees is 2 x pivot height x sin 15 = 1.05",
+    "a root offset x of 10 moved the root matrix by 10 world units (116 voxels): the root offset is in world units, the other positions in voxels (one voxel is 0.086 world units here)",
+    "a model's matrix places the model's minimum corner: with the creature's yaw of 180 degrees baked in, the body model's corner is at (+5, +4) from the hub in the world frame, i.e. the model is centred on the hub in x and y",
+    "the player's z in the matrices jumped by 108 world units between two phases (the world finished loading); a second reference for any later reading: take positions relative to the root matrix of the same sample",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "after the original returns for the local player, the draw record holds one part matrix per slot at rec + 0xEC + 0x40 k (k 0 to 16), and the record's model slots equal the creature's appearance ids (head 1246, hair 1252, body 1, hands 430, feet 432)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/rig_read_proto"]
+input = [
+    "until rigread: done",
+]
+script = """
+log rig-read: task 7.2, the part matrices and the model slots
+wait world
+wait 20
+wait 200
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

@@ -1,0 +1,6 @@
+id = "mm_failed"
+name = "Manage: failed"
+version = "not a version"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Unit test: a manifest that does not parse is listed with state failed and the parse error."

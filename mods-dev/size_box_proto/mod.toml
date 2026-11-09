@@ -1,0 +1,9 @@
+id = "size_box_proto"
+name = "Size box prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+description = "Development only (probe appearance-size-hit): parks two hostile slimes at the same spot in front of the player, one with appearance.size (Creature+0x80) widened, one untouched, and logs their hp so a melee hit from a distance shows which box the game tests."
+
+[native]
+common = "bin/size_box_proto.dll"

@@ -1,0 +1,10 @@
+id = "weapon_swap_proto"
+name = "Weapon swap prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe weapon-swap): for a ranger the right weapon slot (equipment 7) gets sub_type 6, a bow. Specialization 0 leaves the bow in the slot while the game autosaves; specialization 1 puts the real weapon back for the length of each save_character call; specialization 2 puts it back for good. Logs the slot and the bar at each change."
+
+[scripts]
+client = "scripts/client.lua"

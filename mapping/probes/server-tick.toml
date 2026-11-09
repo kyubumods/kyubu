@@ -1,0 +1,77 @@
+# Recorded with kyubu_probe and the Kyubu loader of add-game-api (API 1.1, a MinGW build), unattended under Wine 9.0
+# (WSL on the Windows laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe in the same Wine
+# prefix that joins 127.0.0.1 with a new character and walks (client = "join"). The script runs on the server.
+# Static reading (main, 0x549AD0): a server tick is one pass of main's loop, 0x549ED0 to the jmp back at 0x54A106,
+# with no branch before the step. now = timeGetTime(); the cube::Server methods 0x427FF0 and 0x427F30 (thiscall, one
+# pointer, ret 4) each move a queue of the Server's (+0x34, +0x3C) into the step's input, each under the World lock;
+# the World lock (0x4D3D50); cube::World::update(now - last, &out, &in), the only call of 0x532260 in Server.exe, then
+# last = now; 0x427F90 and the send 0x427020 (&out); the creature list rebuilt under main's critical section; the
+# World unlock (0x4D5910); Sleep(20).
+id = "server-tick"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1 (API 1.1)"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Server.exe with --kyubu-dev, then Cube.exe joined 127.0.0.1 with a new character (Tester, warrior)",
+    "Detoured cube::World::update (3 stack arguments); traced main's calls before (0x427FF0) and after (0x427020) it",
+    "Traced 60 s with no client, then 120 s while the joined client walked",
+    "Compared the call counts, the callers and the elapsed-ms argument",
+]
+observations = [
+    "Wine replay 1 passed, 15 of 15 held; the client connected (client.log) 11 s after phase 1 ended",
+    "no client, 60 s: update 2,954 calls, 0x427FF0 2,955, the send 0x427020 2,954; about 49 passes a second",
+    "client joined and walking, 120 s: update 5,635 calls, 0x427FF0 5,636, 0x427020 5,635",
+    "every call from main (0x549F33, 0x549EF1, 0x549F55) on one thread (36), the process's main thread",
+    "the ms argument 0x14 to 0x4A: mostly 20 (main's Sleep(20)), never 0",
+    "0x427FF0's argument is update's step_in (0x31FAA0); 0x427020's is its step_out (0x31F9F8)",
+]
+
+[[confirms]]
+entry = "cube::World::update"
+observed = "Server.exe's tick: main calls it once per loop pass (counts match main's other calls), with the ms since the last"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 360
+input = [
+    "shot 01-joined",
+    "until 2.4: walk",
+    "hold s 120", "shot 02-walked",
+]
+script = """
+log server tick (add-game-api 2.4): main's loop steps the World once per pass
+trace detour 3 cube::World::update
+trace add @0x427FF0
+trace add @0x427020
+# phase 1, no client yet (the client connects about 95 s after the server is ready and loads for 30 s)
+trace start
+wait 60
+trace stop
+trace report
+expect cube::World::update calls cube::World::update > 1000
+# once per pass: as often as main's calls before and after the step (a call at each end of the trace can miss one)
+expect cube::World::update calls cube::World::update within 2 of @0x427FF0
+expect cube::World::update calls cube::World::update within 2 of @0x427020
+expect cube::World::update caller cube::World::update 0x549F33
+expect cube::World::update caller @0x427FF0 0x549EF1
+expect cube::World::update caller @0x427020 0x549F55
+# the ms since the last pass (main sleeps 20 ms per pass): never 0, which a second step in one pass would show
+expect cube::World::update arg cube::World::update 1 > 0
+expect cube::World::update arg cube::World::update 1 < 1000
+wait 90
+# phase 2, the client joined and walks
+trace start
+log 2.4: walk
+wait 120
+trace stop
+trace report
+expect cube::World::update calls cube::World::update > 1000
+expect cube::World::update calls cube::World::update within 2 of @0x427FF0
+expect cube::World::update calls cube::World::update within 2 of @0x427020
+expect cube::World::update caller cube::World::update 0x549F33
+expect cube::World::update arg cube::World::update 1 > 0
+expect cube::World::update arg cube::World::update 1 < 1000
+expect - hooks == 0
+"""

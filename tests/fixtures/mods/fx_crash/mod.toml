@@ -1,0 +1,8 @@
+id = "fx_crash"
+name = "Fixture: crash outside any guard"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Hooks Game::frame with a raw hook that dereferences null after 60 frames (loader-bootstrap/Mod crashes the game)."
+[native]
+client = "bin/fx_crash.dll"

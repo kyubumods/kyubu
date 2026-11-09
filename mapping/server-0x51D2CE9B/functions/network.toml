@@ -1,0 +1,138 @@
+# Server.exe: the listening server, its connections and the packet loop.
+
+[[function]]
+name = "cube::Server::Server"
+address = 0x422BF0
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Server", "xref:main"]
+source = "kyubu"
+notes = "stores the vtable; 84 bytes"
+
+[[function]]
+name = "cube::Server::~Server"
+address = 0x4235B0
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Server", "string:\"Stopping server...\""]
+source = "kyubu"
+notes = "called by vtable slot 0 (the deleting destructor); closes the socket and waits for the threads"
+
+[[function]]
+name = "cube::Connection::Connection"
+address = 0x422680
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Connection", "xref:server_accept_loop"]
+source = "kyubu"
+notes = "stores the vtable; 176 bytes, one per client"
+
+[[function]]
+name = "cube::Connection::~Connection"
+address = 0x4234E0
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Connection", "manual:only caller is vtable slot 0 (the deleting destructor)"]
+source = "kyubu"
+
+[[function]]
+name = "server_accept_loop"
+address = 0x425290
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!accept", "string:\"Waiting for connection.\""]
+source = "kyubu"
+notes = "thread: accept, read the client's packet id (17) and version, print it, refuse full or wrong-version clients, send the join, build a cube::Creature and a cube::Connection, start its receive loop. A version other than 3 (compare at 0x42554E) gets a bare 3, not 17 (static, see probe:protocol-version)"
+
+[[function]]
+name = "connection_receive_loop"
+address = 0x425E10
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!recv", "cuwo:cuwo/packet.py"]
+source = "kyubu"
+notes = "thread per client: switches on 0 and 6-12, cuwo's client-to-server packets; 0 merges the client's creature data, 7-9 queue hits, passives and shots, 10 sends the chat to every connection"
+
+[[function]]
+name = "connection_send_loop"
+address = 0x423BC0
+convention = "thiscall"
+subsystem = "network"
+status = "verified"
+evidence = ["import:ws2_32.dll!send", "xref:server_accept_loop", "manual:body of a std::function lambda; slot 2 of vtable 0x55B220 jumps here"]
+source = "kyubu"
+aliases = ["Server::simLoop"]
+notes = "resolved in 7.5, formerly sim_loop: a thread per client, not the simulation. While its connection is open it locks the World, collects changes, unlocks, sends them to that client's socket, then paces to 20 ms"
+
+[[function]]
+name = "connection_send_pass_site"
+address = 0x424F08
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "network"
+status = "verified"
+evidence = ["xref:connection_send_loop", "manual:jge target of the 20 ms pacing: every pass that sent, after any Sleep"]
+source = "kyubu"
+aliases = ["Server::tickSite"]
+notes = "resolved in 7.5, formerly sim_loop_tick_site: once per pass of one client's send loop, not a server tick (that is main's loop). lea ecx,[ebp-0xA0]; mov [0x583DCC],esi"
+
+[[function]]
+name = "creature_update_read"
+address = 0x415810
+convention = "cdecl"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:connection_receive_loop", "cuwo:cuwo/entity.pyx"]
+source = "kyubu"
+notes = "packet 0 on the server: reads the mask and each masked field into a copy of the player's creature data, spare fields included (data+0x144, 0x17C, 0x17D, 0x19C, 0x1CC...)"
+
+[[function]]
+name = "Net::acceptVersionSite"
+address = 0x42554E
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:cmp dword [ebp-0x1BC],3; je", "probe:server-level-sites"]
+source = "kyubu"
+notes = "in server_accept_loop: the client's version against 3. The 3 is an imm8 (83 BD 44 FE FF FF 03): 0x4B4C0001 does not fit, so D7's byte patch is impossible here; 8.3 needs a mid hook. A wrong version gets the bare reply below."
+
+[[function]]
+name = "Net::acceptWrongVersionReplySite"
+address = 0x42555F
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:mov dword [ebp-0x198],3, send, Sleep 500, close", "probe:server-level-sites"]
+source = "kyubu"
+notes = "the refusal of a wrong version: sends a 4-byte 3 (imm32 at 0x425565), waits 500 ms, closes. Vanilla never sends the 17 the client's version text belongs to; the mod (task 8.3) patches it to 17 and sends 8 bytes, so probes trace 0x42556E."
+
+[[function]]
+name = "Net::acceptJoinSite"
+address = 0x4255AC
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:je target at 0x425555: the join reply"]
+source = "kyubu"
+notes = "in server_accept_loop: the join. Reached when the client's version equals 3 (task 8.3: the mod's hook at 0x42554E turns the mod's version into 3 and vanilla's 3 into 0, so only a modded client gets here on a modded server). Sends the 4-byte 0x10 reply."
+
+[[function]]
+name = "creature_update_level_site"
+address = 0x415B05
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:creature_update_read", "manual:the call at 0x415B00 reads data+0x180", "probe:server-protocol-modded"]
+source = "kyubu"
+notes = "in creature_update_read: the call at 0x415B00 reads the level (data+0x180) into the copy of the player's data, ESI. This is the next instruction: the level check (D7) goes here. Corrected 2026-10-04 (task 8.3) from 0x415B47, which follows the read of a different field (+0x190)."

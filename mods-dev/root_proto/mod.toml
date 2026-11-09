@@ -1,0 +1,11 @@
+id = "root_proto"
+name = "Rooted creature probe (dev)"
+version = "0.1.0"
+kyubu = "^1.4"
+sides = ["client", "server"]
+trust = "full"
+description = "Development only (probe creature-root-server): roots a monster on the server, knocks it, and watches it from the joined client."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

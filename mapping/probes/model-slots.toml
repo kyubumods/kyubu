@@ -1,0 +1,155 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world (seed 1234). Task 8.4: how a creature's appearance and equipment become model slots, and what the three sites
+# 1.0.1 listed as model resolvers really are.
+# The call tracer watches draw_creature (0x4129C0, the per-creature draw that picks each body part's model), the item
+# resolver ModelLoader::itemModel (0x4EB290), weapon_model_slot (0x51ACE0), the table getter ModelLoader::get
+# (0x412190), and the former resolver C, cube::World::generateZone (0x5E3280), with cube::Zone::Zone. The player's
+# appearance hair id is set to another slot and then out of range, and the weapon's sub_type is changed, with a
+# screenshot after each edit; then the character walks so that new zones are generated.
+id = "model-slots"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced draw_creature, ModelLoader::itemModel, weapon_model_slot, ModelLoader::get, generateZone and Zone::Zone",
+    "Standing still for 5 s: counted the calls and checked their this (RTTI of the creature, controller and World)",
+    "Set the player's appearance hair_model to 1124 (a chest armour model), then to 32767 (past the table's end)",
+    "Set the weapon's (equipment slot 7) sub_type from 17 to 0",
+    "Walked (W) for 60 s while tracing",
+]
+observations = [
+    "Wine replay 1 passed, 7 of 7 entries held; screenshots after each edit (evidence model-slots-2026-09-28)",
+    "standing 5 s: draw_creature 225 calls, its record's first word a cube::Creature (RTTI)",
+    "standing: ModelLoader::itemModel 4,752 and ModelLoader::get 1,305 calls, this = GameController + 0x2F8",
+    "the player's appearance ids: head 1246, hair 1252, hands 430, feet 432, body 1; tail, shoulder2, wings -1",
+    "hair_model 1124 (the iron chest model): an armour piece drawn where the hair was, on the model and portrait",
+    "hair_model 32767 (past the 2569 slots): no hair drawn; drawing went on (95 draw_creature calls in 3 s)",
+    "weapon_model_slot called only from itemModel (0x4EB302) with (17, 0, 0, 2): the weapon's sub_type, material 2",
+    "weapon sub_type set to 0: the calls became (0, 0, 0, 2) and the big wooden weapon became a small blade",
+    "generateZone runs on a worker thread from zone_loader_step (0x46B136), this a cube::World (RTTI)",
+    "generateZone's args are zone coordinates around the player's zone (0x8020, 0x8020), rising in y while walking",
+    "each generateZone call built one cube::Zone (3 standing after the world start, 0 later standing, 10 walking)",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "225 calls in 5 s standing; this holds a cube::Creature; hair id edits change the drawn hair; 32767 draws none"
+
+[[confirms]]
+entry = "ModelLoader::get"
+observed = "1,305 calls in 5 s; this is GameController + 0x2F8, whose vector at + 4 is allocated"
+
+[[confirms]]
+entry = "ModelLoader::itemModel"
+observed = "4,752 calls in 5 s, this the ModelLoader; the weapon's sub_type change changed the drawn weapon"
+
+[[confirms]]
+entry = "weapon_model_slot"
+observed = "called only from itemModel with the weapon's (sub_type, modifier, rarity, material): 17 then 0"
+
+[[confirms]]
+entry = "cube::World::generateZone"
+observed = "10 calls in 60 s of walking, all from zone_loader_step; this a cube::World; args zone x and y"
+
+[[confirms]]
+entry = "cube::Zone::Zone"
+observed = "one call per generateZone call, always returning to 0x5E33B4"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 360
+input = [
+    "until 8.4: start", "wait 2", "shot 01-start",
+    "until 8.4: hair 1124", "wait 2", "shot 02-hair-1124",
+    "until 8.4: hair 32767", "wait 2", "shot 03-hair-32767",
+    "until 8.4: weapon sub_type 0", "wait 2", "shot 04-weapon-sub-type-0",
+    "until 8.4: walk", "hold w 55", "shot 05-walk",
+]
+script = """
+log model slots (task 8.4): appearance and equipment to model slots, and the three former resolver sites
+wait world
+wait 15
+# P = the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; appearance at P + 0x78 (cube::CreatureData + 0x68):
+# head_model P + 0x8C, hair_model + 0x8E, hand + 0x90, foot + 0x92, body + 0x94, tail + 0x96, shoulder2 + 0x98,
+# wing + 0x9A; equipment slot n at P + 0x300 + n * 0x118 (the weapon in slot 7 at P + 0xAA8)
+inspect player [@0x7691C8]
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+trace args 4
+trace add @0x4129C0
+trace add @0x4EB290
+trace add @0x51ACE0
+trace add @0x412190
+trace add @0x5E3280
+trace add cube::Zone::Zone
+# phase 1, standing: every frame each visible creature is drawn; its parts come from the model table
+trace start
+log 8.4: start
+wait 5
+trace stop
+trace report
+expect draw_creature calls @0x4129C0 > 10
+# draw_creature's this is a draw record whose first word is a cube::Creature (".?AVCreature@cube@@": "Crea", "ture")
+expect draw_creature value u32 == 1634038339 [[[[ecx(@0x4129C0)]] - 4] + 0xC] + 0xC
+expect draw_creature value u32 == 1701999988 [[[[ecx(@0x4129C0)]] - 4] + 0xC] + 0x10
+# the item resolver and the getter run on the ModelLoader, GameController + 0x2F8 (".?AVGameController@cube@@")
+expect ModelLoader::itemModel calls @0x4EB290 > 10
+expect ModelLoader::itemModel value u32 == 1701667143 [[[ecx(@0x4EB290) - 0x2F8] - 4] + 0xC] + 0xC
+expect ModelLoader::itemModel value u32 == 1953394499 [[[ecx(@0x4EB290) - 0x2F8] - 4] + 0xC] + 0x10
+expect ModelLoader::get calls @0x412190 > 10
+expect ModelLoader::get value u32 == 1701667143 [[[ecx(@0x412190) - 0x2F8] - 4] + 0xC] + 0xC
+# the models vector (its begin pointer at ModelLoader + 4 = GameController + 0x2FC) is allocated
+expect ModelLoader::get value u32 != 0 [[@0x7691C8] + 0x2FC]
+# the player's weapon (slot 7: type 3, sub_type 17, material 2) is drawn through weapon_model_slot
+expect weapon_model_slot value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0xAA8
+expect weapon_model_slot value u8 == 17 [[@0x7691C8] + 0x8006C8] + 0xAA9
+expect weapon_model_slot calls @0x51ACE0 > 0
+expect weapon_model_slot caller @0x51ACE0 0x4EB302
+# phase 2, appearance: the hair id is a model slot; 1124 (0x464) is the slot ModelLoader::itemModel gives an iron
+# chest armour (type 4, material 1, modifier 0, rarity 0), so the head should wear a chest plate instead of hair
+inspect player [@0x7691C8]
+inspect set data.appearance.hair_model 1124
+expect draw_creature value i16 == 1124 [[@0x7691C8] + 0x8006C8] + 0x8E
+log 8.4: hair 1124
+wait 6
+trace start
+wait 3
+trace stop
+expect draw_creature calls @0x4129C0 > 5
+# past the table's end (2569 slots): draw_creature's bounds check draws no hair, and the game goes on drawing
+inspect set data.appearance.hair_model 32767
+log 8.4: hair 32767
+wait 6
+trace start
+wait 3
+trace stop
+expect draw_creature calls @0x4129C0 > 5
+expect draw_creature value i16 == 32767 [[@0x7691C8] + 0x8006C8] + 0x8E
+# phase 3, equipment: the weapon's sub_type picks its model (weapon_model_slot's first argument)
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set sub_type 0
+log 8.4: weapon sub_type 0
+wait 6
+trace start
+wait 3
+trace stop
+trace report
+expect weapon_model_slot calls @0x51ACE0 > 0
+expect weapon_model_slot caller @0x51ACE0 0x4EB302
+expect ModelLoader::itemModel value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0xAA9
+# phase 4, walking: the zone loader generates the zones ahead (the former model resolver C)
+trace start
+log 8.4: walk
+wait 60
+trace stop
+trace report
+expect cube::World::generateZone calls @0x5E3280 > 0
+expect cube::World::generateZone caller @0x5E3280 0x46B136
+expect cube::World::generateZone value u32 == 1819438935 [[[ecx(@0x5E3280)] - 4] + 0xC] + 0xC
+expect cube::World::generateZone value u32 == 1969438820 [[[ecx(@0x5E3280)] - 4] + 0xC] + 0x10
+expect cube::Zone::Zone calls cube::Zone::Zone > 0
+expect cube::Zone::Zone caller cube::Zone::Zone 0x5E33B4
+expect - hooks == 0
+"""

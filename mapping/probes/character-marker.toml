@@ -1,0 +1,42 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with the mod level_rework installed beside kyubu_probe. Task 7.2 of add-level-rework (D6): the mod adds the save marker to
+# a new character before the first save. The marker itself is checked outside the game, by tests/tools/charflag.py on the sandbox's
+# Save/characters.db (kept with --keep). The hooks of the mod (create_character, save_character) cannot be traced by the probe, so the
+# only expectation is on character_world_map_index, which the mod calls and the game's autosave calls too.
+id = "character-marker"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework; the mod's create_character hook raised its flag and its save_character hook added the marker before the first save",
+    "The script waited for the world, traced character_world_map_index for 140 s (two autosaves of 60 s)",
+    "After the run, charflag.py read the kept sandbox's Save/characters.db",
+]
+observations = [
+    "run 1 passed: the log shows `save marker added to the new character` once, at the creation of Tester, and nothing after the autosaves",
+    "character_world_map_index had 2 calls in the 140 s window: the two autosaves, each through save_character (the mod's own call came before the window)",
+    "charflag.py on the kept Save/characters.db (last written by the second autosave, 12:48; the character was created at 12:45): slot 0, Tester, level 1, XP 0, marker ok (KLV1, format 1, 16 zero bytes). The vanilla save kept the entry through both autosaves, as the draft of D6 found",
+]
+
+[[confirms]]
+entry = "character_world_map_index"
+observed = "the autosaves of the world called the map's operator[] while the marker was in the map (the count of calls is in the report)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-gameplay/level_rework"]
+script = """
+log character marker of level_rework (task 7.2 of add-level-rework)
+wait world
+wait 15
+trace add character_world_map_index
+trace start
+wait 140
+trace stop
+trace report
+expect - calls character_world_map_index >= 2
+log character marker: done
+"""

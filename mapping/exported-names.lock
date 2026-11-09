@@ -1,0 +1,48 @@
+# Exported names that shipped in a release, each with the release that first shipped it (mapping-exports, "Name
+# stability"). Mods pass these names to resolve_symbol or compile against them, so kmap check fails when one is no
+# longer the name or an alias of an exported entry in mapping/: a rename keeps the old name in `aliases`.
+# Written by `kmap lock --release` on release. A name is dropped only when KYUBU_API_VERSION_MAJOR goes up.
+release = "1.0.1"
+api_major = 1
+
+[symbols.cube-0x51D2CE9C]
+"Database::Database" = "1.0.1"
+"Database::get" = "1.0.1"
+"Database::getBuffer" = "1.0.1"
+"Database::open" = "1.0.1"
+"Database::~Database" = "1.0.1"
+"Game::frame" = "1.0.1"
+"GameController::GameController" = "1.0.1"
+"GameController::render" = "1.0.1"
+"GameController::update" = "1.0.1"
+"Map::openSave" = "1.0.1"
+"Model::Model" = "1.0.1"
+"Model::load" = "1.0.1"
+"ModelLoader::loadAll" = "1.0.1"
+"ModelLoader::resizeSite" = "1.0.1"
+ModelResolverB = "1.0.1"
+ModelResolverC = "1.0.1"
+"ModelVector::at" = "1.0.1"
+"ModelVector::resize" = "1.0.1"
+"Net::connectPortSite" = "1.0.1"
+WinMain = "1.0.1"
+"World::openSave" = "1.0.1"
+asset_decode = "1.0.1"
+entry = "1.0.1"
+sqlite3_close = "1.0.1"
+
+[symbols.server-0x51D2CE9B]
+"Database::Database" = "1.0.1"
+"Database::get" = "1.0.1"
+"Database::getBuffer" = "1.0.1"
+"Database::open" = "1.0.1"
+"Model::load" = "1.0.1"
+"ModelLoader::loadAll" = "1.0.1"
+"ModelVector::resize" = "1.0.1"
+"Server::main" = "1.0.1"
+"Server::simLoop" = "1.0.1"
+"Server::tickSite" = "1.0.1"
+"World::openSave" = "1.0.1"
+asset_decode = "1.0.1"
+entry = "1.0.1"
+sqlite3_close = "1.0.1"

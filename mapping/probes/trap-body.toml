@@ -1,0 +1,54 @@
+# Written 2026-10-17 for task 9.2a of add-skills-unleashed (the Scout's trap). Question: can the trap be a creature of the game's own (a
+# "carrier") that gives the throw, the landing and the bounce through the game's physics, with the mod drawing the trap itself? One
+# pink slime that stands still is thrown by mods-dev/trap_proto, bounced by a write of its vertical velocity, and hidden by the hide mask
+# of draw_creature; at rest its hp is set to 0. Five replays (1 to 5) tuned the probe; this record holds the input of the fifth.
+id = "trap-body"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-17"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there; the body yaw is set to 0",
+    "`spawner PINK_SLIME 1 still` puts one slime 4 blocks north of the player; it is the carrier (the newest creature)",
+    "`trap_proto:run`: the carrier is put 2 blocks east and 2 north of the player, 1.5 up, and given 5 blocks/s north and 6 up; every World step it is logged; when it lands after a fall faster than 1.5 its vertical velocity is written back as 0.55 times the fastest fall seen (a Lua bounce); the hide mask (draw_creature argument 9, [ESP+0x20] at creature_draw_site) is 0xFFFFFFFF; at +6 s its hp is set to 0",
+    "shots: at rest and hidden, and after the hp write",
+    "runs 1 to 4 (the same probe, earlier timelines): throw with and without the bounce; the draw colour's alpha at 0, 0.35 and the green and blue at 0; the hide mask at 0xFFFFFFFF; the creature's scale (+0x80) at 0.02",
+]
+observations = [
+    "the game's physics moves a creature that stands still: a velocity written at Creature+0x34 (blocks a second) carries it, gravity pulls it down about 30 blocks/s^2 (6 up at 5 blocks/s north: apex 0.5 s later, ground at 0.63 s), the on-ground bit (Creature+0x5C bit 0, flags 0x11) comes up at the landing and the ground friction brings 5 blocks/s to 0 in about 1.5 s (thrown at 5 blocks/s north and 6 up from 1.5 above the ground: with no bounce it rests 4.0 blocks from where it started, with two bounces 5.3 blocks); the creature stops dead (velocity 0.00 for the next 4 s)",
+    "a bounce by a Lua write works: at the landing the vertical velocity was written upward (0.55 times the fall speed of 11.7 blocks/s: 6.4, then 2.6 after the second landing) and the creature rose again and landed twice; one throw of the first four runs missed its landing because the fall speed was read from the step before the landing; run 5 keeps the fastest fall seen and landed both bounces",
+    "the creature's draw colour alpha is not an opacity: alpha 0 darkened the pink slime to dark purple and 0.35 left it nearly as pink as 1 (runs 1 to 3 shots 07 and 09); green and blue at 0 only darken it",
+    "the hide mask of draw_creature works: with 0xFFFFFFFF written at [ESP+0x20] of creature_draw_site the slime is not drawn (run 4 shot 04-mask-rest and run 5 shot 02-rest-hidden against the pink slime beside the bow in runs 3 and 4); the value before the write was 0",
+    "the creature's scale at AppearanceData.scale (Creature+0x80, read 0.8 on the carrier) written to 0.016 each step did not make it vanish (run 4 shot 07: the slime is still drawn): that copy is not what the draw reads",
+    "hp set to 0 on the carrier at rest: the creature was gone from the map by the next lookup (the same millisecond of the log), no error and no corpse in the shot (run 5 shot 03); the player's XP stayed 0/50",
+    "a creature spawned by entity_spawner (hostile type 1, behaviour still) was used; the player attacks and the AI of monsters were not tried on it",
+    "replay 5 passed, 1 of 1 expectations held; the four trap_proto hooks installed; the slime was drawn through the first draw site (0x4B5D8C, `draw_a` 43 to 144 passes), the later passes (0x4BA8D8, 0x4BA97F) never ran",
+]
+
+[[confirms]]
+entry = "creature_draw_site"
+observed = "the stack argument 9 of draw_creature at [ESP+0x20] (hide mask) set to 0xFFFFFFFF hides the creature; the colour vec4 at [ESP+0x14] alpha only darkens"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 200
+mods = ["mods-dev/trap_proto", "mods-examples/entity_spawner"]
+input = [
+    "until tb: A", "console entity_spawner:spawner PINK_SLIME 1 still", "wait 5", "shot 01-slime",
+    "until tb: B", "console trap_proto:run",
+    "wait 4", "shot 02-rest-hidden", "wait 5", "shot 03-after-kill",
+]
+script = """
+log trap-body: trap_proto, a thrown creature (the Scout's trap carrier)
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log tb: A
+wait 30
+log tb: B
+wait 60
+expect creature_draw_site hooks == 0
+"""

@@ -1,0 +1,56 @@
+# Written 2026-10-19 for task 10.2a of add-skills-unleashed (the Assassin's shadow clones). Question: can a clone be the player drawn
+# a second time from creature_draw_site (draw_creature called again with a moved matrix, a black colour, the shader's opacity, and an
+# ability clip's pose through the player's mode swapped for that call), with no creature of its own?
+id = "shadow-clone-draw"
+build = "cube-0x51D2CE9C"
+kyubu = "1.1.0"
+date = "2026-10-19"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there; the body yaw is set to 0",
+    "the wheel twelve notches down (the camera out of the first person view), then `clone_proto:run`: phase A no clone (the player's matrix, the draw's arguments and the record's root part matrix are logged); B two black clones 6 blocks north and 2.5 east and west, the player's own pose, the matrix turned +90 and -90 about the root; C the same in the pose of clone_proto:dash (the player's mode swapped for the extra draw, the record's time 300 ms); D the dash pose turned 180 (6 north) and 45 (3 north, 3 east); E none. Each phase 8 s, a shot 1 s into it",
+    "runs 2 to 7 tried earlier timelines: clones without a turn, the body yaw (+0x30) written for the extra draw, opacity 0.4 and 0.15 with z-writes off; their shots are in the evidence folder",
+]
+observations = [
+    "the extra draw works: draw_creature called again from creature_draw_site (a Lua mid hook, the call made through the FFI with the site's own ten arguments, the matrix and the colour replaced) drew the player a second time at the moved place every frame, 114 to 336 extra draws a run and no error or crash in eight runs; the player's own draw stayed as it was",
+    "argument 2 is the view matrix of the frame, not the creature's own: for a player standing still at yaw -180 it read rows (1,0,0) (0,0,-1) (0,1,0) and a translation with the player's x and y at 0 and its z in blocks (run 2: -294.36 with the camera 2.3 blocks over a player at z 292.08), so the world before the view is in blocks with the origin at the player's x and y; moved by (dx, dy, dz) as render moves the trail copies (0x424A60), the clone stood dx east, dy north and dz up",
+    "the colour (argument 6) multiplies: (0, 0, 0, 1) drew a solid black silhouette of the player with its weapon (run 3 shot 02, run 4 shot 01)",
+    "cube::CubeShader::setOpacity before the draw, with z-writes off (SetRenderState 14 on the device at GameController+0x134), made the clone see-through: 0.4 and 0.5 showed the ground through a dark clone (run 3 shot 05, run 4 shot 03); put back to 1 after it, nothing else was see-through",
+    "the pose: with current_mode set to the number of clone_proto:dash (112, an ability on no bar with a tracks clip) and the record's time to 300 for the extra draw, and the record's words +4 to +0x4EC saved and written back round it, the clone was drawn in that clip's pose with the club in hand, while the player beside it kept its idle pose (run 4 shot 02, run 8 shot 02)",
+    "the body yaw at +0x30 written for the extra draw turned nothing (run 4 shot 01: clones at +90 and -90 drawn as the player, back to the camera); draw_creature does not read it",
+    "the turn: the matrix turned about the root (the record's first part matrix at +0xEC, row 3: (0, 0, z) in that frame, row 0 the voxel size 0.0857 with the player's own turn) by T(-p) Rz T(p) after the move: clones at +90 and -90 were drawn in profile facing away from each other, at 180 facing the camera, at 45 diagonally (run 8 shots 01 to 03)",
+    "the root matrix is zero before the creature's first draw (run 5's first log): it holds the last draw's values after that",
+    "shots and phases: a `console` step ran the command in runs 2, 3, 4 and 8 (about 5 s late) and was lost in run 5; a run started by the mod itself (runs 6 and 7) began a minute before gamepilot's shots, which then showed no clone; the record keeps the console start with 8 s phases",
+    "replay 8 passed, 1 of 1 expectations held",
+]
+
+[[confirms]]
+entry = "cube::CubeShader::setOpacity"
+observed = "called with 0.4 and 0.5 before an extra draw_creature (z-writes off): the creature drawn see-through; with 1 after it, the rest drawn as usual"
+
+[[confirms]]
+entry = "creature_draw_site"
+observed = "draw_creature called again from the site with the stack's arguments, the matrix moved and turned and the colour black: a black copy of the creature, every frame, no fault"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 170
+mods = ["mods-dev/clone_proto"]
+input = [
+    "until cl: A", "wheel down 12", "wait 1", "console clone_proto:run",
+    "until phase B", "wait 1", "shot 01-B-idle-turned",
+    "until phase C", "wait 1", "shot 02-C-dash-turned",
+    "until phase D", "wait 1", "shot 03-D-dash-180-45",
+    "until phase E", "wait 1", "shot 04-E-none",
+    "until phase done",
+]
+script = """
+log shadow-clone-draw: clone_proto, the player drawn again as a shadow clone
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.body_yaw 0
+log cl: A
+wait 60
+expect creature_draw_site hooks == 0
+"""

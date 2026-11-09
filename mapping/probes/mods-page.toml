@@ -1,0 +1,104 @@
+# Task 2.5 of add-mod-manager (design D9). The dev mod mods-dev/start_menu_row 0.2.0 opens an empty page on a click on Mods: a
+# blackwidget panel (a clone of cube::GameController.blackwidget_template), a Back button at (20, 20) and a Test button in the
+# middle of the panel (clones of cube::GameController.creation_back_button, the second relabelled with plasma::Node::setText). A mid
+# hook at cube::GameController::startMenuShownSite hides the logo and the menu after the game's update shows them again, and
+# tests queued clicks against the two buttons. The input opens the page, hovers and clicks Test, then clicks Back.
+id = "mods-page"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Extended the dev mod start_menu_row (0.2.0): Mods queues an open; the update-site hook clones the panel and two buttons once, shows them and hides the logo and menu each update while open; Back closes",
+    "Replayed at the start menu under Wine at 1024 x 768: clicked Mods (y 559), hovered and clicked Test (512, 384), clicked beside it, clicked Back (120, 40)",
+    "Run 2 after showing the Test clone (run 1 left it hidden); runs 3 and 4 with arrow pickers cloned from options_panel",
+]
+observations = [
+    "replays 2 and 4 passed under Wine at 1024 x 768 (evidence/mods-page-2026-10-24; run 3 had the same game results but its Back came after the checks, so the script waits longer since), 8 of 8 expectations each: with the page open start_scene 1, start_menu_node 0 and logo 0; after Back all three 1; quit_requested 0",
+    "the game shows start_menu_node again on every update while options_panel is hidden: the hook found it shown in each of 766 updates with the page open (run 4), and the menu's draw ran 0 times in them, so hiding it at the site is enough and nothing flickers",
+    "a node clone keeps its source's visible value: clones of character creation's hidden Back start hidden (logged 0); the blackwidget template's clone starts shown. Run 1 forgot the Test button and it was not drawn",
+    "clones carry no click connection: clicking them did nothing in the game; the clones' own hover works (the game's grey on Back and Test); a child cloned under the panel is placed in the panel's frame",
+    "setText relabelled the Test clone; setSize 600 x 300 and 200 x 40; a click at (512, 384) counted as Test and one at (700, 600) as nothing, from getCursor against getSizeWidth and getSizeHeight",
+    "the arrow pickers: findChild on options_panel found leftbutton and rightbutton (clones keep the template's name), 19 x 21 and already visible; their clones beside Test make the game's picker look, and clicks at (382, 384) and (642, 384) counted as left and right",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "a mid hook here hid start_menu_node and logo on each of 766 updates; the menu was not drawn once"
+
+[[confirms]]
+entry = "plasma::Node::clone"
+observed = "three clones (a panel under start_scene, two buttons) drawn as the game's own; the clone keeps the source's visible value"
+
+[[confirms]]
+entry = "plasma::Node::setText"
+observed = "the clone's label read Test"
+
+[[confirms]]
+entry = "plasma::Node::findChild"
+observed = "found leftbutton and rightbutton on options_panel by name (wstrings of 10 and 11 characters, the pointer form)"
+
+[[confirms]]
+entry = "plasma::Widget::setPosition"
+observed = "the panel centred at (212, 234), Back at (20, 20), Test in the panel's frame at (200, 130)"
+
+[[confirms]]
+entry = "plasma::Widget::setSize"
+observed = "the panel drawn 600 x 300, Test 200 x 40"
+
+[[confirms]]
+entry = "plasma::Widget::getSizeWidth"
+observed = "returned the sizes set: the hit test of the clicks matched the drawn buttons"
+
+[[confirms]]
+entry = "plasma::Widget::getSizeHeight"
+observed = "returned the sizes set: the hit test of the clicks matched the drawn buttons"
+
+[[confirms]]
+entry = "cube::GameController.blackwidget_template"
+observed = "its clone is the game's dark panel with the white stepped edge"
+
+[[confirms]]
+entry = "cube::GameController.creation_back_button"
+observed = "its clones are game buttons with the grey hover and no click connection"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-dev/start_menu_row"]
+input = [
+    "until page open",
+    "move 512 559", "wait 2", "click 512 559", "wait 6", "shot 01-page",
+    "console start_menu_row:state",
+    "until page test",
+    "move 512 384", "wait 4", "shot 02-test-hover",
+    "click 512 384", "wait 4",
+    "move 700 600", "wait 2", "click 700 600", "wait 4",
+    "move 382 384", "wait 4", "shot 02b-left-hover", "click 382 384", "wait 4",
+    "move 642 384", "wait 2", "click 642 384", "wait 4",
+    "console start_menu_row:state",
+    "until page back",
+    "move 120 40", "wait 4", "shot 03-back-hover",
+    "click 120 40", "wait 6", "shot 04-title",
+    "console start_menu_row:state",
+]
+script = """
+log page: task 2.5 of add-mod-manager
+wait 15
+log page open
+wait 20
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+expect cube::GameController::startMenuShownSite value i32 == 0 [[[[@0x7691C8] + 0x800910] + 0x3C] + 0x94]
+expect cube::GameController::startMenuShownSite value i32 == 0 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+log page test
+wait 50
+expect - value i32 == 0 [[[[@0x7691C8] + 0x800910] + 0x3C] + 0x94]
+log page back
+wait 25
+expect - value i32 == 1 [[[[@0x7691C8] + 0x800910] + 0x3C] + 0x94]
+expect - value i32 == 1 [[[[@0x7691C8] + 0x800870] + 0x3C] + 0x94]
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+expect - value u8 == 0 [@0x7691C8] + 0x198
+log page done
+wait 20
+"""

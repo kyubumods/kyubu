@@ -1,0 +1,38 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (kmap probe replay, setup "menu"). The object's type is read from MSVC RTTI as in
+# creature-collection: ".?AVWorldMap@cube@@" holds "Worl" at +0xC and "dMap" at +0x10 of its type descriptor.
+id = "world-map-save"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Read the only call of the former Map::openSave (zone_loader_step): this is GameController+0x800D3C",
+    "Read the controller's constructor: it runs cube::WorldMap::WorldMap on this+0x800D3C",
+    "Started Cube.exe with --kyubu-dev and kyubu_probe through kmap probe replay, and waited at the start menu",
+    "Read the RTTI of the object at GameController+0x800D3C and compared its vtable with cube::WorldMap's",
+]
+observations = [
+    "at the menu the object at GameController+0x800D3C is a complete .?AVWorldMap@cube@@ (complete-object offset 0)",
+    "its vtable pointer is @0x71CF1C, cube::WorldMap's vtable in classes.toml",
+    "so the former Map::openSave, called only with this = GameController+0x800D3C, is cube::WorldMap::openSave",
+    "it takes no stack arguments (plain ret) and calls world_map_close before it opens Save/map_<name>.db",
+]
+
+[[confirms]]
+entry = "cube::WorldMap::openSave"
+observed = "the object its only caller passes as this is a complete cube::WorldMap with cube::WorldMap's vtable"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+log the object cube::WorldMap::openSave runs on (GameController+0x800D3C), client side, at the start menu
+wait 5
+# a complete cube::WorldMap: RTTI name and complete-object offset 0
+expect cube::WorldMap::openSave value u32 == 1819438935 [[[[@0x7691C8] + 0x800D3C] - 4] + 0xC] + 0xC
+expect cube::WorldMap::openSave value u32 == 1885424996 [[[[@0x7691C8] + 0x800D3C] - 4] + 0xC] + 0x10
+expect cube::WorldMap::openSave value u32 == 0 [[[@0x7691C8] + 0x800D3C] - 4] + 4
+# its vtable is cube::WorldMap's @0x71CF1C: vtable - @0x71CF1C = 0 lands on the name in the type descriptor
+expect cube::WorldMap::openSave value u32 == 1819438935 [[@0x7691C8] + 0x800D3C] - @0x71CF1C + @0x765A0C
+"""

@@ -1,0 +1,10 @@
+id = "trap_proto"
+name = "Trap prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe trap-body): the console command trap_proto:run throws the newest creature (a spawned slime that stands still) as the Scout's trap would be thrown, logs its flight, makes it bounce by writing its vertical velocity when it lands, and hides it by the alpha of its draw colour. Replaced by the Scout ability."
+
+[scripts]
+client = "scripts/client.lua"

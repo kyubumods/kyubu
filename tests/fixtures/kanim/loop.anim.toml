@@ -1,0 +1,11 @@
+duration = 500
+end = "loop"
+
+[[track]]
+part = "tail"
+channel = "rot"
+keys = [
+  { t = 0.0, v = [0, 0, 0] },
+  { t = 0.5, v = [0, 15, 0], ease = "smooth" },
+  { t = 1.0, v = [0, 5, 0], ease = "smooth" },
+]

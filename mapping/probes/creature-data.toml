@@ -1,0 +1,85 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL Ubuntu 24.04 on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates a character and a new world, waits
+# 90 s and holds W for 150 s. The same script can be played by hand (docs/probes.md, "Session report"): enter a new
+# world, stand still for a minute and a half, then walk forward. Position is cuwo's LongVector3 (three int64), so the
+# finder searches i32 words and finds the low halves.
+id = "creature-data"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Menu (Windows, Cube.exe): read the player's cube::Creature from outside and laid cuwo's EntityData over it",
+    "Wine replay: gamepilot made the character Tester and a new world; the script ran after the world was entered",
+    "Standing: find new i32 over the whole Creature, two snapshots 5 s apart, kept the unchanged words",
+    "Walking (W held): three snapshots 2 s apart, kept the words that changed each time, listed the best 40",
+    "Watched data.pos x and y every 10 ms for 5 s, traced cube::GameController::render meanwhile, inspect player",
+]
+observations = [
+    "at the menu +8 holds the uint64 1, the player's key in World.creatures; +0x10 on matches cuwo's EntityData",
+    "menu values at +0x10: pos near the world centre, hp 100, level 1, class 1, appearance scales, name Wollay",
+    "in the world, data.hp (Creature+0x16C) reads 265, what the HUD shows (265/265) for a level 1 warrior",
+    "the finder ranked +0x18 first (data.pos.y), then data.body_pitch (+0x2C) and data.velocity (+0x34, y 10.4)",
+    "data.pos.y changed 30 times in 5.2 s of walking; render ran 21 times in those 5 s: a new position each frame",
+    "data.pos.x stayed at the world centre: gamepilot's character spawns facing +y (body_yaw 0) and walks along y",
+    "inspect player shows id and every data.* row with its [V] or [C] marker; the tracer left 0 hooks",
+    "the finder also kept +0x1358, a copy of pos.y in the unknown part after the data block (not mapped yet)",
+]
+
+[[confirms]]
+entry = "cube::Creature.id"
+observed = "the uint64 1 for the local player, its key in cube::World.creatures, at the menu and in the world"
+
+[[confirms]]
+entry = "cube::Creature.data"
+observed = "cuwo's EntityData at +0x10: menu values fit it, walking moves data.pos.y every frame, hp matches the HUD"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+input = ["wait 90", "hold w 150"]
+script = """
+log creature data: the local player's cube::Creature, watched while walking (task 8.1)
+wait 5
+inspect player [@0x7691C8]
+# the id after the vtable is the player's key in World.creatures, the uint64 1
+expect cube::Creature.id value u32 == 1 [[@0x7691C8] + 0x8006C8] + 8
+expect cube::Creature.id value u32 == 0 [[@0x7691C8] + 0x8006C8] + 0xC
+wait world
+log in the world: standing still for 90 s, then walking forward
+wait 15
+# standing still: keep the words that do not change
+find new i32 0x1E60 [[@0x7691C8] + 0x8006C8]
+find snap
+wait 5
+find snap
+find unchanged
+wait 110
+# walking: keep the words that change in each of three 2-second steps
+find snap
+find changed
+wait 2
+find snap
+find changed
+wait 2
+find snap
+find changed
+find list 40
+# data.pos, low halves (Creature+0x10 is x, +0x18 is y), sampled every 10 ms while walking. Gamepilot's character
+# spawns facing +y (body_yaw 0), so W walks along y and x stays put; by hand, steer and both change. The render
+# trace over the same 5 s counts the frames, to compare with the number of changes.
+watch pos_x i32 [[@0x7691C8] + 0x8006C8] + 0x10
+watch pos_y i32 [[@0x7691C8] + 0x8006C8] + 0x18
+trace add cube::GameController::render
+trace start
+wait 5
+trace stop
+watch
+inspect player
+expect cube::Creature.data found 0x18
+expect cube::Creature.data watch pos_y changed
+expect - calls cube::GameController::render > 0
+expect - hooks == 0
+# hp at data+0x15C: 265 for gamepilot's level-1 warrior (the HUD shows 265/265), 100 for the menu's creature
+expect cube::Creature.data value f32 > 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+"""

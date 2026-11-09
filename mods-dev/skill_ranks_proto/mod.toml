@@ -1,0 +1,10 @@
+id = "skill_ranks_proto"
+name = "Skill ranks prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ability-learn): sets the player's skills 6 to 8 to rank 5 while the skill panel is closed, so that button 9 (the fourth ability) can be learned, and logs every change of Creature.skills[9]. It does not show the button or give it an icon: the loader does."
+
+[scripts]
+client = "scripts/client.lua"

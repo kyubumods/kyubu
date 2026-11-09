@@ -1,0 +1,10 @@
+id = "stealth_proto"
+name = "Stealth prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe ninja-scan-skip): drops the hostile creatures' threat on the player, keeps the player out of the combat AI's first-target scan and holds the player's stealth at 1.0, on a timeline started by stealth_proto:run. Replaced by the Ninja ability."
+
+[scripts]
+client = "scripts/client.lua"

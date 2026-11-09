@@ -1,0 +1,61 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (task 2.6 of add-ability-api, M5): the icon map at GameController+0x800818. G below is the game controller, [@0x7691C8].
+# slot4_proto pushes 115 as slot 4; the HUD's own look-up (IntMap::operator[], 0x4044D0) then inserts a node for 115 with a
+# null value. `slot4_proto:icons` reads the nodes without inserting, `slot4_proto:icon 115 54` copies smash's icon pointer
+# into 115's node, and `slot4_proto:icon 115 0 reset` writes null back.
+id = "ability-icons"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the level-1 warrior Tester and a new world; slot4_proto pushed 115 as slot 4",
+    "read the icon map (size, nodes 0, 54, 57 and 115) before any write; screenshot of the HUD",
+    "wrote smash's icon pointer (node 54) into node 115, read the map again, screenshots of slot 4 over 60 s",
+    "wrote null back into node 115, screenshot; the game kept running to the end of the script",
+]
+observations = [
+    "Wine replay 1 passed on the first run; the log has no fault and no loader error",
+    "at the first read the icon map held 69 nodes (size at GameController+0x80081C); node 0 held 0x13C8E1B0, node 54 (smash) 0x13D64820, node 57 0x13C8E220, all non-null; node 115 existed with value 0 at 0x1464477C, far from the constructor's nodes: the HUD's own look-up (IntMap::operator[]) inserted it on the first frame 115 was on the bar",
+    "the HUD drew slot 4 as an empty grey square while node 115 was null (01-before.png); after slot4_proto copied node 54's value into node 115 the same slot drew smash's icon, identical to slot 1 (02-smash-icon.png), and it kept it 40 s later (03-later.png)",
+    "writing 0 back into node 115 made slot 4 empty again at once (04-reset.png), so the HUD re-reads the node every frame and skips a null",
+    "node 115 held node 54's pointer for 40 s (written 02:01:14, reset 02:01:54) and the game ran on to the end of the script at 02:02:30 with no fault and no error line; 4 expectations held",
+    "a clean exit did not run: the replay ends the game with a timeout, so the destructor's behaviour rests on the static read (it frees nodes only); see the evidence README",
+]
+
+[[confirms]]
+entry = "cube::GameController.ability_icons"
+observed = "at +0x800818 (head) and +0x80081C (size 69): nodes with key at +0x10 and a 4-byte value at +0x14; node 115 appeared by itself with a null value and the HUD drew slot 4 from what was written there"
+
+[[confirms]]
+entry = "IntMap::operator[]"
+observed = "not traced; its effect shows in the map: the HUD's look-up of 115 left a node with value 0 at +0x14, and my walk of the same layout found it and the nodes 0, 54 and 57"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/slot4_proto"]
+input = [
+    "until icons A", "console slot4_proto:icons", "console slot4_proto:icons 115", "shot 01-before",
+    "console slot4_proto:icon 115 54", "wait 6", "console slot4_proto:icons", "shot 02-smash-icon",
+    "until icons B", "shot 03-later",
+    "console slot4_proto:icon 115 0 reset", "wait 6", "console slot4_proto:icons", "shot 04-reset",
+]
+script = """
+log icons: task 2.6 of add-ability-api, the icon map of the game controller
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect - value i32 == 115 [[@0x7691C8] + 0x80080C] + 20
+expect cube::GameController.ability_icons value i32 != 0 [@0x7691C8] + 0x800818
+expect cube::GameController.ability_icons value i32 >= 60 [@0x7691C8] + 0x80081C
+wait 8
+log icons A
+wait 40
+log icons B
+wait 60
+log icons C
+wait 20
+expect cube::GameController.ability_icons value i32 >= 60 [@0x7691C8] + 0x80081C
+log icons done
+"""

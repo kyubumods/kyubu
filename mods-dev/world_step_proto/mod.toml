@@ -1,0 +1,10 @@
+id = "world_step_proto"
+name = "sim.world_step and game.hit probe (dev)"
+version = "0.1.0"
+kyubu = "^1.4"
+sides = ["server"]
+trust = "full"
+description = "Development only (probes world-step-hit-client and world-step-hit-server): counts sim.world_step, then hits one monster with kyubu.game.hit and logs its stun."
+
+[scripts]
+server = "scripts/server.lua"

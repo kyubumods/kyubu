@@ -1,0 +1,13 @@
+# Server.exe: world save database.
+
+[[function]]
+name = "cube::World::openSave"
+address = 0x4D83A0
+convention = "thiscall"
+subsystem = "saves"
+prototype = "void __thiscall cube::World::openSave(cube::World* this, uint32_t seed, std::string* name)"
+status = "verified"
+evidence = ["correlated:cube-0x51EA955E:cube::World::openSave", "manual:main calls it on the World it allocates (0x80029C bytes)", "correlated:server-0x51D2CE9B:cube::World::openSave"]
+source = "kyubu"
+aliases = ["World::openSave"]
+notes = "found by signature from Cube.exe; resolved in 7.5: ret 8 as in Cube.exe, and main passes the new World as this. Its other callers are cube::World::World and 0x549550"

@@ -1,0 +1,40 @@
+# Task 7.1 of add-mod-manager. The catalog fetch: a good copy of the test catalog is accepted and saved, a copy with one byte changed after
+# signing and a copy with no signature are rejected, and an unreachable address falls back to the saved copy (marked offline).
+id = "mod-catalog"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Added src/index.h (parser, Ed25519 check, the choice between the fetched and the saved copy), src/fetch.h (WinHTTP and file:///), src/catalog.h (worker thread, saved copy in the data folder) and the console aid mod_manager:catalog",
+    "Replayed at the start menu under Wine: fetch the good copy, the tampered copy, the unsigned copy, then an address that does not exist",
+]
+observations = [
+    "run 1 passed (evidence/mod-catalog-2026-10-24): the good copy logs catalog online, 3 mods, 4 versions, 1 packs; the copy with one changed byte and the copy with no signature log catalog rejected (The catalog could not be verified.) with 0 mods; an address that does not exist logs catalog offline with the saved copy's 3 mods",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager logs each finished catalog fetch from its mid hook here"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog"]
+input = [
+    "until modcat open",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 2",
+    "console mod_manager:catalog mods:mm_fixture_catalog/bad", "until catalog rejected", "wait 2",
+    "console mod_manager:catalog mods:mm_fixture_catalog/nosig", "wait 6",
+    "console mod_manager:catalog mods:mm_fixture_catalog/missing", "until catalog offline", "wait 2",
+]
+script = """
+log modcat: task 7.1 of add-mod-manager
+wait 15
+log modcat open
+wait 120
+log modcat done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

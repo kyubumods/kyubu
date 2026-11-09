@@ -1,0 +1,62 @@
+# Cube.exe: sound and music (cube::XAudio2Engine; XAudio2 2.7, created with CoCreateInstance).
+# Server.exe has no audio classes and no .wav names.
+
+[[function]]
+name = "cube::XAudio2Engine::XAudio2Engine"
+address = 0x622DA0
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["rtti:cube::XAudio2Engine", "xref:WinMain", "correlated:cube-0x51D2CE9C:cube::XAudio2Engine::XAudio2Engine"]
+source = "kyubu"
+notes = "stores the vtable; opens data2.db (the sound archive) in its own cube::Database; the engine is a local of WinMain, passed to the game controller's constructor"
+
+[[function]]
+name = "cube::XAudio2Engine::~XAudio2Engine"
+address = 0x622EF0
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["rtti:cube::XAudio2Engine", "xref:WinMain", "correlated:cube-0x51D2CE9C:cube::XAudio2Engine::~XAudio2Engine"]
+source = "kyubu"
+notes = "called at the end of WinMain and by vtable slot 8 (the deleting destructor); calls slot 0 first"
+
+[[function]]
+name = "cube::XAudio2Engine::init"
+address = 0x623530
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["xref:WinMain", "manual:CoCreateInstance, then IXAudio2 Initialize and CreateMasteringVoice", "correlated:cube-0x51D2CE9C:cube::XAudio2Engine::init"]
+source = "kyubu"
+notes = "CoInitializeEx, the XAudio2 object into this+4, the mastering voice into this+8, then cube::Music; false makes WinMain show the XAudio2 error"
+
+[[function]]
+name = "cube::XAudio2Engine::loadSound"
+address = 0x623A60
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["vtable:cube::XAudio2Engine:7", "manual:builds a cube::XAudio2Engine::Sound from a file or data2.db", "correlated:cube-0x51D2CE9C:cube::XAudio2Engine::loadSound"]
+source = "kyubu"
+notes = "stores the Sound vtable; reads the file with CreateFileW, or the blob with cube::Database::getBuffer and asset_decode"
+
+[[function]]
+name = "cube::Music::Music"
+address = 0x622D60
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["rtti:cube::Music", "xref:cube::XAudio2Engine::init", "correlated:cube-0x51D2CE9C:cube::Music::Music"]
+source = "kyubu"
+notes = "stores the vtable; the object is about 1.9 MB (operator new of 1966832 bytes: a stream buffer?); volume 1.0 at +0x1E0018"
+
+[[function]]
+name = "play_sound"
+address = 0x484350
+convention = "thiscall"
+subsystem = "audio"
+status = "candidate"
+evidence = ["string:\"pickup.wav\"", "manual:a switch from sound id to the .wav name, with a distance (sqrt)", "correlated:cube-0x51D2CE9C:play_sound"]
+source = "kyubu"
+notes = "(sound id, position, volume, ...); id 0 is hit.wav; called by the game controller's update, render and mouse handler, the speech widget, and 0x484320 (volume 1.0)"

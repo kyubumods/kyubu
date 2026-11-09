@@ -1,0 +1,61 @@
+# Task 2.7 of add-ability-animation (A9, footstep sounds). mods-dev/sound_ids_proto hooks play_sound (0x484820) and logs the id, the
+# local player's current_mode and the caller. Question: which ids play while idle, walking, jumping and swinging, and does any depend on the mode?
+id = "sound-ids"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Idle, then walked (W), jumped (space), swung (mouse 1), then walked with the mode forced to 115",
+]
+observations = [
+    "Wine replay 2 passed, 1 of 1 expectations held; the mid hook at 0x484820 installed and logged the id (first stack argument), the player's current_mode and the caller for every call (run 1 had no forced-mode phase)",
+    "only three ids were played by calls in the run: 32 (step2.wav) from the caller 0x495825, 94 from 0x4AD3ED (also at idle, so ambience), and 12, 15 and 17 once each during the swing (caller 0x495825); 83 and 84 once at load (0x48B592)",
+    "no call site passes 32 or 33 as a constant (static): the id is read from an event record (+0xC) at 0x49580x, so the step sound comes from a queue whose producer is not traced",
+    "id 32 did not play in the 8 s of idle but did walking (45 calls in 10 s), jumping (17), swinging (19 with the player's mode at 0, 57, 58 and 67) and with the mode forced to 115 while W was held (63 with mode 115, 11 with mode 0): the id and the caller never changed with the mode",
+    "not known: whether the step events are the player's or other creatures' (the hook read no position); id 33 never played (no water)",
+]
+
+[[confirms]]
+entry = "play_sound"
+observed = "a mid hook at 0x484820 installs and logs the sound id with the player's current_mode"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+mods = ["mods-dev/sound_ids_proto"]
+input = [
+    "until sound-ids walk",
+    "hold w 6",
+    "until sound-ids jump",
+    "hold space 1",
+    "hold space 1",
+    "until sound-ids swing",
+    "hold mouse1 2",
+    "until sound-ids m115",
+    "hold w 6",
+]
+script = """
+log sound-ids: task 2.7, the ids of play_sound
+wait world
+wait 20
+inspect player [@0x7691C8]
+log sound-ids idle
+wait 8
+log sound-ids walk
+wait 10
+log sound-ids jump
+wait 6
+log sound-ids swing
+wait 8
+log sound-ids m115
+inspect set data.current_mode 115
+inspect set data.mode_start_time 0
+wait 9
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 3
+log sound-ids done
+expect play_sound value u32 != 0 [@0x7691C8]
+"""

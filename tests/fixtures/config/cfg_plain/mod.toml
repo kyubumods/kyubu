@@ -1,0 +1,6 @@
+id = "cfg_plain"
+name = "Config: none"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Fixture: a mod without config.toml."

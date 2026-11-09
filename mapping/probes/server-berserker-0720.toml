@@ -1,0 +1,55 @@
+# Recorded with kyubu_probe and the Kyubu loader, native on Windows (kmap probe replay, client = "join"). Task 5.2 of
+# add-skills-unleashed-multiplayer: Server.exe runs scripts/server.lua of skills_unleashed (the server's Uppercut, src/server/) for a
+# joined player's slot-4 start, with no particle, light or sound call. mp_fill keeps the client's mp at 1; su_rank sets the rank 3; su_dummy (server) puts one monster 3 blocks in front of the player while it is in a mod mode.
+id = "server-berserker-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-11-07"
+steps = [
+    "native replay: Server.exe and a client that joins with a new warrior, both with emtweaks and skills_unleashed (the gate), mp_fill and su_rank",
+    "the client held key 4 for 0.9 s",
+]
+observations = [
+    "signal waits, 2026-11-08 (evidence/fast-join-2026-11-08/waits-run1/server-berserker-0720), passed in 23 s: the script waits for Net::acceptJoinSite (the join, held after 7 to 8.5 s) instead of 140 s, and for the dispatch site instead of a fixed 40 to 90 s; the dispatch wait holds at once (monsters call it too), so the trace no longer spans the presses: log_expect checks them",
+    "task 10.10 run, 2026-11-09 (evidence/berserker-loopback-2026-11-09/server-berserker-0720-run1), passed: the throws written through creature_state_set; the strike at rank 3 and the landing 0.84 s later (1 creature), no warning on the server",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-berserker-0720), passed in 236 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 2026-11-07 (evidence/server-berserker-2026-11-07/run4): Server.exe loaded scripts/server.lua (8 of 8 abilities defined, the client's order) and the joined client's Uppercut (number 116) ran on the server for 83 steps, 1712 ms, ending `done`",
+    "the strike at 700 ms hit the monster su_dummy had put 3 blocks in front: hp 151.57 to 120.58 (the first quarter of the damage, through the server's own hitCreature and applyHit) and its vertical velocity went from 0.62 to 37.15; the landing, 5 s later (the flight's time limit), hit 1 creature. The server log has no warning and no particle, light or sound call",
+    "run 1 (a server with only the Berserker defined) found no ability for the client's number: the loader numbers abilities by registry place, so the server now defines all eight in the client's order (logic/roster.lua)",
+    "limits: the frame offsets of the World step (EBP-0x2B28, EBP-0x2BE8) held here for hitCreature; the damage number is not shown on the server (no push twin); one joined player, one monster, rank 3",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site reaches the server's Uppercut: the mod's callbacks and the deferred strike run from it"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 420
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "shot 01-joined",
+    "until slot: press",
+    "click 820 384",
+    "wait 2",
+    "hold 4 0.9",
+    "wait 4",
+    "shot 02-after",
+]
+script = """
+log server-berserker-0720: task 5.2 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace add @0x4257BC
+trace start
+wait 140 until calls @0x4257BC >= 1
+log slot: press
+wait 90 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-berserker-0720: done
+"""

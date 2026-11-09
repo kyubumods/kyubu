@@ -1,0 +1,9 @@
+id = "anim_borrow_proto"
+name = "Animation borrow (proto)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe anim-borrow): four mod abilities, one with no clip, one whose clip borrows a vanilla pose, one that borrows it and hides the head, and one (probe anim-borrow-time) whose clip takes the ability's duration and hides the hair in the middle of it. The mod forces the local player into each, pinned at 300 ms of the mode, and a screenshot per phase shows what the pose provider draws. A mid hook at the join site of draw_creature logs the pose id and time the draw reads."
+[scripts]
+client = "scripts/client.lua"

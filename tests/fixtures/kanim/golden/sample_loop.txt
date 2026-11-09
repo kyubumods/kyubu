@@ -1,0 +1,5 @@
+clip: loop.anim.toml, duration 500 ms, base pose all zeros
+t 0.25 (125 ms), weight 1
+  tail: rot 0 7.5 0
+t 0.75 (375 ms), weight 1
+  tail: rot 0 10 0

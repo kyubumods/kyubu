@@ -1,0 +1,33 @@
+# Task 5.1 of add-mod-manager. The package mods-gameplay/mod_manager loads in the menu and resolves every entry of tasks 2.2 and 2.5.
+id = "mod-manager-load"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Built mod_manager (ninja mod_manager) and replayed the menu under Wine with it installed",
+    "Ran the console command mods and read the log for the symbol check",
+]
+observations = ["replay 1 passed under Wine (evidence/mod-manager-load-2026-10-24): the log shows Discovered 2 mod package(s), Load order: kyubu_probe, mod_manager, mod_manager: loaded, 14 symbols resolve, loaded ModManager 0.1.0; the title screen stayed visible; the console command mods prints to the console only, so the load order line is the proof that it lists the mod"]
+
+[[confirms]]
+entry = "plasma::FontEngine::getFont"
+observed = "resolved by name at load, with the other entries the page uses"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-gameplay/mod_manager"]
+input = [
+    "until modman ready",
+    "console mods",
+]
+script = """
+log modman: task 5.1 of add-mod-manager
+wait 40
+log modman ready
+expect - value i32 == 1 [[[[@0x7691C8] + 0x80086C] + 0x3C] + 0x94]
+wait 25
+log modman done
+wait 10
+"""

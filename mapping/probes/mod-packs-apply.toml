@@ -1,0 +1,59 @@
+# Task 8.2 of add-mod-manager. Apply modpack, then Restore: the test pack downloads its three pinned mods, disables every other mod
+# except ModManager, sets its option, saves the profile "Before Test pack" and restarts; the profile then puts the setup back.
+id = "mod-packs-apply"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-25"
+steps = [
+    "Added src/profile.h (the pack's work, the local profiles, the restore plan) and the Apply modpack, Restore and Delete profile actions to ModManager; the loader checks a config op against a queued install of the same id first",
+    "Replayed at the start menu under Wine at 1024 x 768: open the page, fetch the good test catalog, open Install / Modpacks, select Test pack, Actions > Apply modpack; after the restart look at My mods and the packs, select Before Test pack, Actions > Restore; after the second restart look at My mods",
+]
+observations = [
+    "run 1 failed at the Restore step (evidence/mod-packs-apply-2026-10-25/run1): the pack applied (pending.toml: 9 applied, 0 failed; the plan then reads keep cat_alpha, cat_beta, cat_lib 1.0.0, settings 0) and Before Test pack is listed as PROFILE, but the click at y 362 hit the edge of the profile row and Test pack stayed selected",
+    "run 2 failed the same way (run2): the click that closes the pack menu was at y 600, below the restarted window (about 792 x 592 under Xvfb), so the menu stayed open and the profile click only closed it; moved to y 520",
+    "run 3 passed the script (run3): Restore ran; the third process logs Restarted by game_restart, pending.toml: cat_alpha, cat_beta, cat_lib disabled, kyubu_probe and mm_fixture_catalog enabled, 5 applied, 0 failed, Load order: kyubu_probe, mm_fixture_catalog, mod_manager. The input waited for the line restore before_cat_pack, which the restart had already rotated out of latest.log, so the last shot was skipped; the input now waits for the probe script, which runs again only once Restore has enabled the probe",
+    "run 4 passed (run4): before Apply the plan reads will download cat_alpha, cat_beta, cat_lib 1.0.0 (547, 527, 526 B), Kyubu Probe and Fixture Catalog will be disabled, and the Actions menu row Apply modpack is white; Apply downloads, saves before_cat_pack.json and restarts",
+    "after the first restart: pending.toml installed cat_alpha, cat_beta, cat_lib 1.0.0, enabled them, disabled kyubu_probe and mm_fixture_catalog, 9 applied, 0 failed; cat_alpha logs options: strength = 8 (the pack's value, a config op checked against the staged zip); My mods shows 6 MODS, 4 ON",
+    "Install / Modpacks lists 2 MODPACKS: Test pack and the row PROFILE Before Test pack; Test pack's plan reads installed for all three and 0 SETTINGS CHANGE, and its Apply modpack row is grey (the setup in use)",
+    "the profile's details read LOCAL PROFILE, 2 MODS, RESTORE: cat_alpha, cat_beta, cat_lib will be disabled, Kyubu Probe and Fixture Catalog installed 1.0.0, will be enabled; its menu has Restore and Delete profile",
+    "after Restore and the second restart: pending.toml disabled cat_alpha, cat_beta, cat_lib, enabled kyubu_probe and mm_fixture_catalog, 5 applied, 0 failed; Load order kyubu_probe, mm_fixture_catalog, mod_manager; My mods shows 6 MODS, 3 ON, the profile is still listed",
+    "the restarted window is about 792 x 592 under Xvfb, so shots after a restart are cut on the right; a long profile name ran into the Actions button there (fixed after run 4 in main.cpp, not replayed)",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook runs Apply modpack and Restore from the pack's Actions menu"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 900
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog"]
+input = [
+    "until modpacks open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 3", "click 647 142", "wait 3", "click 300 330", "wait 3", "shot 01-pack", "console mod_manager:state",
+    "click 731 228", "wait 3", "shot 02-pack-menu", "click 700 290", "wait 2", "shot 03-applying",
+    "until Restarted by game_restart",
+    "wait 30", "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 04-my-mods-after-pack", "console mod_manager:state",
+    "console config cat_alpha",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 3", "click 647 142", "wait 3", "click 300 330", "wait 3", "shot 05-pack-in-use",
+    "click 731 228", "wait 3", "shot 06-pack-menu-grey", "click 300 520", "wait 2",
+    "click 300 378", "wait 3", "shot 07-profile", "console mod_manager:state",
+    "click 731 228", "wait 3", "shot 08-profile-menu", "click 700 290", "wait 2",
+    "until modpacks open",
+    "wait 5", "move 512 559", "wait 2", "click 512 559", "wait 8", "shot 09-my-mods-after-restore", "console mod_manager:state",
+    "wait 5",
+]
+script = """
+log modpacks: task 8.2 of add-mod-manager
+wait 15
+log modpacks open
+wait 150
+log modpacks done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

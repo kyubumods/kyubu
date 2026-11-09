@@ -1,0 +1,39 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay, setup menu with clicks as input steps, with the mod level_rework beside
+# kyubu_probe, on the prepared Save/ of record character-vanilla-refusal (slot 0 vanilla `testi`, slot 1 marked `Tester`). Task 7.3
+# of add-level-rework (D6): deleting a character without the marker works as in vanilla, and the other character keeps its marker.
+# The result is read outside the game, by tests/tools/charflag.py on the sandbox's Save/characters.db (kept with --keep).
+id = "character-vanilla-delete"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Built a Wine sandbox with the prepared characters.db (slot 0 vanilla, slot 1 marked) and the testopia world files in its Save/",
+    "Replay with setup menu and input steps: Start, a hover on the first card and a click on its X, then the confirmation",
+    "After the run, charflag.py read the kept sandbox's Save/characters.db",
+]
+observations = [
+    "run 2 passed: the X of the vanilla card opened a DELETE CHARACTER button (01-confirm.png), a click on it deleted the card (02-after.png)",
+    "charflag.py on the kept Save/characters.db: one character left, slot 0 `Tester`, level 1, marker ok; the vanilla `testi` is gone and the marked blob kept its marker",
+    "run 1 only showed the DELETE CHARACTER button (no click on it yet)",
+]
+
+[[confirms]]
+entry = "character_select_click"
+observed = "the controller's selected index (+0x800A04) is 0 while the delete button of the vanilla card is shown"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 150
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "click 511 457", "wait 10", "move 512 119", "wait 3", "click 781 70", "wait 6", "shot 01-confirm", "click 930 73", "wait 6", "shot 02-after", "wait 10", "shot 03-final",
+]
+script = """
+log character-vanilla-delete (task 7.3 of add-level-rework): deleting a character without the save marker
+wait 30
+expect character_select_click value u32 == 0 [@0x7691C8] + 0x800A04
+wait 20
+log character-vanilla-delete: done
+"""

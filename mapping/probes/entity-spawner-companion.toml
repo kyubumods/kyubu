@@ -1,0 +1,62 @@
+# Recorded with kyubu_probe, the entity_spawner mod and the Kyubu 1.1 loader in development, unattended under Wine 9.0
+# (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human
+# warrior "Tester" and a new world (seed 1234). A fix after the user's play tests of add-entity-spawner: a companion was
+# always a named friendly (type 3) and could be talked to, unlike the game's pets, and a friendly creature had no combat
+# behaviour. A companion is now a nameless creature of the player's side (hostile type 2) or, named, a summon (type 3), with its
+# owner's id in the creature; a friendly creature fights what is hostile to it. This record checks the types and that they
+# fight. (A first run with the game's pet type, 5, saw the creature removed by the game after 2 s.)
+id = "entity-spawner-companion"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world; waited 15 s there",
+]
+observations = [
+    "Two runs: the first spawned the troll as the game's pet (hostile type 5, owner id in the creature): the game removed it 2 s later at full hp, because it kills a type-5 creature that is not the one pet its owner has registered (the owner's creature holds the pet's id at +0x11C8; check at 0x60D441). So a nameless companion is now hostile type 2, a named one 3",
+    "the second run (this record's input, evidence/entity-spawner-play-fixes-2026-09-30, headless on Xvfb): `spawned Troll (hostile 2, behavior companion)`, `Elf female (hostile 3, behavior companion)`, `Green slime (hostile 2, behavior friendly)` and `Green slime (hostile 1, behavior monster)`, ids -1 to -4; the troll was still there at the end and took no damage",
+    "the hostile slime fought the elf (the named companion): the elf's hp fell from 100 to 26 in 17 s (7 changes) and it was gone at 16:38:43, the slime lost 5.8 hp; the friendly slime and the monster slime wandered to about 219 blocks and the game removed them. The allies deal little damage to a level-1 slime and take a lot from it, as in the first play tests",
+]
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "17 to 18 creatures at the end (7 changes): the four the mod spawned entered the map with the game's id rule (-1 to -4) and the troll (type 2 companion) stayed while the game removed the elf (dead), the monster and the friendly slime"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+# The mod logs every change of a spawned creature's hp (`Name (id N): hp a -> b`) and, with `trace`, where each one is and
+# how far from the player. A nameless companion (a troll: hostile type 2), a named one (an elf: 3) and a friendly slime
+# (2), then a hostile green slime four blocks north that comes to the player: the three should fight it (its hp falls) and
+# the player is not their target.
+input = [
+    "until companion: trace", "console config entity_spawner trace true", "wait 20",
+    "until companion: pet", "console entity_spawner:spawner TROLL companion unnamed", "wait 30",
+    "until companion: named", "console entity_spawner:spawner ELF_FEMALE companion named", "wait 30",
+    "until companion: friendly", "console entity_spawner:spawner GREEN_SLIME friendly", "wait 30", "shot 01-allies",
+    "until companion: monster", "console entity_spawner:spawner GREEN_SLIME monster", "wait 60", "shot 02-fight", "wait 120", "shot 03-later",
+]
+script = """
+log entity spawner companion (a fix after the play tests): a pet, a named companion and a friendly creature fight
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+watch count u32 [@0x7691C8] + 0x2E4
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log companion: trace
+wait 60
+log companion: pet
+wait 60
+log companion: named
+wait 60
+log companion: friendly
+wait 60
+log companion: monster
+wait 420
+inspect creatures
+expect cube::World.creatures watch count increased
+log companion: end
+wait 10
+"""

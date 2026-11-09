@@ -1,0 +1,6 @@
+id = "fx_requires_server"
+name = "Fixture: needs a Kyubu server"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+requires_server = true

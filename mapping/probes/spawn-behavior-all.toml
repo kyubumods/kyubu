@@ -1,0 +1,110 @@
+# Recorded with kyubu_probe, the behavior_proto development mod and the Kyubu 1.1 loader in development, unattended under
+# Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world (seed 1234). Task 8.2 of add-entity-spawner: every behaviour class
+# attached by hand to a spawned slime (the mod calls the game's constructors, appends the children and writes
+# cube::Creature.behavior), and what each one does.
+id = "spawn-behavior-all"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Detoured the four constructors 6.1 left out (CompanionBehavior, RandomInteractionBehavior, SpawnLocationBehavior with no stack argument, WalkPathBehavior with one), traced the sequence and combat constructors, WaypointVector::push_back and the death removal site 0x60E04B; watched the creature count and the player's hp",
+    "`console behavior_proto:cases` (the development mod, hand-built objects: a block from operator_new zeroed, the game's constructor, the children appended, cube::Creature.behavior written, the creature's spawn_pos (+0x1C0) set to its position). Twelve friendly slimes (hostile type 3, which the player cannot hurt) around the player: a control with no behaviour, RandomWalk alone (no sequence), Seq[SpawnLocation, RandomWalk], Seq[LookAt] 10 blocks away and 4 blocks away, Seq[RandomInteraction] 10 and 4 blocks away, Seq[WalkPath] (a 5-block square, 16 blocks away; a 3-block square, 4 blocks away), Seq[Combat, WalkPath] (the guard shape), a Seq[WalkPath] with one waypoint 6 blocks from its spawn, and Seq[Combat, Companion] whose owner is the player's creature id (1), 12 blocks away. The mod logs each creature every 40 ticks (about 12 s under Wine): position, distance from its spawn, body_yaw, hp, distance and bearing to the player, and the behaviour object's words",
+    "The mod's own clock (the console steps of a replay land 8 to 60 s late): after 170 s it writes hp 0 into every case but the companion; after 200 s it spawns a hostile slime (hostile type 1, level 1) with a lone CombatBehavior (no sequence) 6 blocks north-east of the player and writes hp 0 into it 35 s later; the companion gets hp 0 10 s after that. Before the kill the script gave the player input: hold d 5 s, hold a 10 s, hold d 5 s (the player walked about 10 blocks east, then 44 west and back)",
+    "Five runs, kept in the evidence folder (run1 to run4 beside the final files): 1 had no kill or combat phase (its console steps never landed); 2 killed the cases (the death site was hit) but the combat phase failed on int64 coordinates; 3 ran the combat phase; runs 1 to 3 read heap garbage in the fields the constructors do not write (WalkPath +0x14, Companion +4), so the mod now zeroes each block first; 4 is the first with zeroed blocks; 5 (the record) keeps the companion alive for the combat phase",
+]
+observations = [
+    "the four new constructors ran without a fault as detours (Companion 1 call, RandomInteraction 5, SpawnLocation 4, WalkPath 31 with the stack argument 2.0f; the counts include the zone generators' own creatures except Companion, which only the mod built), WaypointVector::push_back 519 calls, the sequence and combat constructors 55 (Combat, incl. two of the mod's); the death removal site ran 14 times after the kills; the hooks were all removed at the end",
+    "every object the mod built was stepped by the game: no fault in any of the five runs, and the game ran on after every kill (the destructor frees the sequence's block only, as 6.1 read: the children and the WalkPath's vector are not freed by it, a leak per creature, not a fault)",
+    "CombatBehavior alone (no sequence) as cube::Creature.behavior works: the hostile slime went from 6 blocks to 2.2 blocks of the player within the first sample, then followed the player (0.1 to 1.2 blocks in the next samples); the player's hp fell from 265 to 167.6 and 23.6 in run 5 (to 0 in run 3). The object's words: +4 a countdown (0x4BC1, 0x18C6, then 0), +8 = 0x41A00000 (20.0f) all the time, +0xC 0x25F once (a state), +0x10 0",
+    "CompanionBehavior: with the owner id written at +8 (the player's id, 1; +0xC 0; +4 zero from the zeroed block) the friendly slime walked from 12 blocks to 2.0 to 3.0 blocks of the player and stayed there, and when the player moved it followed (26.9 blocks from its spawn while the player was 44 blocks west, then back to 2 blocks); it fights what the player fights: in run 5 the hostile slime's hp went 100, 99.3, 15.4, 1.5 while the player stood still and the companion attacked it (the companion's hp fell to 15.9 and it was knocked 26.8 blocks from its spawn); the hostile slime hit the player too (265 to 23.6). The child Combat's +4 counted down like a lone CombatBehavior's",
+    "RandomWalkBehavior alone (no sequence) works: the friendly slime wandered up to 32 to 35 blocks from its spawn (mean 9 to 11), yaw changing at every sample; its +4 is a changing counter. The control (no behaviour) stayed within 0.5 to 1.6 blocks of its spawn with yaw 0",
+    "Seq[SpawnLocation, RandomWalk]: the creature wandered as far as the lone RandomWalk (mean 10 to 14 blocks, at most 31 to 34 blocks from its spawn) although its spawn_pos (+0x1C0) was set: no pull towards the home position was visible up to 34 blocks; the object has no state (4 bytes). Either the class pulls only from farther, or it needs another condition, or it is inert as the first child",
+    "LookAtPlayerBehavior in a sequence turns the creature: the slime 4 blocks north of the player had body_yaw -180.0 (facing south, at the player, bearing 180) and followed the player round (yaw -131 at bearing 125); the one 10 blocks away stayed at yaw 0.0 (as the control) and turned at 8.8 blocks (once the player came nearer), not at 9.6 blocks and beyond: the range is about 9 blocks",
+    "RandomInteractionBehavior in a sequence did nothing that shows: yaw 0.0 and the position unchanged (up to 2 blocks of settling) over about 240 s at 4 and 10 blocks, +4 zero all the time, no change of the name tag or the [R] TALK prompt (every hostile-3 creature has it); the villagers' talk is not from this class, as the strings suggested",
+    "WalkPathBehavior with a hand-built path works once its +0x14 is zero (the copy constructor 0x58B860 zeroes it, the constructor 0x58B8A0 does not): the waypoint index at +0x10 counted 0, 1, 2, 3 (the four corners) for the 5-block and the 3-block square and for the guard's Seq[Combat, WalkPath], the creature turned (yaw changed at 11 to 17 samples) and stayed within 3.5 to 6.9 blocks of its spawn (the square's diagonal is 7.1 blocks), and +0x14 was a timer of some thousand units (up to 0x13C3) that counted down to 0 while the creature stood at a waypoint; the vector at +4 held begin, end and capacity 96 bytes apart for four waypoints (24 bytes each), the float at +0x18 stayed 2.0f. The Seq[WalkPath] with one waypoint 6 blocks south of the creature's spawn walked 4.3 to 5.0 blocks towards it with yaw 178 (facing south) and stopped, index 0 all the time. Runs 1 to 3 (the block not zeroed) showed +0x14 as garbage, a tiny float or a small integer, and the creature did not walk in runs 1 and 2",
+    "the creature's own field the recipe leaves out: +0x1C0 (spawn_pos in the layout) is the SpawnLocationBehavior's home; the loader's recipe does not set it (the zone path copies the Spawn's position there), and 8.3's spawn has to set it for the kinds that read it",
+]
+
+[[confirms]]
+entry = "cube::CompanionBehavior::CompanionBehavior"
+observed = "detoured with no stack argument, 1 call (the mod's); with the owner id 1 written at +8 the friendly slime walked from 12 blocks to 2 to 3 blocks of the player, followed the player over 44 blocks and attacked the hostile slime the player did not touch (its hp 100 to 1.5). +4 is not written by the constructor (zero from a zeroed block, garbage otherwise)"
+
+[[confirms]]
+entry = "cube::RandomInteractionBehavior::RandomInteractionBehavior"
+observed = "detoured with no stack argument, 5 calls (the mod's plus the zone generators'); the object built by hand ran in a sequence for about 240 s at 4 and 10 blocks with no visible effect (yaw and position unchanged, +4 zero), no fault"
+
+[[confirms]]
+entry = "cube::SpawnLocationBehavior::SpawnLocationBehavior"
+observed = "detoured with no stack argument, 4 calls; Seq[SpawnLocation, RandomWalk] with the creature's spawn_pos set wandered as far as a lone RandomWalk (up to 31 to 34 blocks): no pull to the home position seen, no fault"
+
+[[confirms]]
+entry = "cube::WalkPathBehavior::WalkPathBehavior"
+observed = "detoured with one stack argument (2.0f), 31 calls; with +0x14 zeroed and four waypoints appended the object stepped the creature round the square (index 0 to 3, turning, within 7 blocks of its spawn); with one waypoint the creature walked 4 to 5 of 6 blocks towards it. The constructor does not write +0x14"
+
+[[confirms]]
+entry = "WaypointVector::push_back"
+observed = "519 calls (the mod's four appends per path, six paths, and the zone generators'); each path's vector held the appended waypoints 24 bytes apart (96 bytes for four), no fault"
+
+[[confirms]]
+entry = "cube::CombatBehavior::CombatBehavior"
+observed = "traced, 55 calls incl. the mod's; alone as cube::Creature.behavior (no sequence) it drove a hostile slime to 0.1 to 2.2 blocks of the player, whose hp fell 265 to 23.6; inside Seq[Combat, Companion] it fought the hostile slime (hp 100 to 1.5)"
+
+[[confirms]]
+entry = "cube::World::creatureDeathRemoveSite"
+observed = "14 calls after hp 0 was written into the friendly cases, the lone-Combat slime and the companion; no fault, the game ran on"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the count changed 28 times (first 17, last 18): the twelve cases and the hostile slime spawned, all removed after hp 0 (a zone creature may come in as well)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/behavior_proto"]
+input = [
+    "until 8.2: spawn", "console behavior_proto:cases", "wait 40", "shot 01-spawned", "wait 40", "shot 02-later",
+    "until 8.2: circle", "hold d 5", "shot 03-east", "hold a 10", "shot 04-west", "hold d 5",
+    "until cases: phase kill", "wait 6", "shot 05-killed",
+    "until cases: phase combat", "wait 15", "shot 06-combat", "wait 15", "shot 07-combat-later",
+]
+script = """
+log spawn behaviour, every class (task 8.2 of add-entity-spawner)
+wait world
+wait 15
+trace args 3
+trace detour 0 cube::CompanionBehavior::CompanionBehavior
+trace detour 0 cube::RandomInteractionBehavior::RandomInteractionBehavior
+trace detour 0 cube::SpawnLocationBehavior::SpawnLocationBehavior
+trace detour 1 cube::WalkPathBehavior::WalkPathBehavior
+trace add cube::SequentialBehavior::SequentialBehavior
+trace add cube::CombatBehavior::CombatBehavior
+trace add WaypointVector::push_back
+trace add @0x60E04B
+inspect creatures [@0x7691C8] + 0x2DC
+watch count u32 [@0x7691C8] + 0x2E4
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+trace start
+log 8.2: spawn
+wait 150
+inspect creatures
+log 8.2: circle
+wait 170
+trace stop
+trace report
+inspect creatures
+expect cube::CompanionBehavior::CompanionBehavior calls cube::CompanionBehavior::CompanionBehavior >= 1
+expect cube::RandomInteractionBehavior::RandomInteractionBehavior calls cube::RandomInteractionBehavior::RandomInteractionBehavior >= 1
+expect cube::SpawnLocationBehavior::SpawnLocationBehavior calls cube::SpawnLocationBehavior::SpawnLocationBehavior >= 1
+expect cube::WalkPathBehavior::WalkPathBehavior calls cube::WalkPathBehavior::WalkPathBehavior >= 1
+expect WaypointVector::push_back calls WaypointVector::push_back >= 4
+expect cube::World::creatureDeathRemoveSite calls @0x60E04B >= 1
+expect cube::World.creatures watch count changed
+expect cube::CombatBehavior::CombatBehavior calls cube::CombatBehavior::CombatBehavior >= 2
+watch clear
+log 8.2: end
+wait 10
+expect - hooks == 0
+"""

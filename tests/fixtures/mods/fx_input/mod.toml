@@ -1,0 +1,8 @@
+id = "fx_input"
+name = "Fixture: input cancellation"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+description = "Cancels the chat key (Enter) and left clicks while its overlay window is hovered; draws an overlay window every frame."
+[scripts]
+client = "scripts/client.lua"

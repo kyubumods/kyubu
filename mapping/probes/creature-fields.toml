@@ -1,0 +1,240 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. The script reads each field task 8.2 needs, edits the ones the HUD shows and logs a line after each edit;
+# the input waits for that line (`until`) and takes a screenshot (`shot`), so the report folder holds the HUD after
+# every edit. Then the player walks, turns and attacks while watches sample position, velocity, orientation and mode.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; data fields sit at P + 0x10 + their offset.
+id = "creature-fields"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Read name, level, xp, class, specialization, entity type, hostility, hp, mp and the max-hp multiplier",
+    "Edited hp, mp, max_hp_multiplier, level, current_xp and the hair colour; a screenshot after each edit",
+    "Logged the 13 equipment slots, recoloured the weapon slots (material), looked at the creature with the top id",
+    "Walked (W), turned (a click), attacked (mouse buttons held) watching pos, velocity, yaw, pitch, mode, mp",
+    "Set class_type to ranger for a last screenshot",
+]
+observations = [
+    "Wine replay 2 passed, 34 of 34 held; its report folder has a screenshot of the HUD after each edit",
+    "editing HP: hp 265 set to 132.5, both HP bars then read 132/265 and are half full (02-hp-half.png)",
+    "mp is a 0..1 fraction (0.5 shows as 42/100 a second later, draining); max hp scales with max_hp_multiplier",
+    "level 2 and class 2 change the HUD's LVL 2 WARRIOR / LVL 1 RANGER line and the maximum HP",
+    "current_xp 25 fills the XP bar to 25/50, and the game announces the gain",
+    "hair colour edits recolour the model, the HUD portrait and the map marker; weapon material swaps the weapon model",
+    "the warrior's weapon is in equipment slot 7 (cuwo's second weapon slot); slot 6 is empty",
+    "the creature with the top id (the World map's rightmost node) is a bush: EntityType 120, HostileType 6, 25 hp",
+    "mode_start_time is the time spent in the current mode in ms: it counts up and restarts when the mode changes",
+    "replay 1 found two input problems, now fixed: clicks did not attack (the button is read once a frame)",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.pos"
+observed = "walking and turning moved data.pos: y 176 and x 101 changes in 45 s (low halves of the int64 x and y)"
+
+[[confirms]]
+entry = "cube::CreatureData.velocity"
+observed = "velocity.y changed 289 times while walking and stopping (8.1 saw about 10.4 at walking speed)"
+
+[[confirms]]
+entry = "cube::CreatureData.body_yaw"
+observed = "turning (the cursor moved right) changed body_yaw 18 times, in degrees: -102.2 to -123.2"
+
+[[confirms]]
+entry = "cube::CreatureData.body_pitch"
+observed = "changed 300 times while walking, but only by noise (about 1e-38); not shown to mean pitch"
+
+[[confirms]]
+entry = "cube::CreatureData.hp"
+observed = "editing HP: set to 132.5 (half of 265), both HP bars show 132/265 and half full; stays until changed"
+
+[[confirms]]
+entry = "cube::CreatureData.mp"
+observed = "set to 0.5, the MP bar shows 42/100 a second later: a 0..1 fraction that drains (warrior rage)"
+
+[[confirms]]
+entry = "cube::CreatureData.max_hp_multiplier"
+observed = "100 for the player; set to 200, the HUD maximum went from 265 to 525; back to 100, 265"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "1; set to 2, the HUD shows LVL 2 WARRIOR, max HP 292 and XP 0/97; back to 1"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "0; set to 25, the XP bar shows 25/50 and the game says 'You gain 25 XP'"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 (WARRIOR, as the HUD says); set to 2, the HUD shows LVL 1 RANGER and max HP 225"
+
+[[confirms]]
+entry = "cube::CreatureData.specialization"
+observed = "0 for a new character, the byte after class_type; no edit shows on screen"
+
+[[confirms]]
+entry = "cube::CreatureData.entity_type"
+observed = "2 (HUMAN_MALE) for Tester; 120 (BUSH) for the creature with the top id, a bush with 25 hp"
+
+[[confirms]]
+entry = "cube::CreatureData.hostile_type"
+observed = "0 (FRIENDLY_PLAYER) for the player; 6 (TARGET) for the bush"
+
+[[confirms]]
+entry = "cube::CreatureData.current_mode"
+observed = "stays 0 while walking; changed 4 times over two held left-button attacks (0, attack, 0)"
+
+[[confirms]]
+entry = "cube::CreatureData.mode_start_time"
+observed = "counts ms up in real time while the mode stays (+45038 in 45 s) and restarts on a new mode"
+
+[[confirms]]
+entry = "cube::CreatureData.appearance"
+observed = "hair 255/200/50 (the yellow hair); set to 40/80/255, model, portrait and map marker turn blue"
+
+[[confirms]]
+entry = "cube::CreatureData.equipment"
+observed = "13 ItemData: slot 7 the wooden weapon (type 3, material 2), 8/9 rings (9), 10 a lamp (24)"
+
+[[confirms]]
+entry = "cube::CreatureData.name"
+observed = "'Tester', the name gamepilot typed, NUL-terminated; the HUD shows TESTER"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 450
+input = [
+    "until 8.2 hud: start", "wait 2", "shot 01-start",
+    "until 8.2 hud: hp halved", "wait 2", "shot 02-hp-half",
+    "until 8.2 hud: mp half", "wait 1", "shot 03-mp-half",
+    "until 8.2 hud: max hp multiplier doubled", "wait 2", "shot 04-max-hp-x2",
+    "until 8.2 hud: level 2", "wait 2", "shot 05-level-2",
+    "until 8.2 hud: xp 25", "wait 2", "shot 06-xp-25",
+    "until 8.2 hud: hair blue", "wait 2", "shot 07-hair-blue",
+    "until 8.2 hud: weapon gold", "wait 2", "shot 08-weapon-gold",
+    "until 8.2 move: walk, turn, attack",
+    "hold w 8", "click 820 384", "hold w 6", "hold mouse1 1", "wait 2", "hold mouse1 1", "wait 2", "hold mouse3 1",
+    "wait 2", "hold w 4",
+    "shot 09-after-walk",
+    "until 8.2 hud: class ranger", "wait 2", "shot 10-class-ranger",
+]
+script = """
+log creature fields: each required field of the player's cube::Creature, read, edited, seen on the HUD (task 8.2)
+wait world
+wait 20
+inspect player [@0x7691C8]
+# identity: gamepilot's character is "Tester", a level-1 human male (EntityType 2) warrior (ClassType 1), no
+# specialization yet, friendly to the player (HostileType 0), at full health (the HUD shows 265/265, MP 0/100, XP 0/50)
+expect cube::CreatureData.name value u32 == 1953719636 [[@0x7691C8] + 0x8006C8] + 0x1168
+expect cube::CreatureData.name value u16 == 29285 [[@0x7691C8] + 0x8006C8] + 0x116C
+expect cube::CreatureData.name value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x116E
+expect cube::CreatureData.level value i32 == 1 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+expect cube::CreatureData.specialization value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x141
+expect cube::CreatureData.entity_type value u32 == 2 [[@0x7691C8] + 0x8006C8] + 0x64
+expect cube::CreatureData.hostile_type value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x60
+expect cube::CreatureData.hp value f32 == 265 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::CreatureData.mp value f32 == 0 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.max_hp_multiplier value f32 == 100 [[@0x7691C8] + 0x8006C8] + 0x178
+# the appearance gamepilot's character keeps: yellow hair (255, 200, 50), as the HUD portrait shows
+expect cube::CreatureData.appearance value u8 == 255 [[@0x7691C8] + 0x8006C8] + 0x7A
+expect cube::CreatureData.appearance value u8 == 200 [[@0x7691C8] + 0x8006C8] + 0x7B
+expect cube::CreatureData.appearance value u8 == 50 [[@0x7691C8] + 0x8006C8] + 0x7C
+log 8.2 hud: start
+wait 10
+# the editing-HP scenario: half of the current 265
+inspect set data.hp 132.5
+expect cube::CreatureData.hp value f32 <= 133 [[@0x7691C8] + 0x8006C8] + 0x16C
+watch hp f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log 8.2 hud: hp halved
+wait 10
+watch
+watch clear
+expect cube::CreatureData.hp value f32 < 200 [[@0x7691C8] + 0x8006C8] + 0x16C
+inspect set data.mp 0.5
+log 8.2 hud: mp half
+wait 8
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+wait 3
+watch
+watch clear
+inspect set data.max_hp_multiplier 200
+log 8.2 hud: max hp multiplier doubled
+wait 10
+inspect set data.max_hp_multiplier 100
+inspect set data.level 2
+log 8.2 hud: level 2
+wait 10
+inspect set data.level 1
+inspect set data.current_xp 25
+log 8.2 hud: xp 25
+wait 10
+expect cube::CreatureData.current_xp value i32 == 25 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.level value i32 == 1 [[@0x7691C8] + 0x8006C8] + 0x190
+inspect set data.appearance.hair_red 40
+inspect set data.appearance.hair_green 80
+inspect set data.appearance.hair_blue 255
+log 8.2 hud: hair blue
+wait 10
+# equipment: 13 cube::ItemData of 0x118 bytes from P + 0x300 (slot n at P + 0x300 + n * 0x118)
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x300
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x418
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x530
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x648
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x760
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x878
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xBC0
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xCD8
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xDF0
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xF08
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x1020
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0x990
+# the warrior's wooden weapon is in slot 7 (type 3, a weapon; material 2, wood); slot 6 is empty
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+expect cube::CreatureData.equipment value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x990
+expect cube::CreatureData.equipment value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0xAA8
+expect cube::CreatureData.equipment value u8 == 2 [[@0x7691C8] + 0x8006C8] + 0xAA8 + 0xD
+inspect set material 11
+log 8.2 hud: weapon gold
+wait 10
+# another creature: the one with the highest id (in gamepilot's seed-1234 world a bush: EntityType 120 BUSH,
+# HostileType 6 TARGET, 25 hp), the rightmost node of World.creatures (World = controller + 0x2DC,
+# the map at World + 4, its head's right link at +8, the node's cube::Creature* at +0x18)
+inspect creatures [@0x7691C8] + 0x2DC
+expect cube::CreatureData.hostile_type creatures > 1 [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect cube::CreatureData.hp value f32 > 0 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+expect cube::CreatureData.level value i32 >= 1 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x190
+expect cube::CreatureData.hostile_type value u8 == 6 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x60
+expect cube::CreatureData.entity_type value u32 == 120 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x64
+# moving: W for 8 s, a click to the right (turns the camera), W, two attacks (left button held 1 s: a click is over
+# before a frame reads the button at 4 fps), the right-button attack, W
+watch pos_x i32 [[@0x7691C8] + 0x8006C8] + 0x10
+watch pos_y i32 [[@0x7691C8] + 0x8006C8] + 0x18
+watch vel_y f32 [[@0x7691C8] + 0x8006C8] + 0x38
+watch yaw f32 [[@0x7691C8] + 0x8006C8] + 0x30
+watch pitch f32 [[@0x7691C8] + 0x8006C8] + 0x2C
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mode_start u32 [[@0x7691C8] + 0x8006C8] + 0x6C
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+log 8.2 move: walk, turn, attack
+wait 45
+watch
+expect cube::CreatureData.pos watch pos_y increased
+expect cube::CreatureData.pos watch pos_x changed
+expect cube::CreatureData.velocity watch vel_y changed
+expect cube::CreatureData.body_yaw watch yaw changed
+expect cube::CreatureData.body_pitch watch pitch changed
+expect cube::CreatureData.current_mode watch mode changed
+expect cube::CreatureData.mode_start_time watch mode_start changed
+watch clear
+inspect player
+inspect set data.class_type 2
+log 8.2 hud: class ranger
+wait 10
+inspect set data.class_type 1
+inspect player
+"""

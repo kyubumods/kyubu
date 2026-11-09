@@ -1,0 +1,4 @@
+[options.strength]
+type = "int"
+default = 5
+description = "A test option."

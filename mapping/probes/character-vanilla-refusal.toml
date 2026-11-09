@@ -1,0 +1,46 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay, setup menu with clicks as input steps, with the mod level_rework beside
+# kyubu_probe. The sandbox's Save/ held a prepared characters.db (slot 0 the vanilla level-34 `testi`, slot 1 the marked level-1
+# `Tester` of record character-marker, blobs copied unchanged) and the world "testopia", put there by hand before the run
+# (RECIPES.md, "To test with a save"). Task 7.3 of add-level-rework (D6): SELECT on a character without the save marker is refused.
+# The mod hooks character_select_click, so the probe cannot trace it: the refusal is read from the mod's log line, the screenshot and
+# the hash of Save/characters.db before and after (kept with --keep).
+id = "character-vanilla-refusal"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Built a Wine sandbox and copied a prepared characters.db (slot 0 vanilla, slot 1 marked) and the testopia world files into its Save/",
+    "Replay with setup menu and input steps: Start, a hover on the first card (the vanilla character) and SELECT",
+    "Then the input selects the marked card (SELECT goes on to the world list) and enters testopia, where the 60 s autosave writes the marked character",
+    "Read the mod's log, the screenshot of the list after the click, and the hash of Save/characters.db after the run",
+]
+observations = [
+    "run 5 passed (2 of 2 expectations): SELECT on slot 0 (vanilla, level 34) logged `character slot 0 refused: it has no save marker`, the list stayed on screen with the mod's message window (02-refused.png) and the selected index stayed 0",
+    "SELECT on slot 1 (marked) logged `SELECT on character slot 1: marker ok` and the game went on to the world list (03-marked.png); the selected index was 1",
+    "the vanilla blob in Save/characters.db is byte for byte the same after the run (1728 bytes); the marked blob was written by the world's autosave (1029 to 1902 bytes) and charflag.py says `marker ok`; no `save of slot ... skipped` line",
+    "runs 1 to 3 (and a run without the mod) failed for set-up reasons only: SELECT was clicked at y 175, the top edge of the button (it spans y 203 to 271 in the screenshots, and an input's y is about 28 less than the screenshot's: use 205)",
+]
+
+[[confirms]]
+entry = "character_select_click"
+observed = "the controller's selected index (+0x800A04) is 0 after SELECT on the vanilla card and 1 after SELECT on the marked card (the mod hooks the handler, so the probe cannot trace it)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "click 511 457", "wait 10", "shot 01-list", "move 512 119", "wait 3", "click 691 205", "wait 6", "shot 02-refused", "wait 20",
+    "move 512 400", "wait 3", "click 691 435", "wait 8", "shot 03-marked", "move 512 230", "wait 3", "click 691 322", "wait 20", "shot 04-world",
+]
+script = """
+log character-vanilla-refusal (task 7.3 of add-level-rework): SELECT on a character without the save marker
+wait 30
+expect character_select_click value u32 == 0 [@0x7691C8] + 0x800A04
+wait 28
+expect character_select_click value u32 == 1 [@0x7691C8] + 0x800A04
+wait 110
+log character-vanilla-refusal: done
+"""

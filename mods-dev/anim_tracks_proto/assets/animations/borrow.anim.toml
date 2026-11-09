@@ -1,0 +1,5 @@
+# Phase 1 alone: wear pose 2 (the pose vanilla mode 57 draws). The base of `both`.
+duration = 800
+
+[borrow]
+mode = 2

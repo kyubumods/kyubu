@@ -1,0 +1,1449 @@
+# Cube.exe: statically linked library code (MSVC CRT startup, STL template instances, SQLite 3.7.15.2).
+
+[[function]]
+name = "WinMainCRTStartup"
+address = 0x68E1E0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:crt", "manual:PE AddressOfEntryPoint", "correlated:cube-0x51D2CE9C:WinMainCRTStartup"]
+source = "kyubu"
+aliases = ["entry"]
+notes = "MSVC CRT entry: __security_init_cookie, then __tmainCRTStartup, which calls WinMain"
+
+[[function]]
+name = "ModelVector::resize"
+address = 0x40D9D0
+convention = "thiscall"
+prototype = "void __thiscall ModelVector::resize(std::vector<void*>* v, uint32_t n)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "correlated:cube-0x51D2CE9C:ModelVector::resize"]
+source = "kyubu"
+notes = "std::vector<Model*>::resize; ret 4"
+
+[[function]]
+name = "std::list::push_back"
+address = 0x4860B0
+convention = "thiscall"
+prototype = "void __thiscall std::list::push_back(std::list<void*>* list, void** value)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "xref:cube::World::update", "manual:the zone default appends with it, 0x6102A7", "correlated:cube-0x51D2CE9C:std::list::push_back", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+notes = "std::list<T*>::push_back as the compiler folded it: ECX is the list, the stack argument the address of the pointer to append, ret 4. Other pointer lists use it too (0x620D68). On a sequence's list (cube::SequentialBehavior + 4) it adds a child behaviour"
+
+[[function]]
+name = "WaypointVector::push_back"
+address = 0x5BF4F0
+convention = "thiscall"
+prototype = "void __thiscall WaypointVector::push_back(std::vector<void*>* v, const cube::LongVector3* value)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "manual:the region generators append the spawn position to a walk path, 0x5BCD7E", "manual:24-byte elements, grows through 0x5ADF50", "correlated:cube-0x51D2CE9C:WaypointVector::push_back"]
+source = "kyubu"
+notes = "std::vector<cube::LongVector3>::push_back as the compiler folded it: ECX is the vector (begin, end, cap), the stack argument the address of the element, ret 4. On cube::WalkPathBehavior + 4 it adds a waypoint"
+
+[[function]]
+name = "ModelVector::at"
+address = 0x468C60
+convention = "thiscall"
+prototype = "void** __thiscall ModelVector::at(std::vector<void*>* v, uint32_t i)"
+subsystem = "library"
+status = "verified"
+evidence = ["xref:ModelLoader::loadAll", "manual:lea eax,[ecx+eax*4]: element address, no bounds check", "correlated:cube-0x51D2CE9C:ModelVector::at", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+
+[[function]]
+name = "sqlite3_close"
+address = 0x520620
+convention = "cdecl"
+prototype = "int32_t __cdecl sqlite3_close(void* db)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "correlated:cube-0x51D2CE9C:sqlite3_close"]
+source = "kyubu"
+notes = "called by Database::open, Database::close and the destructor"
+
+[[function]]
+name = "winShmMap"
+address = 0x51CBF0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winShmMap"]
+source = "survey"
+
+[[function]]
+name = "attachFunc"
+address = 0x51E390
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:attachFunc"]
+source = "survey"
+
+[[function]]
+name = "datetimeFunc"
+address = 0x51F1F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:datetimeFunc"]
+source = "survey"
+
+[[function]]
+name = "timeFunc"
+address = 0x51F3C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:timeFunc"]
+source = "survey"
+
+[[function]]
+name = "detachFunc"
+address = 0x51F4C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:detachFunc"]
+source = "survey"
+
+[[function]]
+name = "dateFunc"
+address = 0x51F790
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:dateFunc"]
+source = "survey"
+
+[[function]]
+name = "winAccess"
+address = 0x5201B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winAccess"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_compileoption_used"
+address = 0x5203C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_compileoption_used"]
+source = "survey"
+
+[[function]]
+name = "winFullPathname"
+address = 0x520EA0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winFullPathname"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_blob_open"
+address = 0x521A60
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_blob_open"]
+source = "survey"
+
+[[function]]
+name = "winClose"
+address = 0x522690
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winClose"]
+source = "survey"
+
+[[function]]
+name = "winRead"
+address = 0x522830
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winRead"]
+source = "survey"
+
+[[function]]
+name = "winWrite"
+address = 0x523070
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winWrite"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_complete"
+address = 0x5232D0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_complete"]
+source = "survey"
+
+[[function]]
+name = "winTruncate"
+address = 0x5239D0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winTruncate"]
+source = "survey"
+
+[[function]]
+name = "winSync"
+address = 0x524120
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winSync"]
+source = "survey"
+
+[[function]]
+name = "renameParentFunc"
+address = 0x5241A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:renameParentFunc"]
+source = "survey"
+
+[[function]]
+name = "winFileSize"
+address = 0x524570
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winFileSize"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_backup_init"
+address = 0x524800
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_backup_init"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_wal_checkpoint_v2"
+address = 0x525D90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_wal_checkpoint_v2"]
+source = "survey"
+
+[[function]]
+name = "winUnlock"
+address = 0x5264C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winUnlock"]
+source = "survey"
+
+[[function]]
+name = "sqlite3MemMalloc"
+address = 0x5267C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3MemMalloc"]
+source = "survey"
+
+[[function]]
+name = "sqlite3MemRealloc"
+address = 0x526B80
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3MemRealloc"]
+source = "survey"
+
+[[function]]
+name = "winOpen"
+address = 0x527740
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winOpen"]
+source = "survey"
+
+[[function]]
+name = "winDelete"
+address = 0x527B60
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winDelete"]
+source = "survey"
+
+[[function]]
+name = "actionName"
+address = 0x528C60
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:actionName"]
+source = "survey"
+
+[[function]]
+name = "allocateBtreePage"
+address = 0x529110
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:allocateBtreePage"]
+source = "survey"
+
+[[function]]
+name = "allocateSpace"
+address = 0x529AE0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:allocateSpace"]
+source = "survey"
+
+[[function]]
+name = "blobSeekToRow"
+address = 0x52E230
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:blobSeekToRow"]
+source = "survey"
+
+[[function]]
+name = "btreeCreateTable"
+address = 0x52E3B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:btreeCreateTable"]
+source = "survey"
+
+[[function]]
+name = "btreeInitPage"
+address = 0x52E9B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:btreeInitPage"]
+source = "survey"
+
+[[function]]
+name = "checkList"
+address = 0x52F410
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:checkList"]
+source = "survey"
+
+[[function]]
+name = "checkPtrmap"
+address = 0x52F610
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:checkPtrmap"]
+source = "survey"
+
+[[function]]
+name = "checkRef"
+address = 0x52F6A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:checkRef"]
+source = "survey"
+
+[[function]]
+name = "checkTreePage"
+address = 0x52F720
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:checkTreePage"]
+source = "survey"
+
+[[function]]
+name = "constructAutomaticIndex"
+address = 0x532E80
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:constructAutomaticIndex"]
+source = "survey"
+
+[[function]]
+name = "corruptSchema"
+address = 0x5338D0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:corruptSchema"]
+source = "survey"
+
+[[function]]
+name = "createCollation"
+address = 0x533960
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:createCollation"]
+source = "survey"
+
+[[function]]
+name = "createTableStmt"
+address = 0x533C50
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:createTableStmt"]
+source = "survey"
+
+[[function]]
+name = "destroyRootPage"
+address = 0x534100
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:destroyRootPage"]
+source = "survey"
+
+[[function]]
+name = "displayP4"
+address = 0x5343B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:displayP4"]
+source = "survey"
+
+[[function]]
+name = "explainComposite"
+address = 0x534C40
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:explainComposite"]
+source = "survey"
+
+[[function]]
+name = "explainOneScan"
+address = 0x534F70
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:explainOneScan"]
+source = "survey"
+
+[[function]]
+name = "explainSimpleCount"
+address = 0x5351C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:explainSimpleCount"]
+source = "survey"
+
+[[function]]
+name = "explainTempTable"
+address = 0x5352D0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:explainTempTable"]
+source = "survey"
+
+[[function]]
+name = "findBtree"
+address = 0x536FB0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:findBtree"]
+source = "survey"
+
+[[function]]
+name = "flagPragma"
+address = 0x538C40
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:flagPragma"]
+source = "survey"
+
+[[function]]
+name = "freePage2"
+address = 0x539460
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:freePage2"]
+source = "survey"
+
+[[function]]
+name = "getAutoVacuum"
+address = 0x53A730
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:getAutoVacuum"]
+source = "survey"
+
+[[function]]
+name = "getLastErrorMsg"
+address = 0x53A8F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:getLastErrorMsg"]
+source = "survey"
+
+[[function]]
+name = "codeRowTrigger"
+address = 0x53AD90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:codeRowTrigger"]
+source = "survey"
+
+[[function]]
+name = "getSafetyLevel"
+address = 0x53B110
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:getSafetyLevel"]
+source = "survey"
+
+[[function]]
+name = "incrVacuumStep"
+address = 0x53B980
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:incrVacuumStep"]
+source = "survey"
+
+[[function]]
+name = "isSystemTable"
+address = 0x53CB90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:isSystemTable"]
+source = "survey"
+
+[[function]]
+name = "localtimeOffset"
+address = 0x53CE20
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:localtimeOffset"]
+source = "survey"
+
+[[function]]
+name = "locateFkeyIndex"
+address = 0x53D040
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:locateFkeyIndex"]
+source = "survey"
+
+[[function]]
+name = "lockBtree"
+address = 0x53D2A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:lockBtree"]
+source = "survey"
+
+[[function]]
+name = "lookupName"
+address = 0x53D620
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:lookupName"]
+source = "survey"
+
+[[function]]
+name = "multiSelect"
+address = 0x53E4B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:multiSelect"]
+source = "survey"
+
+[[function]]
+name = "openStatTable"
+address = 0x540FF0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:openStatTable"]
+source = "survey"
+
+[[function]]
+name = "parseModifier"
+address = 0x543120
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:parseModifier"]
+source = "survey"
+
+[[function]]
+name = "reloadTableSchema"
+address = 0x545780
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:reloadTableSchema"]
+source = "survey"
+
+[[function]]
+name = "resetAccumulator"
+address = 0x545CE0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:resetAccumulator"]
+source = "survey"
+
+[[function]]
+name = "resolveAttachExpr"
+address = 0x546130
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:resolveAttachExpr"]
+source = "survey"
+
+[[function]]
+name = "resolveCompoundOrderBy"
+address = 0x5461B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:resolveCompoundOrderBy"]
+source = "survey"
+
+[[function]]
+name = "resolveSelectStep"
+address = 0x546AD0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:resolveSelectStep"]
+source = "survey"
+
+[[function]]
+name = "seekWinFile"
+address = 0x5476B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:seekWinFile"]
+source = "survey"
+
+[[function]]
+name = "selectExpander"
+address = 0x547B70
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:selectExpander"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AddColumn"
+address = 0x5490F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AddColumn"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AddDefaultValue"
+address = 0x549280
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AddDefaultValue"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AddPrimaryKey"
+address = 0x549420
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AddPrimaryKey"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AlterBeginAddColumn"
+address = 0x5496D0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AlterBeginAddColumn"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AlterFinishAddColumn"
+address = 0x5498E0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AlterFinishAddColumn"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AlterRenameTable"
+address = 0x549B90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AlterRenameTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AnalysisLoad"
+address = 0x549ED0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AnalysisLoad"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AppendSpace"
+address = 0x54A160
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AppendSpace"]
+source = "survey"
+
+[[function]]
+name = "compare2pow63"
+address = 0x54A9A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:compare2pow63"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AuthReadCol"
+address = 0x54ACC0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AuthReadCol"]
+source = "survey"
+
+[[function]]
+name = "sqlite3AutoLoadExtensions"
+address = 0x54AD90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3AutoLoadExtensions"]
+source = "survey"
+
+[[function]]
+name = "sqlite3BeginTrigger"
+address = 0x54B890
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3BeginTrigger"]
+source = "survey"
+
+[[function]]
+name = "sqlite3BtreeIntegrityCheck"
+address = 0x54D880
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3BtreeIntegrityCheck"]
+source = "survey"
+
+[[function]]
+name = "sqlite3BtreeOpen"
+address = 0x54E4A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3BtreeOpen"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CheckObjectName"
+address = 0x54F8C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CheckObjectName"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ClearStatTables"
+address = 0x54FA40
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ClearStatTables"]
+source = "survey"
+
+[[function]]
+name = "sqlite3Close"
+address = 0x54FC20
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3Close"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CodeDropTable"
+address = 0x5500B0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CodeDropTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CodeSubselect"
+address = 0x5505A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CodeSubselect"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CommitTransaction"
+address = 0x550D90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CommitTransaction"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CreateForeignKey"
+address = 0x551270
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CreateForeignKey"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CreateFunc"
+address = 0x5515C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CreateFunc"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CreateIndex"
+address = 0x551790
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CreateIndex"]
+source = "survey"
+
+[[function]]
+name = "sqlite3CreateView"
+address = 0x552000
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3CreateView"]
+source = "survey"
+
+[[function]]
+name = "sqlite3DeleteFrom"
+address = 0x552560
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3DeleteFrom"]
+source = "survey"
+
+[[function]]
+name = "sqlite3DropIndex"
+address = 0x552CA0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3DropIndex"]
+source = "survey"
+
+[[function]]
+name = "sqlite3DropTable"
+address = 0x552E90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3DropTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3DropTrigger"
+address = 0x5530E0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3DropTrigger"]
+source = "survey"
+
+[[function]]
+name = "sqlite3EndTable"
+address = 0x553490
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3EndTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ExprAssignVarNumber"
+address = 0x553E40
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ExprAssignVarNumber"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ExprCodeTarget"
+address = 0x554E20
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ExprCodeTarget"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ExprListCheckLength"
+address = 0x556650
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ExprListCheckLength"]
+source = "survey"
+
+[[function]]
+name = "sqlite3FinishTrigger"
+address = 0x5576F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3FinishTrigger"]
+source = "survey"
+
+[[function]]
+name = "sqlite3FixSrcList"
+address = 0x557AD0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3FixSrcList"]
+source = "survey"
+
+[[function]]
+name = "sqlite3GenerateConstraintChecks"
+address = 0x558890
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3GenerateConstraintChecks"]
+source = "survey"
+
+[[function]]
+name = "sqlite3GetCollSeq"
+address = 0x55A020
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3GetCollSeq"]
+source = "survey"
+
+[[function]]
+name = "sqlite3IndexedByLookup"
+address = 0x55B3C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3IndexedByLookup"]
+source = "survey"
+
+[[function]]
+name = "sqlite3InitCallback"
+address = 0x55B540
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3InitCallback"]
+source = "survey"
+
+[[function]]
+name = "sqlite3InitOne"
+address = 0x55B750
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3InitOne"]
+source = "survey"
+
+[[function]]
+name = "sqlite3Insert"
+address = 0x55BC20
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3Insert"]
+source = "survey"
+
+[[function]]
+name = "sqlite3InvalidFunction"
+address = 0x55CD50
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3InvalidFunction"]
+source = "survey"
+
+[[function]]
+name = "sqlite3IsReadOnly"
+address = 0x55CF00
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3IsReadOnly"]
+source = "survey"
+
+[[function]]
+name = "sqlite3IsRowid"
+address = 0x55CF90
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3IsRowid"]
+source = "survey"
+
+[[function]]
+name = "sqlite3JoinType"
+address = 0x55D020
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3JoinType"]
+source = "survey"
+
+[[function]]
+name = "sqlite3LoadExtension"
+address = 0x55D490
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3LoadExtension"]
+source = "survey"
+
+[[function]]
+name = "sqlite3LocateTable"
+address = 0x55D730
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3LocateTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3OpenTempDatabase"
+address = 0x55E870
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3OpenTempDatabase"]
+source = "survey"
+
+[[function]]
+name = "sqlite3PagerOpen"
+address = 0x55F550
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3PagerOpen"]
+source = "survey"
+
+[[function]]
+name = "sqlite3PagerSharedLock"
+address = 0x560030
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3PagerSharedLock"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ParseUri"
+address = 0x560540
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ParseUri"]
+source = "survey"
+
+[[function]]
+name = "sqlite3Pragma"
+address = 0x561270
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3Pragma"]
+source = "survey"
+
+[[function]]
+name = "sqlite3RefillIndex"
+address = 0x563950
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3RefillIndex"]
+source = "survey"
+
+[[function]]
+name = "sqlite3Reindex"
+address = 0x563E10
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3Reindex"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ResolveOrderGroupBy"
+address = 0x564180
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ResolveOrderGroupBy"]
+source = "survey"
+
+[[function]]
+name = "sqlite3RunParser"
+address = 0x564800
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3RunParser"]
+source = "survey"
+
+[[function]]
+name = "sqlite3RunVacuum"
+address = 0x564BB0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3RunVacuum"]
+source = "survey"
+
+[[function]]
+name = "sqlite3SafetyCheckOk"
+address = 0x564F10
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3SafetyCheckOk"]
+source = "survey"
+
+[[function]]
+name = "sqlite3SrcListAppendFromTerm"
+address = 0x567240
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3SrcListAppendFromTerm"]
+source = "survey"
+
+[[function]]
+name = "sqlite3StartTable"
+address = 0x567880
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3StartTable"]
+source = "survey"
+
+[[function]]
+name = "sqlite3TwoPartName"
+address = 0x568810
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3TwoPartName"]
+source = "survey"
+
+[[function]]
+name = "sqlite3Update"
+address = 0x568B40
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3Update"]
+source = "survey"
+
+[[function]]
+name = "sqlite3VXPrintf"
+address = 0x56AA30
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3VXPrintf"]
+source = "survey"
+
+[[function]]
+name = "sqlite3VdbeExec"
+address = 0x56C9C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3VdbeExec"]
+source = "survey"
+
+[[function]]
+name = "sqlite3VdbeExpandSql"
+address = 0x573170
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3VdbeExpandSql"]
+source = "survey"
+
+[[function]]
+name = "sqlite3ViewGetColumnNames"
+address = 0x576BD0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3ViewGetColumnNames"]
+source = "survey"
+
+[[function]]
+name = "sqlite3VtabFinishParse"
+address = 0x5771F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3VtabFinishParse"]
+source = "survey"
+
+[[function]]
+name = "sqlite3WalCheckpoint"
+address = 0x577B00
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3WalCheckpoint"]
+source = "survey"
+
+[[function]]
+name = "sqlite3WhereBegin"
+address = 0x5788A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3WhereBegin"]
+source = "survey"
+
+[[function]]
+name = "sqlite3_get_table_cb"
+address = 0x579E10
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqlite3_get_table_cb"]
+source = "survey"
+
+[[function]]
+name = "sqliteProcessJoin"
+address = 0x57A580
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:sqliteProcessJoin"]
+source = "survey"
+
+[[function]]
+name = "unlockReadLock"
+address = 0x57B2F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:unlockReadLock"]
+source = "survey"
+
+[[function]]
+name = "updateVirtualTable"
+address = 0x57B9F0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:updateVirtualTable"]
+source = "survey"
+
+[[function]]
+name = "vdbeCommit"
+address = 0x57C2A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:vdbeCommit"]
+source = "survey"
+
+[[function]]
+name = "vdbeUnbind"
+address = 0x57D290
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:vdbeUnbind"]
+source = "survey"
+
+[[function]]
+name = "vtabBestIndex"
+address = 0x57D440
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:vtabBestIndex"]
+source = "survey"
+
+[[function]]
+name = "vtabCallConstructor"
+address = 0x57D530
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:vtabCallConstructor"]
+source = "survey"
+
+[[function]]
+name = "walIndexRecover"
+address = 0x57E3A0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:walIndexRecover"]
+source = "survey"
+
+[[function]]
+name = "walLimitSize"
+address = 0x57EC20
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:walLimitSize"]
+source = "survey"
+
+[[function]]
+name = "whereTempTriggers"
+address = 0x57F7C0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:whereTempTriggers"]
+source = "survey"
+
+[[function]]
+name = "winLogErrorAtLine"
+address = 0x57FA50
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winLogErrorAtLine"]
+source = "survey"
+
+[[function]]
+name = "winOpenSharedMemory"
+address = 0x57FB50
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:winOpenSharedMemory"]
+source = "survey"
+
+[[function]]
+name = "yy_reduce"
+address = 0x580CD0
+convention = "cdecl"
+subsystem = "library"
+status = "verified"
+evidence = ["library:sqlite3", "manual:named from SQLite 3.7.15.2 source anchors", "correlated:cube-0x51D2CE9C:yy_reduce"]
+source = "survey"
+
+[[function]]
+name = "IntVector::push_back"
+address = 0x66ADD0
+convention = "thiscall"
+prototype = "void __thiscall IntVector::push_back(std::vector<int>* v, const int* value)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "manual:value by pointer, stored at end, end += 4, ret 4", "correlated:cube-0x51D2CE9C:IntVector::push_back"]
+source = "kyubu"
+notes = "std::vector<int>::push_back as the compiler folded it: ECX is the vector (begin, end, cap), the stack argument the address of the 4-byte value, ret 4; grows through 0x63DC90. Appended 115 to the skill bar at GameController+0x80081C and the game kept it (probe ability-slot4)"
+
+[[function]]
+name = "IntVector::clear"
+address = 0x44BE20
+convention = "thiscall"
+prototype = "void __thiscall IntVector::clear(std::vector<int>* v)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "manual:end = begin, capacity kept, no argument", "xref:cube::GameController::update", "correlated:cube-0x51D2CE9C:IntVector::clear"]
+source = "kyubu"
+notes = "std::vector<int>::clear as the compiler folded it: ECX is the vector, no stack argument, plain ret. The first call of the bar build in cube::GameController::update (0x48B8BB); the capacity stays, so a push after the first frame does not allocate"
+
+[[function]]
+name = "IntMap::operator[]"
+address = 0x468910
+convention = "thiscall"
+prototype = "int* __thiscall IntMap::operator[](std::map<int, int>* m, const int* key)"
+subsystem = "library"
+status = "verified"
+evidence = ["library:stl", "manual:lower-bound walk, insert, returns node+0x14, ret 4", "correlated:cube-0x51D2CE9C:IntMap::operator[]"]
+source = "kyubu"
+notes = "std::map<int, 4-byte value>::operator[] as the compiler folded it: ECX is the map (head, size), the stack argument the address of the key, the result the address of the value (node+0x14). A missing key gets a node with value 0. The HUD uses it on the icon map"

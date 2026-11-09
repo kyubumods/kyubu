@@ -1,0 +1,84 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with the mods teleport and level_rework beside kyubu_probe (as teleport-check). Task 6.1 of add-level-rework (M8): the
+# level the loot a spawn carries is made with, in a level-61 dungeon (monsters and chests are made by the same spawn builder).
+id = "item-level-sites-dungeon"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport and level_rework; waited 20 s there",
+    "Traced the item generators (0x5F74E0, 0x5F3BF0, 4 arguments) from the start of the input to the end",
+    "the input turned dev_commands on, went to the nearest level-61 dungeon (`teleport:tp dungeon 61`), landed, and ran `level_rework:levels creatures`",
+]
+observations = [
+    "Wine replays 1 to 3 ran the script to its end with no fault; replay 1 failed on expectations of the record that asked for the spawn builder's call sites (never reached), the final record passed in replay 3. The player was hovered at the nearest level-61 dungeon (x 8400000, y 8389504, +p 2) as in teleport-check; `levels creatures` listed the creatures there, among them 3 chests (type 143) at level 61 with +p 0",
+    "the generators were called once while tracing, about 56 to 58 s after the trace started, 2 s after the hover put the player at the dungeon: item_generate from 0x5F57F5 (inside item_generate_any) with arguments out, level 61 (0x3D), rarity 3 and category -1; item_generate_alt 0 calls. item_generate_any (0x5F5760) was called once, from 0x5F6EC3, with level 61 and rarity 3. So the dungeon's level reaches a generator unconverted, as a mod level",
+    "the spawn builder's two call sites (0x5D827F and 0x5D82DB as return addresses) were not reached: no generator call returned there during the visit. Its loot is rolled when the region is made (before the trace started) or not at all for these spawns; this record does not tell",
+    "0x5EBDBB, the elite's extra item, was passed twice (at 56.3 and 68.3 s): elites exist in the dungeon. The stack words the report prints for that mid hook are not arguments",
+    "not found: what triggered the one generator call (a chest, a monster or a mission item), and where a chest's loot is rolled. The next step is to trace 0x5F6EBE's function with the chest opened, or the callers of the large spawn function near 0x5D1E8F",
+]
+
+[[confirms]]
+entry = "spawn_elite_item_site"
+observed = "passed twice at the dungeon (an elite's extra item; the level word is read straight from the Spawn)"
+
+[[confirms]]
+entry = "item_generate"
+observed = "called once, from 0x5F57F5 (item_generate_any), with level 61, rarity 3, category -1, in a level-61 dungeon"
+
+[[confirms]]
+entry = "item_generate_alt"
+observed = "not called while the player arrived at the dungeon"
+
+[[confirms]]
+entry = "item_generate_any"
+observed = "called once, from 0x5F6EC3, with level 61 and rarity 3"
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61",
+    "wait 50", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 60", "shot 02-landed",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "until tp: done",
+]
+script = """
+log item level sites in a dungeon (task 6.1 of add-level-rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+trace args 4
+trace add @0x5F74E0
+trace add @0x5F3BF0
+trace add @0x5F5760
+trace add @0x5EBDBB
+trace start
+log tp: start
+wait 330
+trace stop
+trace report
+log tp: done
+expect item_generate from @0x5F74E0 @0x5F57F5
+expect item_generate arg @0x5F74E0 2 == 61
+expect item_generate_any from @0x5F5760 @0x5F6EC3
+expect item_generate_any arg @0x5F5760 2 == 61
+expect spawn_elite_item_site calls @0x5EBDBB >= 0
+wait 5
+expect - hooks == 0
+"""

@@ -1,0 +1,76 @@
+# Task 7.1 of add-skills-unleashed-multiplayer: the Berserker's Uppercut in single-player, after the server work (5.x, 6.2, 7.1's
+# landing-push fix), so that single-player still strikes and lands. auto_enter enters the saved world; su_rank sets rank 3 and
+# mp_fill keeps the rage at 1. T is the creature with the top id, [[[[@0x76B1C8] + 0x2E8] + 8] + 0x18] (as in su-armor-compare-0720);
+# the script makes it a stunned level-30 monster at full hp 3 blocks north of the player (P's yaw 0). The strike is an hp drop before 1100 ms of the
+# ability; the landing is the mod's log line of its hits (log_expect), which may come after the ability's end. (Setting hp 10000 does not hold: the game clamps
+# the hp to T's maximum, 25 in run 1, so a check against a fixed hp held before any hit.)
+id = "su-berserker-sp-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-07"
+steps = [
+    "native replay: Cube.exe with auto_enter, emtweaks, skills_unleashed, su_rank and mp_fill; log_effects on through the console",
+    "the script puts T 3 blocks in front of the player, then the input holds key 4 for 0.9 s",
+    "the script watches T's hp until 1100 ms of the ability (the strike); the input waits for the mod's landing line in the log",
+]
+observations = [
+    "native run 5 (2026-11-08, evidence/berserker-e2e-2026-11-07/su-berserker-sp-0720-run5): the strike at rank 3 took T from 85.59 to 54.99 hp (the first quarter) with its sound and ring at T, 3 blocks north; the landing 0.99 s later, 13.8 blocks north, hit 1 creature with its sound, burst and ring; the ability ended `done` after 177 steps, 1705 ms",
+    "native run 1 of task 10.10 (2026-11-09, evidence/berserker-loopback-2026-11-09/su-berserker-sp-0720-run1): the client VM sent the strike over the loopback and the server VM struck, flew and landed T (its log lines say `[server]`); T went from 85.59 to 54.99 hp as in run 5, the landing hit 1 creature 1.0 s after the strike, no warning",
+    "runs 1 to 4 fixed the record, not the mod: hp 10000 is clamped to T's maximum (25 at level 1, so a fixed threshold held before any hit, run 1); a level-1 T died at the strike (run 2); T's velocity reads 0 between the mod's writes (the game zeroes a stunned creature's velocity, run 3); the landing came 1.4 s after the strike, after the ability's end, and a second watch of the top-id creature read a new creature (run 4)",
+]
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "the Uppercut's strike takes hp off T in single-player; the landing hits T (the mod's log)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-dev/auto_enter", "mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/su_rank", "mods-dev/mp_fill"]
+input = [
+    "until berserker ready",
+    "console config skills_unleashed log_effects true",
+    "shot 01-ready",
+    "hold 4 0.9",
+    "shot 02-strike",
+    "until skills_unleashed:berserker ends",
+    "until skills_unleashed: server: berserker: landing hit",
+    "shot 03-after",
+]
+# The landing can come after the ability's end (run 4: 1.4 s after the strike) and T cannot be read again by address (a new
+# creature may take the top id), so the landing is checked in the game's own log: the mod logs its landing hits. Since task 10.10
+# the strike, the flight and the landing are the server VM's (the client VM sends the strike over the loopback): its lines say "server:".
+log_expect = { latest = [
+    "skills_unleashed: server: berserker: strike at rank 3",
+    "skills_unleashed: effect shockwave at",
+    "skills_unleashed:berserker ends `done`",
+    "skills_unleashed: server: berserker: landing hit 1 creature(s)",
+    "skills_unleashed: effect burst at",
+] }
+script = """
+log su-berserker-sp-0720: task 7.1 of add-skills-unleashed-multiplayer
+wait world
+# a timed wait: the nearby creatures stream in after the world is entered, and nothing logs when they have
+wait 5
+inspect cube::Creature [[[[@0x76B1C8] + 0x2E8] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 30
+inspect set data.hp 100000
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x76B1C8] + 0x8006D0] + 0x10
+inspect set data.pos.y from [[@0x76B1C8] + 0x8006D0] + 0x18 plus 0x30000
+inspect set data.pos.z from [[@0x76B1C8] + 0x8006D0] + 0x20
+inspect player [@0x76B1C8]
+inspect set data.body_yaw 0
+watch s f32 [[[[@0x76B1C8] + 0x2E8] + 8] + 0x18] + 0x16C
+log berserker ready
+# the strike is at 700 ms of the player's mode time (+0x6C), the landing about 1 s later: the split is at 1100 ms. (T's velocity
+# is no signal: the game zeroes a stunned creature's velocity, so a sample between two of the mod's writes reads 0.)
+wait 30 until value u8 == 116 [[@0x76B1C8] + 0x8006D0] + 0x68
+wait 5 until value u32 > 1100 [[@0x76B1C8] + 0x8006D0] + 0x6C
+log berserker struck
+expect cube::World::hitCreature watch s decreased
+watch clear
+log su-berserker-sp-0720: done
+"""

@@ -1,0 +1,10 @@
+id = "light_proto"
+name = "Light prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe light-place; the base of the loader's light API). Puts point lights of its own into the frame's light vector at light_collect_site, in timed phases near the player, and logs every record of the vector beside the game's own lamp's."
+
+[scripts]
+client = "scripts/client.lua"

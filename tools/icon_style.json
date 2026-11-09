@@ -1,0 +1,69 @@
+{
+  "_comment": "Measured over the game's 14 x 14 ability icons by `tools/icon_check.py measure`. Numbers only: no pixels. A channel of one number is constant; four numbers are a cubic in the squared distance from `centre`, highest power first.",
+  "version": 1,
+  "size": [14, 14],
+  "tolerance": 8,
+  "tones": {
+    "deep_blue": {
+      "centre": [6.75, 7.25],
+      "channels": [
+        [0],
+        [5.5968e-05, -0.0058473, -0.39231, 119.46],
+        [255]
+      ],
+      "fit_max_error": 2.14
+    },
+    "light_blue": {
+      "centre": [6.75, 6.75],
+      "channels": [
+        [-3.1721e-05, 0.0083528, -1.2919, 71.554],
+        [-1.1373e-05, 0.0050624, -1.1538, 215.55],
+        [255]
+      ],
+      "fit_max_error": 1.91
+    },
+    "red_orange": {
+      "centre": [6.75, 6.5],
+      "channels": [
+        [8.681e-06, -0.0018308, 0.25769, 238.47],
+        [-6.1327e-05, 0.014519, -1.9366, 130.73],
+        [-1.5352e-05, 0.0036105, -0.45594, 31.035]
+      ],
+      "fit_max_error": 1.06
+    },
+    "violet": {
+      "centre": [7.5, 7.5],
+      "channels": [
+        [-3.4038e-07, 0.0022558, -0.38961, 130.57],
+        [-5.1723e-05, 0.013261, -1.8639, 80.344],
+        [255]
+      ],
+      "fit_max_error": 2.89
+    }
+  },
+  "background_pixels_min": 28,
+  "subject_pixels": {
+    "min": 32,
+    "max": 168
+  },
+  "outline": {
+    "colour": [0, 0, 0],
+    "min": 17,
+    "max": 64,
+    "allow_none": true
+  },
+  "distinct_colours": {
+    "min": 2,
+    "max": 95
+  },
+  "sample": {
+    "icons": 57,
+    "per_tone": {
+      "deep_blue": 6,
+      "light_blue": 11,
+      "red_orange": 21,
+      "violet": 19
+    },
+    "without_outline": ["camouflage", "shuriken", "sneak2"]
+  }
+}

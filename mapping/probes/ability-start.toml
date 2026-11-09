@@ -1,0 +1,131 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. The tracer watches the candidate ability-start points found statically in cube::GameController::update (the
+# loader hooks update itself, so its inner site is traced, plus the creature methods it calls) while gamepilot uses
+# the warrior's right-button ability (id 59) three times, then twice before a walk.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-start"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Read the player's ability table (GameController + 0x80080C): slot 0 (M1) 57, slot 1 (M2) 59",
+    "Traced 7 candidates: the switch tail in GameController::update, 5 creature and controller methods, the cooldown",
+    "Phase 1: set mp to 1 and pressed M2 (right button, 0.6 s), three times 12 s apart; a screenshot after each",
+    "Phase 2: two more M2 uses 12 s apart, then walked (W) for 10 s, tracing throughout",
+]
+observations = [
+    "Wine replay 3 passed, all checks held (replay 1 and 2 held the same phases; their primary-attack phase failed)",
+    "phase 1: the site 0x49BF68 fired 3 times, at 9.8, 14.7 and 26.4 s, each on the first frame of a press",
+    "modeInterruptible fired on every frame M2 was held (13 calls in 3 clusters), all from 0x49B820",
+    "current_mode became 59 at each use, then 60 (a follow-up mode) and 0; the HUD's MP bar drops about 70 points",
+    "ability_cooldown ran once per new mode (59, then 60) from cube::World::update (0x616E13), for every creature",
+    "phase 2: the site fired twice (2.0 and 13.7 s) and not during the walk; ability_cooldown kept firing (others)",
+    "primaryAttack, weaponAttack (0x445CA0) and the item use 0x4A2940 (the Q potion) never fired",
+    "mp is forced to 1 before each use: a level-1 warrior's rage starts at 0 and is only earned by hitting",
+    "gamepilot's mouse1 had no effect under Wine; its mouse2 made one M1 attack (discovery), not reproduced",
+]
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "fired exactly once per M2 ability use (3 of 3, then 2 of 2), never while walking; ECX the player"
+
+[[confirms]]
+entry = "cube::Creature::modeInterruptible"
+observed = "called by the ability loop (return 0x49B820) on each frame a slot is held, ECX the player"
+
+[[confirms]]
+entry = "ability_cooldown"
+observed = "called once per mode start by cube::World::update (0x616E13) with the new mode's id and level -1"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+input = [
+    "until 9.1 use 1",
+    "wait 1",
+    "hold mouse3 0.6",
+    "wait 1",
+    "shot 01-use-1",
+    "until 9.1 use 2",
+    "wait 1",
+    "hold mouse3 0.6",
+    "wait 1",
+    "shot 02-use-2",
+    "until 9.1 use 3",
+    "wait 1",
+    "hold mouse3 0.6",
+    "wait 1",
+    "shot 03-use-3",
+    "until 9.1 again 1",
+    "wait 1",
+    "hold mouse3 0.6",
+    "until 9.1 again 2",
+    "wait 1",
+    "hold mouse3 0.6",
+    "until 9.1 walk",
+    "hold w 10",
+]
+script = """
+log ability start (task 9.1): the right-button ability used three times, then twice before a walk
+wait world
+wait 15
+inspect player [@0x7691C8]
+# the player's ability table: a std::vector<int> at GameController + 0x80080C; slot 0 (the primary attack) holds 57
+# and slot 1 (the right button) 59 for gamepilot's warrior
+expect - value i32 == 57 [[@0x7691C8] + 0x80080C]
+expect - value i32 == 59 [[@0x7691C8] + 0x80080C] + 4
+trace args 2
+trace add @0x49BF68
+trace add @0x43EBF0
+trace add @0x43EE40
+trace add @0x445A10
+trace add @0x445CA0
+trace add @0x4A2940
+trace add ability_cooldown
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+# phase 1, the ability-start-traced scenario: three uses, 12 s apart (mp refilled before each: the ability costs
+# about 0.7 of the bar)
+trace start
+inspect set data.mp 1
+log 9.1 use 1
+wait 12
+inspect set data.mp 1
+log 9.1 use 2
+wait 12
+inspect set data.mp 1
+log 9.1 use 3
+wait 12
+trace stop
+trace report
+watch
+watch clear
+# exactly one candidate fires three times: the site in cube::GameController::update where the ability's id becomes
+# current_mode; its ECX is the player's cube::Creature (vtable 0x6FC8CC)
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 3
+expect cube::GameController::abilityStartSite value u32 == 7325900 ecx(@0x49BF68)
+expect cube::Creature::modeInterruptible calls @0x43EBF0 > 3
+expect cube::Creature::modeInterruptible caller @0x43EBF0 0x49B820
+expect - calls @0x445A10 == 0
+expect - calls @0x445CA0 == 0
+expect - calls @0x4A2940 == 0
+expect ability_cooldown calls ability_cooldown >= 6
+expect ability_cooldown caller ability_cooldown 0x616E13
+# phase 2, the which-function-starts-an-ability scenario (5.4): two uses, then ten seconds of walking
+trace start
+inspect set data.mp 1
+log 9.1 again 1
+wait 12
+inspect set data.mp 1
+log 9.1 again 2
+wait 12
+log 9.1 walk
+wait 12
+trace stop
+trace report
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 2
+expect - calls @0x445CA0 == 0
+expect - calls @0x4A2940 == 0
+"""

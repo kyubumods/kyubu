@@ -1,0 +1,169 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop): kmap
+# probe replay starts Server.exe, then a Kyubu-loaded Cube.exe in the same Wine prefix that joins 127.0.0.1 with a new
+# character (client = "join") and attacks with M2 (gamepilot holds the right button). The script runs on the server.
+# Which side decides a hit in multiplayer (task 9.5): the side that runs the attacker's mode detects the hit. The
+# joined client runs only its own player's modes and sends its hits; the server applies them to monsters. The server
+# runs the monsters' modes; a hit on a player is forwarded to that player's client, which applies it and reports its
+# hp. The target is the server's creature with the top id T = [[[W + 4] + 8] + 0x18], made hostile and moved next to
+# the joined player PS = [[[W + 4]] + 0x18] (id 1); W is the server's World, ecx(@0x532260).
+id = "hit-authority"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Server.exe, then a client that joins with a new warrior; the script waits 140 s for it",
+    "Traced the server's hitCreature, applyHit, canHit, damage and forward sites (3 args each)",
+    "Phase 1: T hostile, stunned, level 1, hp 1000; four M2 holds with T half a block along +x, then +y, in turn",
+    "Phase 2: T unstunned, level 20, moved next to PS, forced into cyclone (86) twice; PS's hp watched",
+]
+observations = [
+    "Wine replay 4 passed, 14 of 14 checks held; screenshots 01-joined, 02-attacked, 03-hit",
+    "the server's World: joined (+0xB4) 0 and local_player (+0xB8) 0",
+    "phase 1: each of the 4 M2 holds sent one hit: the received-hit loop passed 4 times (4.7, 16.5, 28.5, 40.5 s)",
+    "phase 1: applyHit 4 times, all from the loop (0x532AF0), each reaching its damage test; no server hitCreature",
+    "phase 1: T's hp stayed 1000: an uncharged M2 deals 0 (probe hit-damage, phase 3), so nothing to subtract",
+    "phase 2: T (level 20) hit PS 26 times (2.3 to 3.2 before armour); hitCreature 26, forward site 26, damage site 0",
+    "phase 2: PS's hp on the server 265 -> 193.8 in 22 steps: the client applied the forwarded hits and reported its hp",
+    "replay 1: at level 1 T's hits did 0.3 in all to the player (armour); replay 3: a wild monster joined in",
+    "replays 1 to 3 failed on guesses since corrected (the M2's 0 damage, T's level, a wild monster during phase 1)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in the server's World"
+
+[[confirms]]
+entry = "cube::World.local_player"
+observed = "0 in the server's World"
+
+[[confirms]]
+entry = "cube::World::applyHit"
+observed = "runs for the hits the client sends (from the received-hit loop), and for the server's own hits"
+
+[[confirms]]
+entry = "cube::World::receivedHitSite"
+observed = "passes once per M2 hit the joined client sent"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "never for the player's attacks (the client detects them); for the creature's cyclone"
+
+[[confirms]]
+entry = "cube::World::canHit"
+observed = "called while the creature's cyclone looks for targets"
+
+[[confirms]]
+entry = "cube::World::hitDamageSite"
+observed = "lowers the monster's hp for the client's hits; never for a hit on the player"
+
+[[confirms]]
+entry = "cube::World::hitForwardSite"
+observed = "passes for the creature's hits on the player"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 360
+input = [
+    "shot 01-joined",
+    "until 9.5: attack 1", "wait 1", "hold mouse3 2",
+    "until 9.5: attack 2", "wait 1", "hold mouse3 2",
+    "until 9.5: attack 3", "wait 1", "hold mouse3 2",
+    "until 9.5: attack 4", "wait 1", "hold mouse3 2", "shot 02-attacked",
+    "until 9.5: the creature hits", "wait 3", "shot 03-hit",
+]
+script = """
+log hits in multiplayer (task 9.5): who detects and who applies a hit, seen from the server
+trace args 3
+trace add @0x532260
+trace start
+wait 140
+trace stop
+expect cube::World.joined value u8 == 0 ecx(@0x532260) + 0xB4
+expect cube::World.local_player value u32 == 0 ecx(@0x532260) + 0xB8
+trace add @0x4CFCC0
+trace add @0x4CE9F0
+trace add @0x4D1830
+trace add @0x4CEF7E
+trace add @0x4CEA9C
+inspect creatures ecx(@0x532260)
+# phase 1: the player hits T. T is hostile (the client's canHit lets a player hit hostile_type 1), stunned (it
+# neither moves nor attacks), at level 1 (the attacker's client subtracts T's armour, which grows with the level, and
+# replay 1's T took no damage), with hp 1000 (max hp raised first); the client's M2 is held four times, with T half a
+# block along +x and +y in turn (the sides replays 1 and 2 hit from). A new warrior has no rage, so its M2 charges
+# nothing and its hits carry a damage of 0 (probe hit-damage, phase 3): the server takes each through applyHit to
+# its damage test, which then has nothing to subtract
+inspect cube::Creature [[[ecx(@0x532260) + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.stun_time 120000
+watch thp f32 [[[ecx(@0x532260) + 4] + 8] + 0x18] + 0x16C
+# the received-hit loop of the server's World step (one pass per hit a client sent) and applyHit's damage test
+trace add @0x532AD0
+trace add @0x4CEE7D
+trace start
+inspect set data.pos.x from [[[ecx(@0x532260) + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[ecx(@0x532260) + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[ecx(@0x532260) + 4]] + 0x18] + 0x20
+log 9.5: attack 1
+wait 12
+inspect set data.pos.x from [[[ecx(@0x532260) + 4]] + 0x18] + 0x10
+inspect set data.pos.y from [[[ecx(@0x532260) + 4]] + 0x18] + 0x18 plus 0x8000
+inspect set data.pos.z from [[[ecx(@0x532260) + 4]] + 0x18] + 0x20
+log 9.5: attack 2
+wait 12
+inspect set data.pos.x from [[[ecx(@0x532260) + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[ecx(@0x532260) + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[ecx(@0x532260) + 4]] + 0x18] + 0x20
+log 9.5: attack 3
+wait 12
+inspect set data.pos.x from [[[ecx(@0x532260) + 4]] + 0x18] + 0x10
+inspect set data.pos.y from [[[ecx(@0x532260) + 4]] + 0x18] + 0x18 plus 0x8000
+inspect set data.pos.z from [[[ecx(@0x532260) + 4]] + 0x18] + 0x20
+log 9.5: attack 4
+wait 12
+trace stop
+trace report
+watch
+inspect cube::Creature [[[ecx(@0x532260) + 4] + 8] + 0x18]
+expect cube::World::receivedHitSite calls @0x532AD0 >= 1
+expect cube::World::applyHit calls @0x4CE9F0 >= 1
+expect cube::World::applyHit caller @0x4CE9F0 0x532AF0
+expect cube::World::applyHit calls @0x4CEE7D >= 1
+expect cube::World::hitCreature calls @0x4CFCC0 == 0
+expect cube::World::hitForwardSite calls @0x4CEA9C == 0
+watch clear
+# phase 2: T hits the player. T is freed, raised to level 20 (at level 1 the player's armour absorbed its hits in
+# replay 1), put next to the player and forced into cyclone; the server's World runs a hostile creature's mode,
+# detects the hits and forwards them; the player's hp on the server falls only when the client, which applied them,
+# reports it
+watch php f32 [[[ecx(@0x532260) + 4]] + 0x18] + 0x16C
+inspect set data.stun_time 0
+inspect set data.level 20
+inspect set data.pos.x from [[[ecx(@0x532260) + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[ecx(@0x532260) + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[ecx(@0x532260) + 4]] + 0x18] + 0x20
+trace start
+log 9.5: the creature hits
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 6
+trace stop
+trace report
+watch
+inspect cube::Creature [[[ecx(@0x532260) + 4]] + 0x18]
+expect cube::World::hitCreature calls @0x4CFCC0 >= 1
+expect cube::World::canHit calls @0x4D1830 >= 1
+expect cube::World::hitForwardSite calls @0x4CEA9C >= 1
+expect cube::World::hitDamageSite calls @0x4CEF7E == 0
+expect cube::World::hitForwardSite watch php decreased
+watch clear
+wait 5
+expect - hooks == 0
+"""

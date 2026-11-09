@@ -1,0 +1,742 @@
+# Cube.exe: the plasma UI framework (widgets, nodes, .plx files) and the game's cube::*Widget classes.
+# Server.exe has no plasma classes and no .plx strings: the UI is client-only.
+
+# --- plasma: the widget base class ------------------------------------------------------------------------------
+
+[[function]]
+name = "plasma::Widget::Widget"
+address = 0x627260
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:plasma::Widget", "manual:stores both vtables; called by every cube widget constructor", "correlated:cube-0x51D2CE9C:plasma::Widget::Widget"]
+source = "kyubu"
+notes = "stores 0x71E724, and 0x71E7D4 at +0x24; the base constructor. 0x627450 stores the same vtables and is called by the clone (slot 40) and by the plasma buttons, lists and edits: the copy constructor"
+
+[[function]]
+name = "plasma::Widget::~Widget"
+address = 0x6276A0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:plasma::Widget", "manual:called by the deleting destructors in vtable slot 0", "correlated:cube-0x51D2CE9C:plasma::Widget::~Widget"]
+source = "kyubu"
+notes = "restores the vtables; slot 0 is 0x428A30 for most widgets"
+
+[[function]]
+name = "plasma::Widget::clone"
+address = 0x627DC0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["vtable:plasma::Widget:40", "manual:operator new, then the copy constructor 0x627450", "correlated:cube-0x51D2CE9C:plasma::Widget::clone"]
+source = "kyubu"
+
+[[function]]
+name = "plasma::Widget::getWidth"
+address = 0x627D50
+convention = "thiscall"
+prototype = "float __thiscall plasma::Widget::getWidth(void* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "manual:88 callers; float in ST0 from the layout at +0x50 to +0x7C", "correlated:cube-0x51D2CE9C:plasma::Widget::getWidth"]
+source = "kyubu"
+notes = "the widget's width in pixels (200 for the start menu), returned in ST0, from three float pairs of the layout at +0x50, +0x60, +0x70, clamped at 0. StartMenuWidget::draw uses it as the right end of the hit test and halves it for the rows' x"
+
+[[function]]
+name = "plasma::Widget::getCursor"
+address = 0x6294D0
+convention = "thiscall"
+prototype = "void __thiscall plasma::Widget::getCursor(void* this, float* out_xy)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "manual:15 callers; one stack argument, callee pops (ret 4)", "correlated:cube-0x51D2CE9C:plasma::Widget::getCursor"]
+source = "kyubu"
+notes = "writes the cursor in the widget's frame to out_xy[0..1]: the engine's cursor (this+4 is the engine; plasma::D3D9Engine.cursor_x, cursor_y) minus the widget's world position (matrix from 0x62D7F0; own position at +0x68, +0x6C). StartMenuWidget::draw tests it against the rows"
+
+[[function]]
+name = "plasma::Widget::setPosition"
+address = 0x62A650
+convention = "thiscall"
+prototype = "void __thiscall plasma::Widget::setPosition(void* this, float x, float y, int update)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize", "manual:three stack arguments, callee pops (ret 0xC)", "correlated:cube-0x51D2CE9C:plasma::Widget::setPosition"]
+source = "kyubu"
+notes = "puts the widget's top-left corner at (x, y) in its parent's frame; onResize places the start menu at ((W - width) / 2, H / 2 + 50) and the Back button at (20, 20) with it; the last argument is 1 at every call"
+
+[[function]]
+name = "plasma::Widget::setSize"
+address = 0x62C570
+convention = "thiscall"
+prototype = "void __thiscall plasma::Widget::setSize(void* this, float width, float height, int update)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "manual:three stack arguments, callee pops (ret 0xC)", "correlated:cube-0x51D2CE9C:plasma::Widget::setSize"]
+source = "kyubu"
+notes = "sizes the widget (and its plate); the constructor sizes the start menu 200 x 100 and the cloned buttons 200 or 300 x 40 with it; the last argument is 1 at every call"
+
+[[function]]
+name = "plasma::Widget::getSizeWidth"
+address = 0x62F600
+convention = "thiscall"
+prototype = "float __thiscall plasma::Widget::getSizeWidth(void* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize", "manual:no stack argument, float in ST0, first of the size pair", "correlated:cube-0x51D2CE9C:plasma::Widget::getSizeWidth"]
+source = "kyubu"
+notes = "the width set by plasma::Widget::setSize; onResize subtracts it from the window width to right-align widgets"
+
+[[function]]
+name = "plasma::Widget::getSizeHeight"
+address = 0x6291D0
+convention = "thiscall"
+prototype = "float __thiscall plasma::Widget::getSizeHeight(void* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::onResize", "manual:no stack argument, float in ST0, second of the size pair", "correlated:cube-0x51D2CE9C:plasma::Widget::getSizeHeight"]
+source = "kyubu"
+notes = "the height set by plasma::Widget::setSize; onResize subtracts it from the window height to bottom-align widgets"
+
+[[function]]
+name = "plasma::connect_widget"
+address = 0x629140
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:called after each MemberFunctionConnection is built", "correlated:cube-0x51D2CE9C:plasma::connect_widget"]
+source = "kyubu"
+notes = "the makers are 0x427BC0, 0x4576F0, 0x4C1A90 and 0x4CF2A0; the plasma buttons and sliders call it too; adds a connection (a member-function callback) to a widget's list; the connection's slot 0 calls the member function"
+
+# --- plasma: engine, nodes and .plx files ------------------------------------------------------------------------
+
+[[function]]
+name = "plasma::Engine::Engine"
+address = 0x64D0F0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:plasma::Engine", "manual:stores the vtable; slot 0 calls 0x64D840, the destructor", "correlated:cube-0x51D2CE9C:plasma::Engine::Engine"]
+source = "kyubu"
+notes = "uses the strings sources and fonts, builds the font engine (0x638FA0) and the root node"
+
+[[function]]
+name = "plasma::D3D9Engine::D3D9Engine"
+address = 0x6887A0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:plasma::D3D9Engine", "manual:stores the vtable; slot 0 calls 0x688900, the destructor", "correlated:cube-0x51D2CE9C:plasma::D3D9Engine::D3D9Engine"]
+source = "kyubu"
+notes = "called by 0x4C8720 (Direct3DCreate9, 1024x768, c:\\windows\\fonts), under WinMain; the engine pointer ends up at GameController+0x800718"
+
+[[function]]
+name = "plasma::create_node"
+address = 0x64F4E0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:calls the Node, Transformation and Display constructors", "correlated:cube-0x51D2CE9C:plasma::create_node"]
+source = "kyubu"
+notes = "thiscall on the engine; a new named node; the last argument is the name (a wstring)"
+
+[[function]]
+name = "plasma::clone_node"
+address = 0x636040
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:recursive; calls plasma::create_node for each node", "correlated:cube-0x51D2CE9C:plasma::clone_node"]
+source = "kyubu"
+notes = "thiscall on the template node, arg the parent; copies a node tree from a template (the inventory slots, the character list); returns the copy"
+
+[[function]]
+name = "plasma::Node::clone"
+address = 0x6326D0
+convention = "thiscall"
+prototype = "void* __thiscall plasma::Node::clone(void* this, void* parent)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "manual:create_node, widget slot 40, recurses into children; ret 4", "correlated:cube-0x51D2CE9C:plasma::Node::clone"]
+source = "kyubu"
+notes = "copies this node and its children under parent and returns the copy: shape (+0x34), transformation (+0x38), display (+0x3C) and widget (+0x40, plasma::Widget::clone, which starts an empty connection list). How the constructor makes every button from the button template"
+
+[[function]]
+name = "plasma::Node::findChild"
+address = 0x633D70
+convention = "thiscall"
+prototype = "void* __thiscall plasma::Node::findChild(void* this, const void* name)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "manual:one stack argument, a std::wstring*; ret 4", "correlated:cube-0x51D2CE9C:plasma::Node::findChild"]
+source = "kyubu"
+notes = "the node of that name under this one, or null; the constructor finds about 60 templates in cube::GameController.templates with it"
+
+[[function]]
+name = "plasma::Node::setParent"
+address = 0x636950
+convention = "thiscall"
+prototype = "void __thiscall plasma::Node::setParent(void* this, void* parent)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:unlinks from the old parent (+0x28) first; ret 4", "correlated:cube-0x51D2CE9C:plasma::Node::setParent"]
+source = "kyubu"
+notes = "moves the node under parent (null detaches it); update moves options_panel between start_scene and templates with it"
+
+[[function]]
+name = "plasma::Node::setText"
+address = 0x636AD0
+convention = "thiscall"
+prototype = "void __thiscall plasma::Node::setText(void* this, const void* text)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::GameController", "manual:one stack argument, a std::wstring*; ret 4", "correlated:cube-0x51D2CE9C:plasma::Node::setText"]
+source = "kyubu"
+notes = "sets the text of the node's text shape (a button's label: Back, Create World, Multiplayer Worlds...)"
+
+[[function]]
+name = "plasma::set_node_widget"
+address = 0x631460
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:walks the child nodes by name and stores the widget", "correlated:cube-0x51D2CE9C:plasma::set_node_widget"]
+source = "kyubu"
+notes = "thiscall on a node, args (name, widget, recursive); how a cube::*Widget is attached: to the node of that name in a loaded .plx tree"
+
+[[function]]
+name = "plasma::load_plx"
+address = 0x653770
+convention = "cdecl"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:prints read <path> to wcout, opens the file and calls plasma::read_plx", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:plasma::load_plx"]
+source = "kyubu"
+notes = "arg 1 is the path (a wstring). Also called by 0x657480 and 0x65F3D0, which open a file themselves (a .plx that refers to another?)"
+
+[[function]]
+name = "plasma::read_plx"
+address = 0x681C70
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:checks the PlasmaGraphics header, throws the plasma exceptions", "xref:plasma::load_plx", "correlated:cube-0x51D2CE9C:plasma::read_plx"]
+source = "kyubu"
+notes = "throws plasma::InvalidFileFormatException, InvalidVersionException and InvalidDemoLicenseException; reads the objects by type name: Texture, TextShape, SmoothMeshShape, GenericShape, Transformation, Display, Widget, Button, ListWidget, Edit, ScrollButton, ScrollSlider, PopUpButton, Node"
+
+[[function]]
+name = "plasma::read_plx_node"
+address = 0x683F00
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:reads the Node.* attributes (Node.widget, Node.child ...)", "xref:plasma::read_plx", "correlated:cube-0x51D2CE9C:plasma::read_plx_node"]
+source = "kyubu"
+
+[[function]]
+name = "plasma::read_plx_widget"
+address = 0x687560
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:reads the Widget.* attributes (Widget.name, Widget.caption ...)", "correlated:cube-0x51D2CE9C:plasma::read_plx_widget"]
+source = "kyubu"
+notes = "called by the per-type readers (Button, ListWidget, Edit ...) for their Widget part"
+
+[[function]]
+name = "cube::load_interface_plx"
+address = 0x584300
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:uses interface.plx and names like button:click, widget:show", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::load_interface_plx"]
+source = "kyubu"
+notes = "reads interface.plx through 0x40D010/0x40CC40, a second PlasmaGraphics reader; the event names are probably the UI sounds (guess)"
+
+# --- cube::*Widget constructors (each is its class's only direct vtable store; size from operator new) ----------
+
+[[function]]
+name = "cube::AdaptionWidget::AdaptionWidget"
+address = 0x40ECD0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::AdaptionWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::AdaptionWidget::AdaptionWidget"]
+source = "kyubu"
+notes = "376 bytes"
+
+[[function]]
+name = "cube::CharacterPreviewWidget::CharacterPreviewWidget"
+address = 0x424E80
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::CharacterPreviewWidget", "manual:called by 0x49D650, which builds one per saved character", "correlated:cube-0x51D2CE9C:cube::CharacterPreviewWidget::CharacterPreviewWidget"]
+source = "kyubu"
+notes = "360 bytes; args (engine, node, game controller)"
+
+[[function]]
+name = "cube::CharacterStyleWidget::CharacterStyleWidget"
+address = 0x427CE0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::CharacterStyleWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::CharacterStyleWidget::CharacterStyleWidget"]
+source = "kyubu"
+notes = "424 bytes; connects its buttons through 0x427BC0 (MemberFunctionConnection<cube::CharacterStyleWidget>)"
+
+[[function]]
+name = "cube::BlueprintPreviewWidget::BlueprintPreviewWidget"
+address = 0x42F190
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::BlueprintPreviewWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::BlueprintPreviewWidget::BlueprintPreviewWidget"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CharacterWidget::CharacterWidget"
+address = 0x434D90
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::CharacterWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::CharacterWidget::CharacterWidget"]
+source = "kyubu"
+notes = "356 bytes"
+
+[[function]]
+name = "cube::ChatWidget::ChatWidget"
+address = 0x4393B0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::ChatWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::ChatWidget::ChatWidget"]
+source = "kyubu"
+notes = "400 bytes"
+
+[[function]]
+name = "cube::EnchantWidget::EnchantWidget"
+address = 0x44E910
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::EnchantWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::EnchantWidget::EnchantWidget"]
+source = "kyubu"
+notes = "372 bytes"
+
+[[function]]
+name = "cube::InventoryWidget::InventoryWidget"
+address = 0x4C1BB0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::InventoryWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::InventoryWidget::InventoryWidget"]
+source = "kyubu"
+notes = "440 bytes, three instances; finds its children upbutton, downbutton and scrollbutton, connects them through 0x4C1A90"
+
+[[function]]
+name = "cube::MapOverlayWidget::MapOverlayWidget"
+address = 0x4C95A0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::MapOverlayWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::MapOverlayWidget::MapOverlayWidget"]
+source = "kyubu"
+notes = "356 bytes"
+
+[[function]]
+name = "cube::ObjectiveWidget::ObjectiveWidget"
+address = 0x4CE180
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::ObjectiveWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::ObjectiveWidget::ObjectiveWidget"]
+source = "kyubu"
+notes = "368 bytes"
+
+[[function]]
+name = "cube::OptionsWidget::OptionsWidget"
+address = 0x4CF3C0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::OptionsWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::OptionsWidget::OptionsWidget"]
+source = "kyubu"
+notes = "496 bytes; connects its controls through 0x4CF2A0"
+
+[[function]]
+name = "cube::PreviewWidget::PreviewWidget"
+address = 0x4D4F10
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::PreviewWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::PreviewWidget::PreviewWidget"]
+source = "kyubu"
+notes = "384 bytes"
+
+[[function]]
+name = "cube::SkillWidget::SkillWidget"
+address = 0x4DD750
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::SkillWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::SkillWidget::SkillWidget"]
+source = "kyubu"
+notes = "404 bytes"
+
+[[function]]
+name = "cube::SpeechWidget::SpeechWidget"
+address = 0x4E5C90
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::SpeechWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::SpeechWidget::SpeechWidget"]
+source = "kyubu"
+notes = "480 bytes, two instances"
+
+[[function]]
+name = "cube::SpriteWidget::SpriteWidget"
+address = 0x51C310
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::SpriteWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::SpriteWidget::SpriteWidget"]
+source = "kyubu"
+notes = "364 bytes, two instances"
+
+[[function]]
+name = "cube::StartMenuWidget::StartMenuWidget"
+address = 0x583270
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::StartMenuWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::StartMenuWidget::StartMenuWidget"]
+source = "kyubu"
+notes = "360 bytes; args (engine, node, controller): stores the controller at +0x164 and -1 in hover"
+
+[[function]]
+name = "cube::StartMenuWidget::draw"
+address = 0x583320
+convention = "thiscall"
+prototype = "void __thiscall cube::StartMenuWidget::draw(cube::StartMenuWidget* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["vtable:cube::StartMenuWidget:1", "manual:only user of the Start Game, Options and Exit strings", "correlated:cube-0x51D2CE9C:cube::StartMenuWidget::draw"]
+source = "kyubu"
+notes = "no arguments. With the font resource1.dat bound, sets hover from the cursor (widget space: x in [0, width), y in [10, 40), [60, 90), [110, 140)) and draws each row centred at y 30, 80, 130, size 18, white with a black 4 px outline; the hovered row is cyan"
+
+[[function]]
+name = "cube::StartMenuWidget::drawEndSite"
+address = 0x583AF5
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "manual:no relative call or jump in its first 5 bytes", "correlated:cube-0x51D2CE9C:cube::StartMenuWidget::drawEndSite"]
+source = "kyubu"
+notes = "in cube::StartMenuWidget::draw after the Exit row and before the font is released, reached only when the font loaded; esi is the widget. A mod can draw a fourth row here with the same font and set hover to 3 (see the ui atlas page, The start menu)"
+
+[[function]]
+name = "cube::GameController::startMenuShownSite"
+address = 0x489020
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:join of the start-scene test; safe 5 bytes (safesites)", "correlated:cube-0x51D2CE9C:cube::GameController::startMenuShownSite", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+notes = "in cube::GameController::update, right after the block that, while start_scene is visible, sets start_menu_node and logo visible exactly while options_panel is hidden; [esp+0x10] is the controller. A screen of a mod's own hides both again here, before the frame is drawn"
+
+[[function]]
+name = "plasma::FontEngine::getFont"
+address = 0x639800
+convention = "thiscall"
+prototype = "void* __thiscall plasma::FontEngine::getFont(void* this, const std::wstring* name)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "manual:this is engine+0x34; one arg, a std::wstring* name", "correlated:cube-0x51D2CE9C:plasma::FontEngine::getFont"]
+source = "kyubu"
+notes = "returns the loaded font of that name (resource1.dat for the start menu) or null; the start menu skips its draw when null"
+
+[[function]]
+name = "plasma::ScalableFont::drawText"
+address = 0x65BC70
+convention = "thiscall"
+prototype = "void __thiscall plasma::ScalableFont::drawText(void* this, const std::wstring* text, float x, float y, float size, float outline, float spacing, float line_gap, float wrap_width, const float* fill, const float* outline_colour, const float* vector_colour, int32_t flags, bool snap)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::StartMenuWidget::draw", "manual:FreeType kerning per glyph; next to ScalableFont's vtable code", "correlated:cube-0x51D2CE9C:plasma::ScalableFont::drawText"]
+source = "kyubu"
+notes = "args (const std::wstring* text, x, y, size, outline, spacing, line_gap, wrap_width as floats, then fill, outline and vector-only RGBA float[4] pointers, flags, bool snap); callee pops (ret 0x34). Flags: 1 centre on x, 2 right-align, 0x10 wrap. See the ui atlas page"
+
+[[function]]
+name = "plasma::ScalableFont::measureText"
+address = 0x65D530
+convention = "thiscall"
+prototype = "void __thiscall plasma::ScalableFont::measureText(void* this, const std::wstring* text, float* out_min, float* out_max, uint32_t align_flags, int32_t start, bool whole_line)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:plasma::ScalableFont::drawText", "manual:drawText calls it to find a line's width for flags 1 and 2; ret 0x18", "correlated:cube-0x51D2CE9C:plasma::ScalableFont::measureText"]
+source = "kyubu"
+notes = "lays the text out as drawText does and writes its bounds as two float[2]. With align_flags 0, start -1 and whole_line true, out_max.x is the pen advance of the longest line in font units; drawText scales by size / font+0xE0. Not virtual."
+
+
+[[function]]
+name = "cube::StatisticsWidget::StatisticsWidget"
+address = 0x583B40
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::StatisticsWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::StatisticsWidget::StatisticsWidget"]
+source = "kyubu"
+notes = "356 bytes"
+
+[[function]]
+name = "cube::SystemWidget::SystemWidget"
+address = 0x587660
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::SystemWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::SystemWidget::SystemWidget"]
+source = "kyubu"
+notes = "360 bytes"
+
+[[function]]
+name = "cube::VoxelWidget::VoxelWidget"
+address = 0x587F70
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::VoxelWidget", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::VoxelWidget::VoxelWidget"]
+source = "kyubu"
+notes = "1088 bytes"
+
+[[function]]
+name = "cube::WorldPreviewWidget::WorldPreviewWidget"
+address = 0x605A20
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["rtti:cube::WorldPreviewWidget", "manual:called by 0x4A23D0, which builds one per saved world", "correlated:cube-0x51D2CE9C:cube::WorldPreviewWidget::WorldPreviewWidget"]
+source = "kyubu"
+notes = "364 bytes"
+
+# The look-at name (read statically on 2026-09-30).
+
+[[function]]
+name = "cube::GameController::lookAtNameSite"
+address = 0x49AE36
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:CreatureLevelDisplay's hook site (07-20 build); its 8 bytes occur once", "correlated:cube-0x51D2CE9C:cube::GameController::lookAtNameSite"]
+source = "kyubu"
+notes = "in cube::GameController::update, where the name of the creature being looked at is appended (0x424BA0): at the site the name string is at [esp+4]. ToufouMaster's CreatureLevelDisplay mod swaps it for \"LV <level> <name>\" here"
+
+# The list behind the look-at name (read statically on 2026-10-12 for add-skills-unleashed: a creature that must show no name).
+
+[[function]]
+name = "cube::GameController::lookListFillSite"
+address = 0x4908BF
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:just before the loop over World.creatures at 0x490920", "correlated:cube-0x51D2CE9C:cube::GameController::lookListFillSite"]
+source = "kyubu"
+notes = "in cube::GameController::update, once a frame, before the loop that fills the look-at list with the near creatures whose hp (+0x16C) is above 0. The crosshair test, the look-at target and every floating name read only that list: hp 0 for the length of the loop hides a creature from them"
+
+[[function]]
+name = "cube::GameController::lookListFilledSite"
+address = 0x4909FA
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:the loop's exit: its je and its fall-through come here", "correlated:cube-0x51D2CE9C:cube::GameController::lookListFilledSite"]
+source = "kyubu"
+notes = "in cube::GameController::update, right after the loop that lookListFillSite precedes: every pass through lookListFillSite reaches it in the same call, so what was changed for the loop is put back here"
+
+# The skill tree's point budget and the respec cost (task 3.5 of add-level-rework, M10), read statically on 2026-10-01.
+# No unspent-points counter is stored: the budget is computed from the level wherever it is needed. creature_level_up
+# writes only the level, the XP and +0x16C, so a level-up grants nothing. The ranks live in Creature+0x1138 (11 values);
+# the open skill panel edits a working copy at SkillWidget+0x160 (GameController+0x800914), copied from the creature when
+# the panel opens (toggleSkills) and written back by the skill-panel part of the click handler (0x47C806 to 0x47C881), which
+# asks respecCost for a price, takes it from Creature+0x1304 and copies the ranks and the specialization byte (+0x141).
+# The panel opens with the key X (VK 0x58, onKeyDown 0x47E7CF) or the HUD button 3 (0x47B805).
+# Two places compute the budget: the click that adds a rank, 2 * level - 2 + mana_cubes / 4 (rounding toward zero), and the
+# Points: text, 2 * level - 2 with no mana-cube term.
+
+[[function]]
+name = "cube::GameController::toggleSkills"
+address = 0x488C70
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:flips +0x8008F1; on opening copies the ranks to the widget", "correlated:cube-0x51D2CE9C:cube::GameController::toggleSkills"]
+source = "kyubu"
+notes = "opens or closes the skill panel: flips GameController+0x8008F9, and on opening copies the player's 11 ranks (Creature+0x1138) and specialization byte (+0x141) into the SkillWidget's working copy. Key X calls it (probe); HUD button 3 too (static)"
+
+[[function]]
+name = "cube::SkillWidget::update"
+address = 0x4DD810
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["vtable:cube::SkillWidget:1", "string:\"Points: \"", "correlated:cube-0x51D2CE9C:cube::SkillWidget::update"]
+source = "kyubu"
+notes = "slot 1 of the SkillWidget vtable, 8 KB long (to 0x4DF75D): builds the skill tree's texts, among them the line Points: <spent>/<limit>. It runs about 5 times a second while the panel is open and not otherwise (the probe); the name is still a guess"
+
+[[function]]
+name = "cube::SkillWidget::pointsLimitSite"
+address = 0x4DDBEF
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::SkillWidget::update", "manual:EAX = 2 * level - 2, ECX = ranks spent", "correlated:cube-0x51D2CE9C:cube::SkillWidget::pointsLimitSite"]
+source = "kyubu"
+notes = "in SkillWidget::update, just before the Points text is built: EAX = 2 * (the player's level, Creature+0x190) - 2, ECX = the sum of the 11 working ranks at SkillWidget+0x160. No mana-cube term. Probe: EAX 58, 58, 16, 18 at levels 30, 30, 9, 10. 6 displaced bytes (two pushes), no jump target"
+
+[[function]]
+name = "cube::GameController::skillPointLimitSite"
+address = 0x47B904
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::GameController::toggleSkills", "manual:EAX = the most ranks the working copy may hold", "correlated:cube-0x51D2CE9C:cube::GameController::skillPointLimitSite"]
+source = "kyubu"
+notes = "in the GameController click handler, the branch that adds a rank: EAX = 2 * (Creature+0x190) - 2 + (Creature+0x1164 / 4, toward zero). A click adds a rank only while the 11 working ranks sum to less. Static only. 6 displaced bytes, no jump target"
+
+[[function]]
+name = "cube::GameController::skillButton9HideSite"
+address = 0x48EB03
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "verified"
+evidence = ["xref:cube::GameController::update", "manual:the hide call at 0x48EAFE", "correlated:cube-0x51D2CE9C:cube::GameController::skillButton9HideSite"]
+source = "kyubu"
+notes = "in cube::GameController::update, right after the game hides skill button 9 (ABILITY4 of the skill tree, skills[9]) on every frame: [esp+0x10] is the game controller. A mid hook that writes 1 into the button's visible flag makes it draw (see the atlas). 11 displaced bytes, no jump target"
+
+[[function]]
+name = "cube::SkillWidget::respecCost"
+address = 0x4DF9C0
+convention = "thiscall"
+prototype = "int32_t __thiscall cube::SkillWidget::respecCost(void* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:ECX = the widget, plain ret, int in EAX", "correlated:cube-0x51D2CE9C:cube::SkillWidget::respecCost"]
+source = "kyubu"
+notes = "the price of applying the working copy: stat_scale(level, 0) * 10 for each rank lowered, plus stat_scale(level, 0) * 100 for a new specialization (level above 1). The level is the raw Creature+0x190. The click handler refuses a price above Creature+0x1304, else subtracts it. Static only"
+
+[[function]]
+name = "cube::SkillWidget::respecCostLevelSite"
+address = 0x4DFA03
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::SkillWidget::respecCost", "xref:stat_scale", "correlated:cube-0x51D2CE9C:cube::SkillWidget::respecCostLevelSite"]
+source = "kyubu"
+notes = "in respecCost's per-rank loop, the instruction after cvtdq2ps: XMM0 = the player's level (Creature+0x190) as a float, then passed to stat_scale. A mid hook could write old_float(N) as at the strength sites. 8 displaced bytes, no jump target. Static only"
+
+[[function]]
+name = "cube::SkillWidget::respecCostSpecLevelSite"
+address = 0x4DFA82
+convention = "cdecl"
+kind = "site"
+subsystem = "ui"
+status = "candidate"
+evidence = ["xref:cube::SkillWidget::respecCost", "xref:stat_scale", "correlated:cube-0x51D2CE9C:cube::SkillWidget::respecCostSpecLevelSite"]
+source = "kyubu"
+notes = "in respecCost's specialization term (specialization changed, level above 1): the same shape as respecCostLevelSite, XMM0 = the player's level as a float before stat_scale. 8 displaced bytes, no jump target. Static only"
+
+[[function]]
+name = "cube::GameController::loadIcon"
+address = 0x486A20
+convention = "thiscall"
+prototype = "void* __thiscall cube::GameController::loadIcon(cube::GameController* this, const std::string* key, cube::Database* db)"
+subsystem = "ui"
+status = "verified"
+evidence = ["xref:cube::GameController::GameController", "manual:asks the engine at +0x800710 (0x658C40 or 0x658FA0), ret 8", "manual:decompile 0x486A20 and its 106 callers", "correlated:cube-0x51D2CE9C:cube::GameController::loadIcon"]
+source = "kyubu"
+notes = "returns the icon object for a PNG key of data3.db (106 calls in the constructor). Reads the key through Database::getBuffer, so through the asset layer. Arguments: ECX the controller, the key std::string, the data3.db Database (never deleted)"
+
+[[function]]
+name = "plasma::D3D9Drawing::draw"
+address = 0x68AB70
+convention = "thiscall"
+prototype = "void __thiscall plasma::D3D9Drawing::draw(plasma::D3D9Drawing* this, plasma::Node* node, float* colour)"
+subsystem = "ui"
+status = "verified"
+evidence = ["vtable:plasma::D3D9Drawing:2", "correlated:cube-0x51D2CE9C:plasma::D3D9Drawing::draw"]
+source = "kyubu"
+notes = "draws one shape, once per call, from the node (may be null) and the colour its parent passes down (RGBA). It sets the mask, the transform, both shaders and every constant itself each call, so state set before it is replaced; a shape with no buffers returns at once"
+
+[[function]]
+name = "plasma::D3D9Drawing::updateBuffers"
+address = 0x68B7F0
+convention = "thiscall"
+prototype = "void __thiscall plasma::D3D9Drawing::updateBuffers(plasma::D3D9Drawing* this)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["vtable:plasma::D3D9Drawing:1", "manual:creates and fills the vertex and index buffers", "correlated:cube-0x51D2CE9C:plasma::D3D9Drawing::updateBuffers"]
+source = "kyubu"
+notes = "vtable slot 1: when the shape's CPU vertices changed, makes the vertex and index buffers (48 bytes a vertex, 4 bytes an index) and keeps a CPU copy for a device reset"
+
+[[function]]
+name = "plasma::D3D9Drawing::~D3D9Drawing"
+address = 0x68AB00
+convention = "thiscall"
+prototype = "plasma::D3D9Drawing* __thiscall plasma::D3D9Drawing::~D3D9Drawing(plasma::D3D9Drawing* this, uint8_t flags)"
+subsystem = "ui"
+status = "candidate"
+evidence = ["vtable:plasma::D3D9Drawing:0", "correlated:cube-0x51D2CE9C:plasma::D3D9Drawing::~D3D9Drawing"]
+source = "kyubu"
+notes = "the scalar deleting destructor, vtable slot 0: releases the buffers and, when bit 0 of flags is set, deletes the object"
+
+[[function]]
+name = "wstring_map_index"
+address = 0x4E2DF0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:map<int, wstring>::operator[], used to fill the name maps", "correlated:cube-0x51D2CE9C:wstring_map_index"]
+source = "kyubu"
+notes = "(map*, const int* key) -> wstring*. cube::World::World fills the skill-name map (World+0x800114, skill index to dictionary name) and the ability-name map (World+0x80011C) through it, then assigns the name with wstring_assign_cstr. A mod can add a name the same way"
+
+[[function]]
+name = "wstring_assign_cstr"
+address = 0x468000
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:wstring::assign(const wchar_t*): measures it, then assigns", "correlated:cube-0x51D2CE9C:wstring_assign_cstr"]
+source = "kyubu"
+notes = "(wstring*, const wchar_t*), ret 4. Follows wstring_map_index in the World constructor's name tables"
+
+
+[[function]]
+name = "wstring_from_cstr"
+address = 0x40EB60
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:std::wstring constructor from a wide C string (24 byte object)", "correlated:cube-0x51D2CE9C:wstring_from_cstr"]
+source = "kyubu"
+notes = "(wstring* uninitialised, const wchar_t*) -> the wstring, ret 4. MSVC 2012 layout: 16 byte buffer, size at +0x10, capacity at +0x14 (7 while it fits the buffer)"
+
+[[function]]
+name = "wstring_map_index_ws"
+address = 0x4689A0
+convention = "thiscall"
+subsystem = "ui"
+status = "candidate"
+evidence = ["manual:map<wstring, wstring>::operator[]; skill_description_fill uses it", "correlated:cube-0x51D2CE9C:wstring_map_index_ws"]
+source = "kyubu"
+notes = "(map*, const wstring* key) -> the value wstring*, ret 4. skill_description_fill stores each @placeholder of a skill text through it, on the map at +8 of its third argument"

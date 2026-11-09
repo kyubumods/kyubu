@@ -1,0 +1,5 @@
+local ok, err = pcall(require, "ffi")
+kyubu.info("require('ffi') ok=" .. tostring(ok) .. " err=" .. tostring(err))
+local ok2, err2 = pcall(kyubu.hook, "Database::get", "void(*)()", function() end)
+kyubu.info("hook ok=" .. tostring(ok2) .. " err=" .. tostring(err2))
+kyubu.info("io available=" .. tostring(io ~= nil) .. " os available=" .. tostring(os ~= nil))

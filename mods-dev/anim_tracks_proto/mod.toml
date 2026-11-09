@@ -1,0 +1,9 @@
+id = "anim_tracks_proto"
+name = "Animation tracks (proto)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probes anim-tracks and anim-lacking): six mod abilities, one with no clip, three whose clips have tracks only (the weapon arm by 30 degrees, the weapon arm far out of its place, the head turned), one that borrows a vanilla pose and one that borrows it and moves the weapon arm; a seventh (118) moves the hand and a tail the warrior has no model for, and runs for each class. The mod forces the local player into each, pinned at 300 ms of the mode, and a screenshot per phase shows what the pose provider draws. A mid hook at the join site of draw_creature logs the vectors the draw reads, and frame.end logs them after the draw."
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,12 @@
+id = "channel_proto"
+name = "Channel transport probe (dev)"
+version = "0.1.0"
+kyubu = "^1.4"
+sides = ["client", "server"]
+gate = true
+trust = "full"
+description = "Development only (probe channel-transport-server): channel messages both ways between Server.exe and a joined Cube.exe."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

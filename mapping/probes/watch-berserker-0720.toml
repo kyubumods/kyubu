@@ -1,0 +1,72 @@
+# Task 6.2 of add-skills-unleashed-multiplayer: two clients on one Server.exe (kmap probe replay, client = "join", watcher = true).
+# The client uses the Berserker's Uppercut next to the monster su_dummy (server) puts 3 blocks in front of it; the watcher, a
+# second client, sees it through the ability's watch callbacks. Both clients log each effect and sound SkillsUnleashed starts
+# (the option log_effects, set with the `config` console command), so log_expect compares what each one showed.
+id = "watch-berserker-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.1"
+date = "2026-11-07"
+steps = [
+    "native replay: Server.exe, a client and a watcher, all three with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "both clients set log_effects on; the client held key 4 for 0.9 s; the watcher's log was read for the watched run and its effects",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/watch-berserker-0720), passed in 24 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 5, 2026-11-07 (evidence/bystanders-2026-11-07/watch-berserker-0720-run5), passed, about 8 min: the gate 0xB381E675 in force on all three games; all three runs end `done` (server 1702 ms, client 1706 ms, watcher (watched) 1682 ms)",
+    "client and watcher: at the strike the sound and a ring at the monster, 3 blocks in front of the client (the two places within 0.5 block); the landing's sound, burst and ring 0.9 s later, 13 blocks east, within 0.2 block of each other",
+    "server: struck at rank 3 (hp 151.57 to 120.58, velocity z 37.15), landed 0.93 s later and hit 1 creature (hp to 21.55)",
+    "fixed between run 2 and run 5: a joined client drew none of its own strike (run 2); the server took a 20 ms back step of the client's reported mode time at 203 ms for a new start and refused it for the cooldown, which cut the run on every game (run 3); the server's run ended `interrupted` at 1591 of 1700 ms (run 2); su_dummy held the target at the player's height after the strike, so the flight ran to its 5 s limit (runs 2 to 4)",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Uppercut runs and a second client watches it"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 420
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 0.9",
+    "shot 02-client-strike",
+    "shot watcher 02-strike",
+    "until watcher (watched) ends",
+    "until watcher effect burst at",
+    "shot watcher 03-landing",
+    "shot 03-client-after",
+]
+# What each client must have shown. The client's own effects are listed too: a joined client that draws nothing of its own
+# strike fails the replay.
+log_expect = { client = [
+    "skills_unleashed:berserker ends `done`",
+    "skills_unleashed: effect sound at",
+    "skills_unleashed: effect shockwave at",
+    "skills_unleashed: effect burst at",
+], watcher = [
+    "skills_unleashed:berserker (watched) ends `done`",
+    "skills_unleashed: effect sound at",
+    "skills_unleashed: effect shockwave at",
+    "skills_unleashed: effect burst at",
+] }
+# The server's script needs no wait for the clients: the replay runs the joins and every input step (they end on the watcher's
+# landing line) before it looks for the script's end. The script only waits for the dispatch site's first call (400 s is a limit).
+script = """
+log watch-berserker-0720: task 6.2 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log watch-berserker-0720: done
+"""

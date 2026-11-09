@@ -1,0 +1,113 @@
+# Recorded with kyubu_probe, mods-dev/stats_proto and the Kyubu loader of task 4.3 of add-ability-api (the stat detours at
+# ability_cooldown, ability_cost and cube::Creature::modeDuration), unattended under Wine 9.0 (WSL, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. stats_proto defines
+# stats_proto:burst (number 112, mp_cost 0.5, cooldown 4000 ms at rank 0 and 3500 at rank 1, duration 800 ms) for the
+# warrior's slot 4 (`any`); every other class has the placeholder (111: cooldown 2000, duration 500, cost 0). P below is the
+# player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-stat-detours"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "stats_proto:state printed the game's answers for 112, 111 and smash (54): can_use, cost, and the cooldown at levels -1, 0, 1 and 9",
+    "mp 0.2, key 4 held 2 s (the cost is 0.5): nothing may start",
+    "mp 1, key 4 held twice in a row (inside the cooldown), then a pause and key 4 again: the tracer counts the starts at abilityStartSite",
+    "class 2 (the placeholder on slot 4), key 4 twice in a row, then class 1 and a forced mode 54 (smash) to read its cooldown-map entry",
+]
+observations = [
+    "Wine replay 5 (the task-4.3 loader, mods-dev/stats_proto) passed: the bar's index 5 read 112 for the warrior and 111 for the mage; replay 7 (the loader of task 0 to 3, no detours, no push) ran the same record for the baseline of smash",
+    "with the detours: ability_cost(112) 0.5 and ability_cooldown(112) 3500 at level -1 (the local player's rank 1), 4000 at level 0, 3500 at levels 1 and 9; the placeholder 111 answers 2000 for every level and cost 0; without the detours 111 answers 0 (the game's own)",
+    "smash (54) is the same with and without the detours: cost 0, cooldown 20000 / 20000 / 18727 / 13368 at levels -1, 0, 1 and 9, modeDuration 900, and a forced mode 54 stored 20000 in the cooldown map (first reads 19847 with, 19814 without)",
+    "key 4 at mp 1: mode 112 started (modeDuration 800 while it ran), the cooldown map entry 112 was 3377 on the first read, counted down to 0 in 3.5 s, and canUseAbility(112) was false during it and true after; the same for 111 (2000 ms, modeDuration 500)",
+    "mp 0.2 or 0: canUseAbility(112) false and key 4 started nothing (3 starts in all at abilityStartSite, none in phase B); canUseAbility(112) turned false when the falling mp passed 0.5",
+    "the game did not take the 0.5 mp: mp at the start of mode 112 was 0.942 after a set to 1 (the fall of about 0.05 a second only), so task 4.4 takes it once",
+    "mode 112, mode 111 and the forced mode 54 all lasted about 10 s (10037 to 10206 ms) although modeDuration said 800, 500 and 900: the game's own 10 s rule ended them, so a mod mode does not end at modeDuration",
+    "the second press inside the cooldown could not be told apart from a press inside the mode (the mode lasts 10 s): the cooldown refusal waits for task 4.4, which ends the mode at duration_ms",
+    "HUD screenshots: slot 4 shows the cooldown sweep as a darker lower half after the press and for the placeholder (03-pressed, 05-placeholder), and not without the detours (run 7); slot 4 has no icon yet (tasks 4.5 and 4.6)",
+]
+
+[[confirms]]
+entry = "ability_cooldown"
+observed = "detoured by the loader: 3500, 4000 and 3500 for a mod ability at levels -1, 0 and 1, 2000 for the placeholder; smash unchanged (20000)"
+
+[[confirms]]
+entry = "ability_cost"
+observed = "detoured by the loader, __fastcall with an unused EDX: 0.5 for a mod ability, float in st0; smash and other vanilla ids unchanged"
+
+[[confirms]]
+entry = "cube::Creature::modeDuration"
+observed = "detoured by the loader: 800 while mode 112 ran, 500 in mode 111, 900 in smash as before; the game ends neither mod mode at it (10 s)"
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the warrior; set to 2 the bar took the placeholder 111 on its next frame"
+
+[[confirms]]
+entry = "cube::GameController::abilityStartSite"
+observed = "3 calls: key 4 at mp 1 (112), after the cooldown (112), and the mage's placeholder (111); none at mp 0.2"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 600
+mods = ["mods-dev/stats_proto"]
+input = [
+    "until statdet A", "console stats_proto:state", "console stats_proto:cooldowns", "shot 01-hud",
+    "until statdet B", "hold 4 2", "console stats_proto:state", "shot 02-low-mp",
+    "until statdet C", "hold 4 1", "hold 4 1", "shot 03-pressed", "console stats_proto:state", "console stats_proto:cooldowns",
+    "until statdet D", "wait 6", "hold 4 1", "console stats_proto:state", "console stats_proto:cooldowns",
+    "until statdet E", "hold 4 1", "hold 4 1", "shot 05-placeholder", "console stats_proto:state", "console stats_proto:cooldowns",
+    "until statdet F", "wait 3", "console stats_proto:cooldowns", "console stats_proto:state",
+]
+script = """
+log statdet: task 4.3 of add-ability-api, the stat detours
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+# the bar: the game builds five ids and the loader appends the number of stats_proto:burst, 112 (index 5 = begin + 20)
+expect - value i32 == 112 [[@0x7691C8] + 0x80080C] + 20
+log statdet A
+wait 30
+# B: too little mp for a cost of 0.5
+inspect set data.mp 0.2
+log statdet B
+wait 30
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+# C: enough mp; the second press comes inside the cooldown
+trace args 2
+trace add @0x49BF68
+trace start
+inspect set data.mp 1
+log statdet C
+wait 40
+# D: after the cooldown a press starts again
+inspect set data.mp 1
+log statdet D
+wait 35
+# E: the mage has the placeholder on slot 4 (111: cooldown 2000, duration 500, cost 0)
+inspect set data.class_type 2
+inspect set data.mp 1
+wait 4
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+log statdet E
+wait 40
+trace stop
+trace report
+expect cube::GameController::abilityStartSite calls @0x49BF68 == 3
+inspect set data.class_type 1
+wait 3
+# F: smash forced (a level-1 warrior has not learned it): the game stores ability_cooldown(54, -1) in the cooldown map
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+inspect set data.mp 1
+inspect set data.current_mode 54
+log statdet F
+wait 30
+watch
+watch clear
+log statdet done
+"""

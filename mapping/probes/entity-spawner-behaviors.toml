@@ -1,0 +1,101 @@
+# Recorded with kyubu_probe, the entity_spawner mod (its `behavior` option) and the Kyubu 1.1 loader in development,
+# unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which
+# creates the level-1 human warrior "Tester" and a new world (seed 1234). Task 8.4 of add-entity-spawner: one creature
+# of every behaviour kind spawned from the mod's console command `spawner NAME [count] [behavior]` (a companion is owned
+# by the player, whose game id the client side sends and the server side finds with creature_find), and what each one does.
+id = "entity-spawner-behaviors"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Traced the constructors of the companion, walk-path, sequence and combat behaviours and WaypointVector::push_back, watched the creature count; F7 opened the mod's window (00-window.png); `console config entity_spawner trace true`",
+    "Phase 1, hostile off (hostile type 2): `spawner behaviors`: one green slime of each behaviour (default, still, monster, friendly, companion, guard) on an arc four blocks north of the player; 400 s of the mod's trace (every fifth second: each creature's distance to the player, both positions), the player's hp watched",
+    "Phase 2, hostile on (hostile type 1): the same `spawner behaviors`; 400 s of trace, the player's hp watched",
+    "Five runs, kept in the evidence folder: run1 (no trace; the spawns one by one, the slimes' fate read from `is gone` lines), run2 (trace, spawns one by one: the console's keystrokes reached the game and moved the player, so its distances are not clean), run3 (the row six blocks north: the hostile ones did not reach the player in 400 s), run4 (this record: the arc four blocks north, as far as spawn-monster's slime starts); spawn-monster (6.2's record) was rerun with the 8.3 loader and passed (php 265 to 0)",
+]
+observations = [
+    "the mod spawned all six kinds through kyubu.game.creature_spawn on the server side, from one console command: `spawned Green slime (type 37, hostile 2, level 1, behavior default|still|monster|friendly|companion|guard), id -1 to -6` in the same millisecond, and ids -7 to -12 for phase 2. The window (00-window.png) shows the behaviour row `[default] still monster friendly companion guard` in place of the old checkbox",
+    "the companion was owned by the player: the client sent the player's game id (1) and the server side found the player with kyubu.game.creature_find, then creature_spawn took it as `owner`. CompanionBehavior's constructor ran once. The companion stayed 3 blocks from the player for the first 7 minutes of phase 1; after the player was knocked away in phase 2 it was 10 to 42 blocks from it (it fights, too)",
+    "guard (WalkPathBehavior, four waypoints of a square with a five-block half-side around the spawn point: WaypointVector::push_back ran 426 times, the zone's own paths included): its distance to the player went 4, 10, 3, 4, 9, 4, 8, 6, 8, 10 blocks over the first 8 minutes, back and forth as a patrol does, then it drifted away (16 to 40 blocks) once the phase's second half began",
+    "still stayed where it was in both phases (4.0 blocks from the player for 7 minutes in phase 1; in phase 2 its distance changed only when the player was knocked back, its own position never did); the friendly slimes stood next to the player for about 7 minutes and then walked off in a straight line (54, 132, 202 blocks) and were removed by the game at 215 blocks (`is gone ... last seen 215.6 blocks from the player`, both phases): random walk has no leash while SpawnLocationBehavior is not wired",
+    "hostility decides whom a combat behaviour fights and does not change the kind: in phase 1 (hostile type 2) the default and monster slimes stood 3 to 4 blocks from the player for 8 minutes and the player's hp stayed 265 (the php watch: 39,364 samples, 0 changes), and in phase 2 (hostile type 1) the player's hp fell from 265 to 169.9 in 52 changes while the still and friendly ones behaved as in phase 1. 03-p2-early.png and 04-p2-later.png show the hp bar at 265 and 169",
+    "the companion, monster, default and guard slimes all carry a CombatBehavior, so which of them hit the player in phase 2 cannot be told from the php watch; spawn-monster (one `default` slime, hostile 1, rerun with the 8.3 loader) hit it from 265 to 0 as in 6.2",
+    "no error or fault in any of the runs; the game ran on after each creature's removal; the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1800
+mods = ["mods-examples/entity_spawner"]
+# The game reads the console's keys some 40 s after gamepilot types them (about 4 frames a second under Wine), so each
+# console step takes about 50 s, the waits between them are long and a screenshot shows the game as it was some seconds
+# before. The mod's `trace` option (every fifth second, each spawned creature's distance to the player and both positions)
+# is the evidence and the screenshots only illustrate it. `spawner behaviors` spawns one green slime of each kind on an
+# arc four blocks north of the player (as far as the slime of spawn-monster starts): phase 1 with hostile off (hostile
+# type 2), phase 2 with it on (hostile type 1).
+input = [
+    "until 8.4: window", "key F7", "wait 20", "shot 00-window", "key F7", "wait 20",
+    "console config entity_spawner trace true", "wait 20",
+    "console config entity_spawner hostile false", "wait 20",
+    "until 8.4: p1", "console entity_spawner:spawner behaviors", "wait 60", "shot 01-p1-early", "wait 90", "shot 02-p1-later",
+    "until 8.4: p2", "console config entity_spawner hostile true", "wait 20",
+    "console entity_spawner:spawner behaviors", "wait 60", "shot 03-p2-early", "wait 90", "shot 04-p2-later",
+]
+script = """
+log entity spawner behaviours (task 8.4 of add-entity-spawner): one creature of every behaviour kind
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+trace args 3
+trace add cube::CompanionBehavior::CompanionBehavior
+trace add cube::WalkPathBehavior::WalkPathBehavior
+trace add cube::SequentialBehavior::SequentialBehavior
+trace add cube::CombatBehavior::CombatBehavior
+trace add WaypointVector::push_back
+trace start
+watch count u32 [@0x7691C8] + 0x2E4
+log 8.4: window
+wait 240
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log 8.4: p1
+wait 400
+inspect creatures
+expect cube::CompanionBehavior::CompanionBehavior calls cube::CompanionBehavior::CompanionBehavior >= 1
+expect cube::WalkPathBehavior::WalkPathBehavior calls cube::WalkPathBehavior::WalkPathBehavior >= 1
+expect WaypointVector::push_back calls WaypointVector::push_back >= 4
+expect cube::World.creatures watch count increased
+expect cube::CombatBehavior::CombatBehavior watch php unchanged
+watch clear
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log 8.4: p2
+wait 400
+inspect creatures
+expect cube::CombatBehavior::CombatBehavior watch php decreased
+trace stop
+trace report
+log 8.4: end
+wait 10
+expect - hooks == 0
+"""
+
+[[confirms]]
+entry = "cube::CompanionBehavior::CompanionBehavior"
+observed = "the loader's recipe called it once, for the companion whose owner was the player (found by id): it stayed three blocks from the player for the first 7 minutes of phase 1 (its ring is closer than the four blocks the others started at); the owner id is the player's, since nothing else in the world is that close and constant"
+
+[[confirms]]
+entry = "cube::WalkPathBehavior::WalkPathBehavior"
+observed = "the loader's recipe called it for the guard (24 calls in run 4, the zone's own included); the guard moved back and forth around its spawn point in a patrol, 3 to 10 blocks from the player over 8 minutes"
+
+[[confirms]]
+entry = "WaypointVector::push_back"
+observed = "the recipe appended four waypoints to the guard's vector (426 calls in run 4, the zone's own included): the guard walked them"
+
+[[confirms]]
+entry = "cube::CombatBehavior::CombatBehavior"
+observed = "the monster and default kinds (hostile type 1) took the player's hp from 265 to 169.9 in 52 changes (the php watch), and with hostile type 2 the same kinds left it at 265 for 400 s: the hostile type decides whom the behaviour fights"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the count went 17 to 23 with the twelve spawns and the removals (the friendly slimes were removed by the game far from the player)"

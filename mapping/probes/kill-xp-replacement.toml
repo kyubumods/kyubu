@@ -1,0 +1,522 @@
+# Re-recorded on 2026-10-04 with the current XP table (design D3).
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 4.3 of add-level-rework: the mod level_rework replaces the kill XP at cube::World::killXpSite (0x594BDD) with
+# X(L) * 20 (a large kind) * 10 (flag 0x200) * 2^(p/4), 0 for flag 0x800. The tracer cannot trace the hooked site, so the replacement
+# shows in the XP the player gains. As in kill-xp, each target is the creature with the top id T = [[[[@0x7691C8] + 0x2E0] + 8] + 0x18],
+# made hostile, stunned and put half a block from the player; the player's forced cyclone (mode 86) kills it. P is the player's
+# cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "kill-xp-replacement"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 15 s there",
+    "11 kills of a level-1 monster (10 with the player at its own XP, and the last with 25 XP written first), each on the creature with the top id: made hostile, hp 1, armour factor 0, stunned, put half a block from the player, then a forced cyclone (mode 86) for 3 s, mode 0 for 1 s, mode 4 for 2 s",
+    "Five more kills with the player at level 40 and 0 XP (7 XP for the last): a level-40 monster with no flag, with power_base 4, with entity type 109 (a large kind: is_giant_creature is true), with flag 0x200 and with flag 0x800",
+]
+observations = [
+    "Wine replay 10 (the re-recording of 2026-10-04 with the current table; evidence `evidence/kill-xp-replacement-2026-10-04/`) passed, all expectations held. An earlier recording found that the world holds about 20 creatures near the player and none respawn, so after the 20th kill the creature with the top id is the player itself: the record makes 16 kills",
+    "cube::World::killXpSite is the mod's hook, so the tracer could not trace it: the replacement shows in the XP the player gained. The mod's log shows `level_rework: kill XP replaced (X(L) = round((8 + 2L)/10), x20 large kinds, x10 flag 0x200, 2^(p/4) for +p, at least 1 more)`",
+    "ten kills of a level-1 monster, no +p, no flag, at the player's own XP of 0: the XP went 1, 2, ..., 10 (1 each, the same as vanilla's floor of 1 for such a monster)",
+    "the boundary: the player's XP written to 25, one more level-1 kill: level 2 with XP 0 (the 26 that level 1 needs)",
+    "with the player written to level 40 and 0 XP (level 40 needs 527, so no level-up): level-40 monster, power_base 0, no flag: 9 XP; power_base 4: 18; entity type 109 (a large kind: is_giant_creature is true for 101, 107-109, 114-119): 180; flag 0x200: 90; flag 0x800: the XP written to 7 stayed 7",
+    "killRecordXpSite passed 16 times and kill_record_apply was called 16 times, once per kill",
+    "no fault; the probe's hooks were all removed at the end (hooks == 0)",
+    "deviations from the task text: 11 level-1 kills, with the 40th shown by the boundary (25 XP written first); the large kind is an existing creature whose entity type was set to 109, not a troll from entity_spawner; the +4 monster is an existing creature with power_base 4 written, as in kill-xp. Not tried: a joined client, a pet's share, the type-13 item XP, a kill that completes a zone, a monster above level 100 (the unit test covers the clamp)",
+]
+
+[[confirms]]
+entry = "cube::World::killRecordXpSite"
+observed = "passed 16 times in 16 kills, once per kill, after the mod wrote the new XP at killXpSite"
+
+[[confirms]]
+entry = "kill_record_apply"
+observed = "called 16 times in 16 kills, once per kill"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "1 per level-1 kill, then 9, 18, 180 and 90 for level-40 victims (plain, +4, large kind, flag 0x200), and no gain for flag 0x800"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "2 after one kill at 25 XP (the boundary of the first level), with XP 0"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1800
+mods = ["mods-gameplay/level_rework"]
+input = []
+script = """
+log kill XP replacement of level_rework (task 4.3 of add-level-rework)
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 1 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+trace args 3
+trace add @0x5950E4
+trace add kill_record_apply
+trace start
+# first level: kill 1 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 1 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 1 [[@0x7691C8] + 0x8006C8] + 0x194
+# first level: kill 2 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 2 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 2 [[@0x7691C8] + 0x8006C8] + 0x194
+# first level: kill 3 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 3 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 4 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 4 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 5 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 5 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 6 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 6 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 7 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 7 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 8 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 8 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 9 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 9 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+# first level: kill 10 of 10 (level 1, no +p, 1 XP each)
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+log first level: kill 10 of 10 (level 1, no +p, 1 XP each)
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 10 [[@0x7691C8] + 0x8006C8] + 0x194
+# first level: the boundary, 25 XP then one kill of 1 XP: level 2 with 0 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.current_xp 25
+inspect set data.mp 1
+log first level: the boundary, 25 XP then one kill of 1 XP: level 2 with 0 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 2 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+# level 40 monster, no +p, no flags: 9 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 40
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 40
+inspect set data.current_xp 0
+inspect set data.mp 1
+log level 40 monster, no +p, no flags: 9 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 9 [[@0x7691C8] + 0x8006C8] + 0x194
+# level 40 monster, +4: 18 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 40
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 40
+inspect set data.current_xp 0
+inspect set data.mp 1
+log level 40 monster, +4: 18 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 18 [[@0x7691C8] + 0x8006C8] + 0x194
+# level 40 monster of a large kind (entity type 109, a troll): 180 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 40
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.entity_type 109
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 40
+inspect set data.current_xp 0
+inspect set data.mp 1
+log level 40 monster of a large kind (entity type 109, a troll): 180 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 180 [[@0x7691C8] + 0x8006C8] + 0x194
+# level 40 monster, flag 0x200: 90 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 40
+inspect set data.power_base 0
+inspect set data.appearance.flags 512
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 40
+inspect set data.current_xp 0
+inspect set data.mp 1
+log level 40 monster, flag 0x200: 90 XP
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 90 [[@0x7691C8] + 0x8006C8] + 0x194
+# level 40 monster, flag 0x800: no XP, the 7 stays
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 40
+inspect set data.power_base 0
+inspect set data.appearance.flags 2048
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 40
+inspect set data.current_xp 7
+inspect set data.mp 1
+log level 40 monster, flag 0x800: no XP, the 7 stays
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+inspect player [@0x7691C8]
+expect cube::CreatureData.current_xp value i32 == 7 [[@0x7691C8] + 0x8006C8] + 0x194
+trace stop
+trace report
+expect cube::World::killRecordXpSite calls @0x5950E4 >= 16
+expect kill_record_apply calls kill_record_apply >= 16
+wait 5
+expect - hooks == 0
+"""

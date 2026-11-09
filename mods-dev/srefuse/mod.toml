@@ -1,0 +1,11 @@
+id = "srefuse"
+name = "Server refusal (dev)"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+trust = "full"
+description = "Development only (probe server-ability-refusal-0720): one slot-4 warrior ability, 800 ms, 0.5 mp, defined on both sides with different cooldowns (the client's 1 s, the server's 30 s), so that a second press 4 s after the first starts on the client and is refused by Server.exe for its cooldown."
+
+[scripts]
+client = "scripts/client.lua"
+server = "scripts/server.lua"

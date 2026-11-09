@@ -1,0 +1,48 @@
+# Task 8.1 of add-mod-manager. Install / Modpacks with cat_alpha 1.1.0 and cat_lib 1.0.0 already in mods\ as folders (by hand, so
+# Unverified): the test pack pins cat_alpha 1.0.0, so its plan must read "will change 1.1.0 -> 1.0.0" and download cat_lib again,
+# at the full 1024 x 768 window (mod-packs shows the Verified case after a restart, whose window Xvfb cuts).
+id = "mod-packs-pinned"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-25"
+steps = [
+    "Same ModManager as mod-packs, with the test catalog's cat_alpha 1.1.0 and cat_lib 1.0.0 source folders copied into mods\\",
+    "Replayed at the start menu under Wine at 1024 x 768: open the page, fetch the good test catalog, open Install / Modpacks and the pack, open its Actions menu, then type in the search box",
+]
+observations = [
+    "run 1 passed (evidence/mod-packs-2026-10-25/pinned-run1): both folders load and read Unverified; the log reads pack plan cat_pack: ok, download cat_alpha 1.1.0>1.0.0, download cat_beta 1.0.0, download cat_lib 1.0.0>1.0.0, disable kyubu_probe 1.0.0, disable mm_fixture_catalog 1.0.0, settings 1+",
+    "run 1 showed the game's font has no arrow glyph (U+2192 drew a blank gap) and that a same-version re-download read 'will change 1.0.0 1.0.0'; fixed to '>' and 'will download 1.0.0 again, not verified'",
+    "run 2 passed (pinned-run2): the plan reads CAT_ALPHA / WILL CHANGE 1.1.0 > 1.0.0 (547 B), CAT_BETA / WILL DOWNLOAD 1.0.0 (527 B), CAT_LIB / WILL DOWNLOAD 1.0.0 AGAIN, NOT VERIFIED (526 B), each under its name because the line is wider than the column",
+    "the wheel over the details scrolls to KYUBU PROBE WILL BE DISABLED, FIXTURE CATALOG WILL BE DISABLED and 1 OR MORE SETTINGS CHANGE",
+    "the Actions menu shows the grey Apply modpack row; typing zzz in the search box shows 0 OF 1 MODPACK and NO MODPACK MATCHES with nothing selected",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook draws the pack plan with a version change"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 300
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog", "tests/fixtures/catalog-src/mods/cat_alpha-1.1.0", "tests/fixtures/catalog-src/mods/cat_lib-1.0.0"]
+input = [
+    "until modpacks open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "click 269 142", "wait 3", "click 647 142", "wait 3", "click 300 330", "wait 3", "shot 01-pack-pinned", "console mod_manager:state",
+    "move 700 500", "wait 1", "wheel down 4", "wait 2", "shot 01b-pack-scrolled",
+    "click 731 228", "wait 3", "shot 02-pack-menu", "click 300 600", "wait 2",
+    "click 240 252", "wait 1", "type zzz", "wait 2", "shot 03-search-none", "console mod_manager:state",
+    "wait 5",
+]
+script = """
+log modpacks: task 8.1 of add-mod-manager
+wait 15
+log modpacks open
+wait 120
+log modpacks done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

@@ -1,0 +1,694 @@
+# Recorded with kyubu_probe and the Kyubu 1.1 loader in development (MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe (no mod) that joins 127.0.0.1 with a new character
+# (client = "join"). The script runs on the server. Task 8.1 of add-level-rework, the rest after probes server-level-sites and
+# server-level-sites-items: the kill drop's item sites. A server creature T (level 10, power_base 4, 1 hp, no armour, stunned) is put at
+# half a block along +x of the player, 6 s each (each try inspects the next creature of the map: a killed one is gone), forty times, while the client holds M1 for the whole run, so that the server makes
+# several kills; a gear drop is rolled in about 1 kill in 10. Nothing here is hooked by a mod: the probe only traces.
+id = "server-kill-drop-sites"
+build = "server-0x51D2CE9B"
+kyubu = "1.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: Server.exe, then a client that joins with a new warrior; the script waits 110 s for it",
+    "T (a server creature) at level 10, power_base 4, 1 hp, no armour, stunned, hostile: put at four places beside the player in turn (6 s each, 40 tries, the creature re-chosen each time) while the client holds M1",
+]
+observations = [
+    "Wine replay 2 (replay 1 reused the one creature, which a kill removes: one kill only; the script now re-inspects the next creature of the map before each try) saw the sites below. The server ran no mod and the client had none",
+    "40 tries of 6 s (a creature of the map made hostile, level 10, power_base 4, 1 hp, no armour, stunned, put half a block along +x of the player, who held M1 for the whole run) made 10 kills in 240 s: cube::World::killXpSite (0x4CF31D) 10 calls, each from the kill code, one every 12 s",
+    "the kill drop's typed drops ran 17 times (kill_drop_typed_item_site 0x4D3000, ESI = 1)",
+    "a gear drop was rolled twice in the 10 kills (55.5 s and 66.9 s): kill_drop_level_site (0x4D2D35) passed twice with ESI = 0xA, the victim's level 10; right after it item_generate_alt (0x5289C0) ran from 0x4D2D99 with the level 9 (0x9) as second argument and rarity 1, and item_generate (0x52C2B0) ran from 0x4D2D7E with level 9 and rarity 2. So the server's kill drop passes level - 1 (a coin flip between level and level - 1: both calls came out as 9), as Cube.exe's twin does, and the return addresses 0x4D2D7E and 0x4D2D99 of the level_rework_server.toml symbols are the ones reached",
+    "not reached: item_generate_any (0x52A530: the zone builder calls it, the kill drop does not), item_generate_level_one (0x52B1C0), the spawn loot returns (0x50D3BF, 0x50D41B). No warning or error in the server's log; the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[[confirms]]
+entry = "cube::World::killXpSite"
+observed = "10 calls, one per kill"
+
+[[confirms]]
+entry = "kill_drop_typed_item_site"
+observed = "17 calls with ESI = 1 over the 10 kills"
+
+[[confirms]]
+entry = "kill_drop_level_site"
+observed = "2 passes (a gear drop in 2 of 10 kills), ESI = 10, the victim's level; a rare event, so the replay may not repeat it (the expectation allows 0)"
+
+[[confirms]]
+entry = "item_generate"
+observed = "1 call from 0x4D2D7E (the kill drop) with level 9 and rarity 2"
+
+[[confirms]]
+entry = "item_generate_alt"
+observed = "1 call from 0x4D2D99 (the kill drop) with level 9 and rarity 1"
+
+[[confirms]]
+entry = "item_generate_any"
+observed = "not reached: the kill drop calls item_generate and item_generate_alt directly"
+
+[[confirms]]
+entry = "item_generate_level_one"
+observed = "not reached"
+
+[[confirms]]
+entry = "spawn_loot_site"
+observed = "not reached (returns 0x50D3BF and 0x50D41B 0 passes)"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 800
+input = [
+    "until 8.1: kills start",
+    "hold mouse1 290",
+]
+script = """
+log server kill drop sites (task 8.1 of add-level-rework)
+trace args 4
+trace add @0x427FF0
+trace start
+wait 110
+trace stop
+trace report
+trace add @0x4CF31D
+trace add @0x4D2D35
+trace add @0x4D3000
+trace add @0x52C2B0
+trace add @0x5289C0
+trace add @0x52A530
+trace add @0x52B1C0
+trace add @0x50D3BF
+trace add @0x50D41B
+inspect creatures [ecx(@0x427FF0) + 4]
+trace start
+log 8.1: kills start
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 1
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 2
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 3
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 4
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 5
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 6
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 7
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 8
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 9
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 10
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 11
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 12
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 13
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 14
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 15
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 16
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 17
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 18
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 19
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 20
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 21
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 22
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 23
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 24
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 25
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 26
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 27
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 28
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 29
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 30
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 31
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 32
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 33
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 34
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 35
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 36
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 37
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 38
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 39
+wait 6
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: try 40
+wait 6
+trace stop
+trace report
+expect cube::World::killXpSite calls @0x4CF31D >= 1
+expect kill_drop_typed_item_site calls @0x4D3000 >= 1
+expect kill_drop_level_site calls @0x4D2D35 >= 0
+expect item_generate calls @0x52C2B0 >= 0
+expect item_generate_alt calls @0x5289C0 >= 0
+log 8.1: kills done
+wait 5
+expect - hooks == 0
+"""

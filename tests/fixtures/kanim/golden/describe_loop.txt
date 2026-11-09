@@ -1,0 +1,12 @@
+clip: loop.anim.toml
+duration: 500 ms against the ability's 900 ms: the clip loops 1.8 times
+end: loop
+blend: in 0 ms, out 0 ms
+tracks: 1
+  tail rot (add): x 0..0, y 0..15, z 0..0 deg
+    fastest: 90 deg/s at 0.25 (125 ms), moving 15 deg from 0 to 0.5
+pops:
+  end: tail rot (add) loops and blend_out is 0: the pose where the run ends is wherever the loop is
+  seam: tail rot (add) jumps 5 deg at each lap
+hide: none
+markers: none

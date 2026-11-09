@@ -1,0 +1,82 @@
+# Tasks 8.1 and 10.6 of add-skills-unleashed-multiplayer: the Fire Mage's Fire Circle on Server.exe with two clients (kmap probe
+# replay, client = "join", watcher = true). The client, made a Fire Mage by su_rank, holds key 4 and lets go: its client writes its
+# mode time 0 at the release, which the server and the watcher must keep as the same run (KyubuAbilityDef.restarts). Since 10.6 the
+# client sends `cast { charge, spot }` on skills_unleashed:ability at its cast (design D13); the server checks it against its own copy
+# of the player, finds the ground with world_block and casts the circle; the watcher draws the charge, the release clip and the circle.
+# All three log what they did (skills_unleashed's log_effects on both clients), so log_expect compares them.
+id = "server-fire-mage-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe, a client and a watcher, all three with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Fire Mage with rank 3 (su_rank options), both clients set log_effects on; the client held key 4 for 1.2 s",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-fire-mage-0720), passed in 27 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "10.6 run 4, 2026-11-08 (evidence/fire-mage-cast-2026-11-08/server-fire-mage-0720-run4), passed: the client released after 1211 ms with charge 0.89 and sent its cast event; the server took it (no refusal logged) and cast 38 ms after the client at the same spot as the client and the watcher (8396928.1, 8396924.8, 83.0 on all three: the server's ground from world_block), radius 9.5; the circle active on all three 1.9 s later",
+    "10.6 run 1 failed: lib.ability_channel was not in src/server.txt, so the server's Fire Mage did not define and the client's ability number fell on the Guardian (fixed; test_server now checks the bundle's requires). Runs 2 and 3: harness errors (a CreateProcess FileNotFoundError, then 'the game wrote no screenshot 01-client-joined'), no game result",
+    "native run 3, 2026-11-08 (evidence/fire-mage-mp-2026-11-08/server-fire-mage-0720-run3), passed, about 8 min: the client (a Fire Mage at rank 3 by su_rank) released after 1222 ms with charge 0.90; the server kept its restart (at 73 ms, after 1243 ms) as the same run and cast 0.17 s later at the same spot as the client and the watcher (x and y within 0.1 block, z 83.0 on all three), radius 9.5; the circle was active on all three 1.9 s after the cast. The watcher kept its restart too (54 ms, after 1253 ms) and drew the cast",
+    "limits: the run ends with the server's circle line, so its damage ticks are not counted here (test_parity_fire_mage.cpp compares them); one client, one watcher, one charge",
+    "run 1 2026-11-08: su_rank did not load (an option description over 120 characters); fixed",
+    "run 2 passed (evidence/fire-mage-mp-2026-11-08/server-fire-mage-0720-run2): charge 0.90, radius 9.5 on all three games, the same x and y; the server kept the client's restart at 59 ms (after 1237 ms of charge) as one run and cast 0.16 s later; the watcher saw the restart, bound the release clip and drew the circle. Found: the aim was on su_dummy's body, and the server's circle stood at its height (z 85.1) where both clients found the ground (83.0), 2.1 blocks under: out of reach_below (1.0), so 0 hits. Fixed with logic.ground_under (an aim inside a monster drops to its feet)",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Fire Circle charges, restarts and casts"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization fire_mage",
+    "console config su_rank ability skills_unleashed:fire_mage",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 1.2",
+    "shot 02-client-release",
+    "shot watcher 02-release",
+    "until server: fire_mage: cast at",
+    "until watcher fire_mage: watched cast at",
+    "until server: fire_mage: the circle (radius",
+    "shot 03-client-circle",
+    "shot watcher 03-circle",
+]
+# What each game must have done. The server: the client's restart kept as one run, the cast and the circle active. The client: its
+# own release and cast, and the circle drawn. The watcher: the run watched with its restart, its cast drawn, the release clip bound.
+log_expect = { latest = [
+    "skills_unleashed:fire_mage restarts (1 of 1)",
+    "skills_unleashed: server: fire_mage: cast at",
+    "skills_unleashed: server: fire_mage: the circle (radius",
+], client = [
+    "su_rank: the character is class 3, specialization 0 (fire_mage)",
+    "skills_unleashed: fire_mage: released after",
+    "skills_unleashed: fire_mage: cast at",
+    "skills_unleashed: effect shockwave at",
+], watcher = [
+    "skills_unleashed:fire_mage (watched) restarts (1 of 1)",
+    "skills_unleashed: fire_mage: watched cast at",
+    "skills_unleashed: effect shockwave at",
+] }
+# The server's script only waits for the dispatch site's first call (400 s is a limit); the inputs (whose `until` steps read the
+# server's log) end on the server's circle line.
+script = """
+log server-fire-mage-0720: task 8.1 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 400 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-fire-mage-0720: done
+"""

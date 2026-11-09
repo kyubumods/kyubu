@@ -1,0 +1,60 @@
+# 07-20 copy of shockwave-ring (2026-10-26): the 07-02 record ported to Cube World Alpha 2013-07-20 (addresses translated);
+# its observations are this build's own replays. The comment below is the 07-02 record's.
+# Probe record (live-probes) for add-particle-effects: where the world's camera is, and that a ring placed at a world position is drawn there.
+# A loader and mod check as much as a game observation: the EMTweaks mod (mods-gameplay/emtweaks) reads the
+# matrices that cube::CubeShader::setMatrices is given and draws a ring with the fixed-function pipeline just before the game clears the
+# depth buffer for the interface; mods-dev/shockwave_proto makes the rings at known places round the player.
+id = "shockwave-ring-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.0.1"
+date = "2026-10-26"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; the mod shockwave_proto waited 4 s and made four rings that do not expand: orange flat on the ground round the player, cyan on its edge 5 blocks ahead, magenta tilted above, green on its edge beside the player; screenshots 00-idle and 01-static",
+    "30 s later one orange ring that expands 0.1 block a tick and fades; screenshots 02-expanding and 03-late",
+]
+observations = [
+    "ported from the 07-02 record on 2026-10-26 (addresses translated); the 07-20 replay results follow",
+    "replay 1 (2026-10-26) passed under Wine: emtweaks and shockwave_proto ran the ring, no probe hooks left (evidence/retarget-0720-2026-10-26/replays/shockwave-ring-0720-1.md)",
+]
+
+[[confirms]]
+entry = "cube::CubeShader::setMatrices"
+observed = "(to fill in after the run)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-gameplay/emtweaks", "mods-dev/shockwave_proto"]
+input = [
+    "until shockwave-ring: ready",
+    "shot 00-idle",
+    "until shockwave-proto: static",
+    "wait 6",
+    "shot 01-static",
+    "until shockwave-proto: solo-green",
+    "wait 4",
+    "shot 02-solo-green",
+    "until shockwave-proto: solo-yellow",
+    "wait 4",
+    "shot 03-solo-yellow",
+    "until shockwave-proto: pair",
+    "wait 4",
+    "shot 04-pair",
+    "until shockwave-proto: expanding",
+    "wait 3",
+    "shot 05-expanding",
+    "wait 6",
+    "shot 06-late",
+    "until shockwave-proto: done",
+    "until shockwave-ring: done",
+]
+script = """
+log shockwave-ring: start
+wait world
+wait 15
+log shockwave-ring: ready
+wait 180
+log shockwave-ring: done
+expect - hooks == 0
+"""

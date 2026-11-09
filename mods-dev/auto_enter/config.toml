@@ -1,0 +1,26 @@
+[options.enabled]
+type = "bool"
+default = true
+description = "Skip the title menus and go straight into your world when the game starts."
+
+[options.character]
+type = "string"
+default = ""
+description = "Which saved character to play: leave empty for the first, a number for its place (0 is the first), or its name."
+
+[options.world]
+type = "string"
+default = ""
+description = "Which saved world to enter: leave empty for the first, a number for its place (0 is the first), or its name."
+
+[options.delay_frames]
+type = "int"
+default = 20
+min = 1
+max = 6000
+description = "How long the title screen stays up first, in frames."
+
+[options.join]
+type = "string"
+default = ""
+description = "A server to join instead of a world (such as 127.0.0.1), with the saved character. Empty: enter the world."

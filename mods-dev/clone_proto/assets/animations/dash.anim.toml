@@ -1,0 +1,42 @@
+# clone_proto: the shadow clone's dash pose, held (the Animator preview's clone: the trunk pitched far forward, the head up to look
+# ahead, the weapon hand thrust forward and down, the other flung back). Tracks over pose 0; no markers.
+duration = 1000
+end = "hold"
+blend_in = 0
+blend_out = 0
+
+[[track]]
+part = "body"
+channel = "rot"
+mode = "add"
+keys = [ { t = 0.0, v = [-42, 0, -8] }, { t = 1.0, v = [-42, 0, -8] } ]
+
+[[track]]
+part = "head"
+channel = "rot"
+mode = "add"
+keys = [ { t = 0.0, v = [30, 0, 6] }, { t = 1.0, v = [30, 0, 6] } ]
+
+[[track]]
+part = "hand_r"
+channel = "pos"
+mode = "add"
+keys = [ { t = 0.0, v = [-1.5, 7.5, 3.5] }, { t = 1.0, v = [-1.5, 7.5, 3.5] } ]
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+mode = "add"
+keys = [ { t = 0.0, v = [-48, 0, -10] }, { t = 1.0, v = [-48, 0, -10] } ]
+
+[[track]]
+part = "hand_l"
+channel = "pos"
+mode = "add"
+keys = [ { t = 0.0, v = [1.5, -6.0, 2.0] }, { t = 1.0, v = [1.5, -6.0, 2.0] } ]
+
+[[track]]
+part = "hand_l"
+channel = "rot"
+mode = "add"
+keys = [ { t = 0.0, v = [125, 0, 15] }, { t = 1.0, v = [125, 0, 15] } ]

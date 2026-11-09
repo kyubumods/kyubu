@@ -1,0 +1,55 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world, with the developer mod give_item. The in-game check of the game API's creature_give_item: the mod gives a weapon, 500 gold coins
+# and a random item through the API, and reads the bags back with raw access. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "give-item"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with give_item installed; waited 15 s there",
+    "The console command give_item:give gave a weapon (type 3, sub_type 17, level 21, rarity 2) twice, 500 gold coins and a random item of stored level 30, rarity 1, all through creature_give_item",
+    "The input opened the inventory with i and took a screenshot",
+]
+observations = [
+    "Wine replay 1 passed, no fault. The mod's command gave each item with kyubu::Mod::creature_give_item (the loader's items primitive, the game's inventory_add with the local player's Creature+0x11DC): a weapon (type 3, sub_type 17, level 21, rarity 2) landed in bag 0 slot 3 and a second one in slot 5, a random item from the game's generator (stored level 30, rarity 1) in slot 4, read back through the tabs vector with the same fields",
+    "500 gold coins (type 12, material 11) raised the coin counter from 0 to 5,000,000, and the inventory screen opened afterwards shows the item bag and 500 G",
+    "the generated item's upgrades are not passed (KyubuItem has none; a generated item starts with none)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "cube::Inventory.coins"
+observed = "0 before, 5,000,000 after 500 gold coins given through creature_give_item"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 400
+mods = ["mods-dev/give_item"]
+input = [
+    "until ia: start",
+    "console give_item:give 3 17 21 2", "wait 3",
+    "console give_item:give coins 500 gold", "wait 3",
+    "console give_item:give random 30 1", "wait 3",
+    "console give_item:give 3 17 21 2", "wait 3",
+    "key i", "wait 10", "shot 01-inventory",
+    "until ia: done",
+]
+script = """
+log creature_give_item through the give_item mod
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+inspect cube::Creature [[@0x7691C8] + 0x8006C8]
+log ia: start
+wait 60
+inspect cube::Creature [[@0x7691C8] + 0x8006C8]
+expect cube::Inventory.coins value u32 >= 5000000 [[@0x7691C8] + 0x8006C8] + 0x1304
+log ia: done
+wait 5
+"""

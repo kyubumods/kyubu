@@ -1,0 +1,42 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (kmap probe replay, setup "menu"). The probe's `alloc` check follows each thunk to
+# its import, compares it with the pair the loader's game_alloc/game_free call (MSVCR110.dll's operator new and
+# delete), and only then hands blocks across: game_alloc -> the game's operator delete, the game's operator new ->
+# game_free, with every block checked to belong to MSVCR110.dll's heap (_get_heap_handle, HeapValidate).
+id = "game-allocator"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Read Cube.exe's import table and thunks: operator new, delete and delete[] are jmp [IAT] thunks to MSVCR110.dll",
+    "Read the loader's game_alloc/game_free (loader/src/core/gametypes.cpp): GetProcAddress on MSVCR110.dll's ??2 and ??3",
+    "Started Cube.exe with --kyubu-dev and kyubu_probe through kmap probe replay, and waited at the start menu",
+    "Ran expect ... alloc on the two thunks: 64 rounds each way, then a full HeapValidate of the CRT heap",
+]
+observations = [
+    "@0x68C3F8 jumps through the IAT to MSVCR110.dll!??2@YAPAXI@Z, and @0x68C3FE to ??3@YAXPAX@Z",
+    "those are the exports the loader's game_alloc and game_free call: the same two functions",
+    "64 rounds each way (0 bytes to 1 MB): game_alloc blocks freed by the game's delete, game blocks by game_free",
+    "every block, from either side, was a block of MSVCR110.dll's heap; the whole heap validated afterwards",
+    "no other allocator: operator new[] is not imported, and 0x46E7F0-style helpers inline _Xbad_alloc around new",
+    "Server.exe has the same three thunks (0x54A636, 0x54A63C, 0x54ABBC) to the same MSVCR110.dll exports",
+]
+
+[[confirms]]
+entry = "operator_new"
+observed = "the thunk leads to the loader's operator new; its blocks are freed by game_free, 64 times, heap valid"
+
+[[confirms]]
+entry = "operator_delete"
+observed = "the thunk leads to the loader's operator delete; it frees game_alloc's blocks, 64 times, heap valid"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+log the game's allocator against the loader's game_alloc/game_free, client side, at the start menu
+wait 5
+expect operator_new alloc @0x68C3F8 @0x68C3FE 64
+expect operator_delete alloc @0x68C3F8 @0x68C3FE 64
+"""

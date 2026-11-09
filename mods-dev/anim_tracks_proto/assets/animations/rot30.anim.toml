@@ -1,0 +1,7 @@
+# Phase 2: the weapon arm turned by 30 degrees on x, an offset on the game's pose (the scenario "A new pose").
+duration = "ability"
+
+[[track]]
+part = "weapon_r"
+channel = "rot"
+keys = [ { t = 0, v = [30, 0, 0] } ]

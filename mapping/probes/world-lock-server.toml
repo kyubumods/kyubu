@@ -1,0 +1,85 @@
+# Recorded with kyubu_probe and the Kyubu loader of add-game-api (API 1.1, a MinGW build), unattended under Wine 9.0
+# (WSL on the Windows laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe that joins
+# 127.0.0.1 with a new character and walks (client = "join"). The script runs on the server.
+# Static reading (Server.exe): World+0x8000C0 is a critical section; cube::World::World sets it up with
+# InitializeCriticalSectionAndSpinCount(0x80000400) and ~World deletes it. 0x4D3D50 enters it and 0x4D5910 leaves it
+# (this = the World, 6 bytes each). Callers: main around the step and the send (every tick), the cube::Server methods
+# 0x427F30/0x427F90/0x427FF0 and the send 0x427020 (from main), server_accept_loop (a join),
+# connection_receive_loop (packet 0: finds the creature under the lock, then writes its data under it) and
+# connection_send_loop (each pass), and main's zone thread 0x5493D0. That thread also enters it directly, with the
+# critical section at +0x8000D8, in 0x4D74E0, 0x4D7560 and 0x4D75F0, which only it calls.
+id = "world-lock-server"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1 (API 1.1)"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Server.exe with --kyubu-dev, then Cube.exe joined 127.0.0.1 with a new character (Tester, warrior)",
+    "Detoured cube::World::update (3 stack arguments) for the World; traced the lock 0x4D3D50 and the unlock 0x4D5910",
+    "Traced the zone thread's direct entries: the EnterCriticalSection calls in 0x4D74E0, 0x4D7560, 0x4D75F0",
+    "Traced 60 s with no client, then 120 s while the joined client walked; tallied every call by caller and thread",
+]
+observations = [
+    "Wine replay 2 passed, 11 of 11 held (replay 1, 12 of 12, traced the zone thread's functions at their entries)",
+    "no client, 60 s: only the main thread (36) locks the World: 2,952 times each from main, 0x427F30, 0x427F90,",
+    "0x427FF0 and the send 0x427020, once per tick; every call's this is update's World (0x02290020)",
+    "the spin count at World+0x8000D4 is 1024 (the constructor's 0x80000400 without the flag bit)",
+    "client joined and walking, 120 s: main's sites 5,615 times each; the receive thread (412) 10,936 times at each",
+    "of packet 0's two sites; the send thread (416) 4,692 times per pass site; all with this = the World",
+    "the zone thread (276) entered it directly 15 times, in 0x4D75F0 (zones dropped at 25 s and 35 s), each call's",
+    "argument 0x02A900E0 = World + 0x8000C0; 0x4D74E0 and 0x4D7560 did not run",
+]
+
+[[confirms]]
+entry = "cube::World.lock"
+observed = "Server.exe: main's tick, main's zone thread and each client's receive and send threads lock the stepped World"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 360
+input = [
+    "shot 01-joined",
+    "until 2.2: walk",
+    "hold s 120", "shot 02-walked",
+]
+script = """
+log World lock (add-game-api 2.2): which threads take World+0x8000C0 in Server.exe
+trace detour 3 cube::World::update
+trace add @0x4D3D50
+trace add @0x4D5910
+# the zone thread's direct entries: the `call EnterCriticalSection` for +0x8000C0 in 0x4D74E0, 0x4D7560, 0x4D75F0
+trace add @0x4D752B
+trace add @0x4D75B3
+trace add @0x4D7699
+# phase 1, no client yet (the client connects about 70 s after the server is ready, then loads)
+trace start
+wait 60
+trace stop
+trace report
+# main locks the World it steps around the step, and 0x427FF0 (from main) does too
+expect cube::World.lock from @0x4D3D50 0x549F06 this ecx(cube::World::update)
+expect cube::World.lock from @0x4D5910 0x54A0CF this ecx(cube::World::update)
+expect cube::World.lock from @0x4D3D50 0x427FFF this ecx(cube::World::update)
+# the constructor's spin count (0x80000400 without the flag bit) at +0x14: a critical section
+expect cube::World.lock value u32 == 1024 ecx(cube::World::update) + 0x8000D4
+wait 90
+# phase 2, the client joined and walks
+trace start
+log 2.2: walk
+wait 120
+trace stop
+trace report
+expect cube::World.lock from @0x4D3D50 0x549F06 this ecx(cube::World::update)
+# the client's receive thread: packet 0 finds the creature, then writes its data, each under the lock
+expect cube::World.lock from @0x4D3D50 0x425FF8 this ecx(cube::World::update)
+expect cube::World.lock from @0x4D3D50 0x426036 this ecx(cube::World::update)
+# the client's send thread, each pass
+expect cube::World.lock from @0x4D3D50 0x423CB9 this ecx(cube::World::update)
+# main, the receive thread and the send thread at least
+expect cube::World.lock threads @0x4D3D50 >= 3 this ecx(cube::World::update)
+# the zone thread changes the zones around the walking player, entering the lock directly: at each of those calls
+# the first stack word is the argument, &World.lock
+expect cube::World.lock from @0x4D752B,@0x4D75B3,@0x4D7699 ecx(cube::World::update)+0x8000C0
+expect - hooks == 0
+"""

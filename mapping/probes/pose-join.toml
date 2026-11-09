@@ -1,0 +1,75 @@
+# Task 2.4 of add-ability-animation (A4, the join site). mods-dev/pose_join_proto installs a read-only mid hook at 0x41F135 in
+# draw_creature (0x4129C0): the merge after the pose switch and its smoothing, before the four adds (call 0x412920) of the hand
+# vectors. EDI holds the draw record there. The mod logs the record's pose vectors (offsets of the task 2.3 table) per who, class,
+# creature mode and pose id, and counts join-site hits against draw_creature entries per creature.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its draw record is P + 0x1498.
+id = "pose-join"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Idle 6 s, then class_type 2, 3, 4 and back to 1 written with the inspector (4 s each, idle), walked (W) 4 s, held mouse 1 for 2 s, forced modes 17 and 5 for 2 s each",
+]
+observations = [
+    "Wine replay 8 passed, 1 of 1 expectations held (runs 1 to 6 lost the game about 90 s in, a known-good record included; runs 7 and 8 ran as usual with no change to the mod's hook sites)",
+    "a read-only mid hook at 0x41F135 installed with no KY_E_UNSAFE: the three displaced instructions (lea eax,[edi+0x30]; push eax; lea ecx,[esp+0x228]) hold no relative branch, and no jump in the function lands on 0x41F136 to 0x41F13F",
+    "it fires once per drawn creature: in every 300-entry tally the hits equalled the entries of draw_creature (300 and 300, no creature with entries different from hits); a second counting hook at 0x41F04B (the mode-28 test, before the scratch smoothing) counted the same 300",
+    "EDI is the draw record at the site (the word at EDI is the creature, EDI + 8 the pose id, in every logged hit)",
+    "player at idle with class_type 1 to 4 written by the inspector: every vector of the task 2.3 table is 0, and so are Creature + 0xC0, +0xC4 to +0xCC, +0xD0, +0xD4 and +0xD8 (the equipment did not change with the class, so this is one warrior's draw four times); another creature at idle (a body model only): all 0",
+    "the vectors move with the pose and match the 2.3 table: mode 57 (pose 2) root euler x 3.5 to 8.5, body euler (7, 7, -42) to (10, 10, -58), both hand eulers (63, 0, 63) to (77, 0, 77) and hand position z 5.1; mode 67 (pose 37) body euler z 89.7, hand eulers (-90, -0.2, -89.7); forced mode 5 (pose 33) root offset y 0.5, hand positions (6, 0, 0) falling to (2, 0, 0); forced mode 17 (pose 35) hand A (6, 8, 2) and (-90, 60, -50), hand B (3, 5, 2) and (-90, -60, -30), body euler z 40",
+    "the record is the smoothed state: after a timed pose ends the draw's pose id reads 0 but the vectors keep easing back (mode 67 with pose 0: body euler z 12.9 then -17.5; forced mode 17 with pose 0: body euler z 25.3 then 20.4), so a write at the join site starts from, and is eased from, the record's own value",
+    "the player's slot mask at idle is head, hair, body, hands, feet and the weapon slot at +0xDC only (the +0xE0 weapon slot is empty for this warrior), so the warrior's club follows hand B; the other creature has the body model only",
+    "head position, head euler, tail, body position, lean and the turn twist stayed 0 in every logged line (not exercised by these modes); no walking line was logged (the mode-0 key was logged twice at load)",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a mid hook at 0x41F135 (after the pose switch and its smoothing, before the four adds of the hand vectors) installs and fires once per draw with EDI = the record; the record's vectors there match the offsets of the 2.3 table"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/pose_join_proto"]
+input = [
+    "until pose-join walk",
+    "hold w 4",
+    "until pose-join swing",
+    "hold mouse1 2",
+]
+script = """
+log pose-join: task 2.4, the join site 0x41F135
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch recpose u32 [[@0x7691C8] + 0x8006C8] + 0x14A0
+log pose-join idle
+wait 6
+log pose-join classes
+inspect set data.class_type 2
+wait 4
+inspect set data.class_type 3
+wait 4
+inspect set data.class_type 4
+wait 4
+inspect set data.class_type 1
+wait 3
+log pose-join walk
+wait 7
+log pose-join swing
+wait 5
+log pose-join forced
+inspect set data.current_mode 17
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 5
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 5
+log pose-join done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+watch clear
+"""

@@ -1,0 +1,184 @@
+# Cube.exe: the voxel model table (2569 vanilla slots) and model loading.
+
+[[function]]
+name = "ModelLoader::loadAll"
+address = 0x4EE230
+convention = "thiscall"
+prototype = "void __thiscall ModelLoader::loadAll(ModelLoader* this, const std::string* base_path)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["string:\"data1.db\"", "correlated:cube-0x51D2CE9C:ModelLoader::loadAll"]
+source = "kyubu"
+notes = "models vector at this+4 resized to 2569; engine pointer at this+0x10; 2,557 model loads; ret 4"
+
+[[function]]
+name = "ModelLoader::resizeSite"
+address = 0x4EE26A
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "rendering"
+status = "verified"
+evidence = ["manual:push 0xA09 (2569) before vector::resize inside loadAll", "correlated:cube-0x51D2CE9C:ModelLoader::resizeSite"]
+source = "kyubu"
+
+[[function]]
+name = "Model::Model"
+address = 0x4E6A20
+convention = "thiscall"
+prototype = "Model* __thiscall Model::Model(Model* this, void* engine, int32_t zero)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:ModelLoader::loadAll", "correlated:cube-0x51D2CE9C:Model::Model"]
+source = "kyubu"
+notes = "sizeof 0x60; ret 8"
+
+[[function]]
+name = "Model::load"
+address = 0x4E7290
+convention = "thiscall"
+prototype = "bool __thiscall Model::load(Model* this, const std::string* key, cube::Database* db, bool flag)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:ModelLoader::loadAll", "correlated:cube-0x51D2CE9C:Model::load"]
+source = "kyubu"
+notes = "called after every model file name in ModelLoader::loadAll; ret 0xC"
+
+[[function]]
+name = "ModelLoader::get"
+address = 0x4120C0
+convention = "thiscall"
+prototype = "Model* __thiscall ModelLoader::get(ModelLoader* this, int32_t slot)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:ModelLoader::itemModel", "manual:models[slot] from the vector at this+4; null when out of range", "correlated:cube-0x51D2CE9C:ModelLoader::get"]
+source = "kyubu"
+notes = "the model table getter (task 8.4); the bound is the vector size, so slots added after 2569 resolve too. Callers: ModelLoader::itemModel, draw_creature, the GameController constructor and render, cube::World::update; ret 4"
+
+[[function]]
+name = "matrix_transform_normal"
+address = 0x488E50
+convention = "thiscall"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["manual:out = v * M, 3x3 part of a row-major 4x4 float matrix; no model table", "correlated:cube-0x51D2CE9C:matrix_transform_normal"]
+source = "kyubu"
+aliases = ["ModelResolverB", "model_resolver_b"]
+notes = "listed in 1.0.1 as model resolver B (149 computed model-slot look-ups); task 8.4 rejected that: it is 144 bytes of SSE maths (like D3DXVec3TransformNormal), this = the matrix, args (out, v), ret 8, and it calls nothing. Callers include GameController::update and render and cube::World::update"
+
+# Task 6.6: the Direct3D 9 set-up, the device reset, and cube::CubeShader.
+
+[[function]]
+name = "render_init"
+address = 0x4C8720
+convention = "cdecl"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["xref:plasma::D3D9Engine::D3D9Engine", "manual:the only caller of Direct3DCreate9; called by WinMain", "correlated:cube-0x51D2CE9C:render_init", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+notes = "Direct3DCreate9(32), CreateDevice (hardware vertex processing, multithreaded), plasma::D3D9Engine (0x2D0 bytes), the fonts folder, then cube::CubeShader; false makes WinMain show the Direct3D error"
+
+[[function]]
+name = "reset_device"
+address = 0x4C8940
+convention = "cdecl"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["xref:Game::frame", "manual:IDirect3DDevice9::Reset (vtable +0x40) until it succeeds", "correlated:cube-0x51D2CE9C:reset_device"]
+source = "kyubu"
+notes = "releases the engine's resources, resets the device to the window or fullscreen size under the game controller's lock, calls the controller's slot 4 (resize), then recreates the resources"
+
+[[function]]
+name = "cube::CubeShader::CubeShader"
+address = 0x447C20
+convention = "thiscall"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["rtti:cube::CubeShader", "xref:render_init", "correlated:cube-0x51D2CE9C:cube::CubeShader::CubeShader"]
+source = "kyubu"
+notes = "stores the vtable; 0x74 bytes (operator new in render_init); takes the Direct3D device"
+
+[[function]]
+name = "cube::CubeShader::~CubeShader"
+address = 0x447C70
+convention = "thiscall"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["rtti:cube::CubeShader", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:cube-0x51D2CE9C:cube::CubeShader::~CubeShader"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CubeShader::init"
+address = 0x447E10
+convention = "thiscall"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["xref:render_init", "manual:fills a vertex-element table; on false render_init deletes the shader", "correlated:cube-0x51D2CE9C:cube::CubeShader::init"]
+source = "kyubu"
+notes = "returns bool; the compiled shaders (vs_3_0 and ps_3_0, HLSL compiler 9.30) are embedded in the data section"
+
+[[function]]
+name = "cube::CubeShader::setMatrices"
+address = 0x4482A0
+convention = "thiscall"
+prototype = "void __thiscall cube::CubeShader::setMatrices(cube::CubeShader* this, const float* world, const float* view, const float* projection)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:ret 0xC, three matrix args", "manual:shader CTAB names c20 to c29", "correlated:cube-0x51D2CE9C:cube::CubeShader::setMatrices", "probe:model-part-draw"]
+source = "kyubu"
+notes = "sets c20 to c29 of the world vertex shader (worldViewProj, worldView, world) from three 4x4 matrices; many drawing functions call it. The render function gives every world draw of a frame the same view and projection: the pair seen most often is the camera"
+
+[[function]]
+name = "cube::CubeShader::setOpacity"
+address = 0x447FB0
+convention = "thiscall"
+prototype = "void __thiscall cube::CubeShader::setOpacity(cube::CubeShader* this, float opacity)"
+subsystem = "rendering"
+status = "candidate"
+evidence = ["xref:cube::GameController::render", "manual:one pixel shader constant (register at this+0x5C); ret 4", "correlated:cube-0x51D2CE9C:cube::CubeShader::setOpacity"]
+source = "kyubu"
+notes = "Writes one float to a pixel shader constant. Render lowers it for the 5 trail copies of modes 48 and 93 (each copy moved back along the velocity, z-writes off) and puts 1 back after, so it reads as an opacity. Not run."
+
+[[function]]
+name = "light_vector_push"
+address = 0x4C11F0
+convention = "thiscall"
+prototype = "void __thiscall light_vector_push(void* vector, const cube::Light* light)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:pushed by the Fire Mage in play, lit models and ground (2026-10-18)", "correlated:cube-0x51D2CE9C:light_vector_push"]
+source = "kyubu"
+notes = "std::vector push_back of the frame's light vector: copies the 0x30-byte record to the end, growing the storage when full. The render calls it about twenty times (world objects, projectiles, flashes, lamps); light_push_site and light_sort_site see the vector at ESP+0xC8."
+
+[[function]]
+name = "Model::draw"
+address = 0x4E6DF0
+convention = "thiscall"
+prototype = "void __thiscall Model::draw(Model* this)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:draw_creature", "manual:disassembly 2026-11-05"]
+source = "kyubu"
+notes = "Draws with the matrices and colour the caller set (setMatrices, setColour); about 25 calls in draw_creature. Model+0x44/+0x48/+0x4C are the x/y/z size in voxels; parts are centred by a last translate of -size/2. Probe model-part-draw, replayed 2026-11-05."
+
+[[function]]
+name = "cube::CubeShader::setColour"
+address = 0x448280
+convention = "thiscall"
+prototype = "void __thiscall cube::CubeShader::setColour(cube::CubeShader* this, const float* colour)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:draw_creature", "manual:disassembly 2026-11-05"]
+source = "kyubu"
+notes = "Sets the world shader's colour constant from a vec4 pointer; draw_creature passes its arg 6. Name is a guess; Probe model-part-draw, replayed 2026-11-05."
+
+[[function]]
+name = "cube::GameController::createParticles"
+address = 0x470D80
+convention = "thiscall"
+prototype = "void __thiscall cube::GameController::createParticles(cube::GameController* this, Model* model, const float* world, const float* unused_vec3, const float* velocity, float unused_factor, float origin_x, float origin_y, const float* colour, int type)"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:cube::GameController::render", "manual:disassembly 2026-11-06", "manual:the name follows the public Infinite-Cubes rebuild"]
+source = "kyubu"
+notes = "Bursts a model into voxel particles (the death burst). Nine stack args, ret 0x24; Model* is the game's sprite (size at +0x44). Half the surface voxels become particles at world*(x,y,z), tinted by the colour vec4, type 0 = lit cube. Args 3, 5, 6, 7 unused. Probe death-burst-call, 11-06."

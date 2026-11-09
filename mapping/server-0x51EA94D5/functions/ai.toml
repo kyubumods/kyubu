@@ -1,0 +1,156 @@
+# Server.exe: creature behaviours (cube::Behavior and its subclasses).
+
+[[function]]
+name = "cube::CombatBehavior::CombatBehavior"
+address = 0x4029E0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::CombatBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::CombatBehavior::CombatBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CombatBehavior::update"
+address = 0x402F40
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CombatBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::CombatBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CombatBehavior::targetScanSite"
+address = 0x40350E
+convention = "cdecl"
+kind = "site"
+subsystem = "ai"
+status = "candidate"
+evidence = ["xref:cube::CombatBehavior::update", "correlated:cube-0x51EA955E:cube::CombatBehavior::targetScanSite", "manual:same code before it as Cube.exe 0x42D0EE, at the same +0x5CE in update"]
+source = "kyubu"
+notes = "once per candidate in the scan for a first target: EBX the candidate, XMM2 its squared distance (divided by the stealth factor), XMM4 the squared radius. A huge XMM2 here keeps that creature out of the scan (the Ninja's true stealth on the server). Cube.exe twin 0x42D0EE"
+
+[[function]]
+name = "cube::CompanionBehavior::CompanionBehavior"
+address = 0x4055D0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::CompanionBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::CompanionBehavior::CompanionBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CompanionBehavior::update"
+address = 0x405780
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CompanionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::CompanionBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::LookAtPlayerBehavior"
+address = 0x414720
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::LookAtPlayerBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::LookAtPlayerBehavior::LookAtPlayerBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::update"
+address = 0x414730
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::LookAtPlayerBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::LookAtPlayerBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::RandomInteractionBehavior"
+address = 0x41BA60
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::RandomInteractionBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::update"
+address = 0x41BC20
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomInteractionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::RandomInteractionBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::RandomWalkBehavior"
+address = 0x41CB90
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::RandomWalkBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::RandomWalkBehavior::RandomWalkBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::update"
+address = 0x41CBB0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomWalkBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::RandomWalkBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SequentialBehavior::SequentialBehavior"
+address = 0x41CFC0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::SequentialBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::SequentialBehavior::SequentialBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SequentialBehavior::update"
+address = 0x41D080
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SequentialBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::SequentialBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::SpawnLocationBehavior"
+address = 0x428920
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::SpawnLocationBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::SpawnLocationBehavior::SpawnLocationBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::update"
+address = 0x428940
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SpawnLocationBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::SpawnLocationBehavior::update"]
+source = "kyubu"
+
+[[function]]
+name = "cube::WalkPathBehavior::WalkPathBehavior"
+address = 0x4C5D50
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::WalkPathBehavior", "manual:stores the vtable; called directly, not from a slot", "correlated:server-0x51D2CE9B:cube::WalkPathBehavior::WalkPathBehavior"]
+source = "kyubu"
+
+[[function]]
+name = "cube::WalkPathBehavior::update"
+address = 0x4C5E00
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::WalkPathBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)", "correlated:server-0x51D2CE9B:cube::WalkPathBehavior::update"]
+source = "kyubu"

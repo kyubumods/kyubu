@@ -1,0 +1,69 @@
+# Task 10.3 of add-skills-unleashed-multiplayer (design D12): KY_CREATURE_ROOTED and creature_state_get / creature_state_set on
+# Server.exe, with a joined Cube.exe (kmap probe replay, client = "join"). The dev mod mods-dev/root_proto puts a monster 4 blocks in
+# front of the joined player, roots it, knocks it every 25 World steps for 250 steps (kyubu.game.hit with knock 15 east and 5 up, and
+# a knock of 10, 10 written with creature_state_set), then clears the flag and knocks it once more. Its client side, on the joined
+# Cube.exe, watches the hostile creature nearest the player in the client's copy.
+id = "creature-root-server"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with root_proto",
+    "the server puts a monster in front of the player with creature_state_set, roots it, reads it back each step with creature_state_get",
+    "ten knocks while rooted, one after the flag is cleared",
+    "the joined client logs the monster that stays put near the player, and when it moves again",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/creature-root-server), passed in 24 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 2, 2026-11-08 (evidence/creature-root-2026-11-08/creature-root-server-run2), passed: 'creature root: installed at 2 sites' on both games",
+    "creature_state_set put monster 550301081602 4 blocks in front of the joined player at its own height; creature_set_flags {rooted = true} returned true and creature_get read flags.rooted true",
+    "while rooted, 250 World steps and 10 knocks (kyubu.game.hit, knock 15 east and 5 up, all landed; and a knock of 10, 10 written with creature_state_set): x, y drift 0.000 blocks, rise 0.000, z held at 85.99, the mode read 0 at every step",
+    "cleared with {}: the free knock landed and the monster went 0.12 blocks in 50 steps, 3.40 in 100, 3.90 in 150 (it walked to the player)",
+    "the joined client saw the same id stay within 0.25 block for 150 steps 4.00 blocks from the player, then go 1.03 blocks once freed",
+    "rooted + unstoppable on Server.exe was refused: creature_flags is not mapped for Server.exe",
+    "creature_state_get read mode 0, mode_ms 21, stun_ms -3420, slowed 0, charge 0, aim 0 on the monster",
+    "run 1 put the monster at the server copy's z of the joined player (8 blocks, inside the terrain): the game lifted it 74.9 blocks back to the surface (resolveCollisions), x and y still drift 0.000; run 2 keeps its own height",
+    "not covered: a rooted creature on Cube.exe single-player (the sites are verified there by xref and manual only), its turning, a rooted player",
+]
+
+[[confirms]]
+entry = "cube::World::aiTickSite"
+observed = "a rooted monster's mode read 0 for 250 steps, and it walked again once the flag was cleared"
+
+[[confirms]]
+entry = "cube::World::moveStepSite"
+observed = "a rooted monster drifted 0.000 blocks under 10 knocks; freed, it moved 3.90 blocks in 150 steps"
+
+[[confirms]]
+entry = "cube::CreatureData.extra_vel"
+observed = "zeroed at the move step, the knocks of 10 hits and of a written knock moved the rooted monster 0.000 blocks"
+
+[[confirms]]
+entry = "cube::CreatureData.accel"
+observed = "zeroed at the move step with the step: the rooted monster, aggroed by 10 hits, did not walk"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 300
+mods = ["mods-dev/root_proto"]
+input = [
+    "until root_proto: server: done",
+    "shot 01-client",
+]
+log_expect = { latest = [
+    "root_proto: server: rooted: true nil, flags.rooted true",
+    "root_proto: server: rooted held: drift 0.0",
+    "root_proto: server: cleared: true nil",
+    "root_proto: server: done: ",
+], client = [
+    "root_proto: client: watching",
+    "root_proto: client: held: monster ",
+    "root_proto: client: moved: monster ",
+] }
+script = """
+log creature-root-server: task 10.3 of add-skills-unleashed-multiplayer
+expect - hooks == 0
+"""

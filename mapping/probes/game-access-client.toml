@@ -1,0 +1,69 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (kmap probe replay, setup "menu"). The object types are read at run time from
+# MSVC RTTI: an object's vtable pointer is at +0, the vtable's slot -1 points at its complete object locator, whose
+# +0xC points at the type descriptor, whose name starts at +8 (".?AVWorld@cube@@", so +0xC holds "Worl").
+id = "game-access-client"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Read WinMain, the controller's constructor and Game::frame statically for the globals they use and the World",
+    "Started Cube.exe with --kyubu-dev and kyubu_probe through kmap probe replay, and waited at the start menu",
+    "Followed 0x7691C8 and GameController+0x2DC and read each object's RTTI type name through its vtable",
+    "Traced cube::GameController::render and compared its this with the pointer at 0x7691C8",
+]
+observations = [
+    "WinMain stores operator new(0x1001010) into 0x7691C8 once the constructor returns",
+    "the survey's other users of 0x7691C8 are Game::frame, window_proc and reset_device",
+    "the constructor runs cube::World::World and openSave on this+0x2DC: the World is embedded, not allocated",
+    "0x2DC + 0x80029C (Server.exe's World size) = 0x800578, just below the command-line string at +0x800590",
+    "the model loader at GameController+0x2F8 (7.1) is World+0x1C, where Server.exe's main loads models too",
+    "Cube.exe has no cube::Server class: single-player simulates the embedded World, with no in-process server",
+    "WinMain passes a flag for argv[1] == server to the constructor; the decompiled constructor never uses it",
+    "at the menu: [0x7691C8] is a cube::GameController (RTTI), and +0x2DC is a complete cube::World (offset 0)",
+    "the this of render's latest traced call was the object at [0x7691C8]",
+]
+
+[[confirms]]
+entry = "cube::game_controller"
+observed = "holds the one cube::GameController, the same object Game::frame renders"
+
+[[confirms]]
+entry = "cube::GameController"
+observed = "the object at [0x7691C8] has the RTTI type .?AVGameController@cube@@"
+
+[[confirms]]
+entry = "cube::GameController.world"
+observed = "+0x2DC is a complete cube::World (RTTI name, complete-object offset 0)"
+
+[[confirms]]
+entry = "cube::World"
+observed = "embedded at GameController+0x2DC, ending before the members that follow it"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+log game access, client side: the controller global and the World inside it
+wait 5
+# cube::game_controller: set, and a cube::GameController (".?AVGameController@cube@@": "Game", "Cont")
+expect cube::game_controller value u32 != 0 @0x7691C8
+expect cube::GameController value u32 == 1701667143 [[[[@0x7691C8]] - 4] + 0xC] + 0xC
+expect cube::GameController value u32 == 1953394499 [[[[@0x7691C8]] - 4] + 0xC] + 0x10
+expect cube::GameController value u32 == 0 [[[@0x7691C8]] - 4] + 4
+# GameController.world: a complete cube::World (".?AVWorld@cube@@": "Worl", "d@cu"; locator offset 0)
+expect cube::GameController.world value u32 == 1819438935 [[[[@0x7691C8] + 0x2DC] - 4] + 0xC] + 0xC
+expect cube::GameController.world value u32 == 1969438820 [[[[@0x7691C8] + 0x2DC] - 4] + 0xC] + 0x10
+expect cube::World value u32 == 0 [[[@0x7691C8] + 0x2DC] - 4] + 4
+# the World's model table (World+0x1C+4) is the 7.1 model vector
+expect cube::World value u32 != 0 [@0x7691C8] + 0x2DC + 0x20
+# the controller Game::frame renders is the one in the global: this - [0x7691C8] = 0 lands on the type name
+trace add cube::GameController::render
+trace start
+wait 3
+trace stop
+expect cube::game_controller calls cube::GameController::render > 20
+expect cube::game_controller value u32 == 1701667143 [@0x7691C8] - ecx(cube::GameController::render) + @0x763BF8
+expect - hooks == 0
+"""

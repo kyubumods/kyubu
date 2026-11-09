@@ -1,0 +1,9 @@
+duration = 650
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+keys = [
+  { t = 0.0, v = [0, 0, 0] },
+  { t = 1.5, v = [90, 0, 0] },
+]

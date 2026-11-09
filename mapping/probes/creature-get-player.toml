@@ -1,0 +1,77 @@
+# Recorded with kyubu_probe, the entity_spawner mod and a Kyubu loader built from add-entity-spawner task 4.2 (API 1.1,
+# with creature_get and creature_player), unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software
+# rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. Task
+# 4.2's in-game check (game-api "The player's position"): the mod's `spawner where 30` reads the player through the
+# game API (kyubu.game.creature_player, then its get) and logs it, and again 30 s later; the script shows the same
+# creature with `inspect player` (cube::GameController.player) while the player stands still, three times, and the
+# player walks (W, along +y in a new world) between the reads while watches sample its position.
+id = "creature-get-player"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-29"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "three reads: `console entity_spawner:spawner where 30` (the mod logs the player through the game API at once and 30 s later), then `inspect player [@0x7691C8]` 100 s after the read's log line",
+    "between the reads, W held for 6 s while watches sampled the player's pos.x and pos.y (low words)",
+]
+observations = [
+    "Wine replay 1 passed, 2 of 2 expectations held; screenshots walk-1 and walk-2 (evidence folder entity-spawner-4.2-2026-09-29). The loader logged `game API: available on this build: world, handles, entity_state`",
+    "read 1, standing at the start: `where` (22:40:12, and 30 s later) gave creature 0x0000000101000000 (id 1) type 2 hostile 0 level 1 hp 265 at 550301073408 550301073408 14095482 yaw -179.98; inspect player (22:41:22) showed id 1 and the same data.pos, body_yaw -179.983, hostile_type 0, entity_type 2, hp 265, level 1",
+    "walk 1: pos.y's low word changed 45 times (545259520 to 550035545); read 2 (22:43:30) gave y 550306497354, z 14488698, yaw 0.00 (x unchanged: W walks along +y), and inspect player (22:43:42) showed the same values; y moved 5,423,946 units (82.8 blocks) from read 1",
+    "walk 2: read 2's later read came at 22:44:00, after the walk: y 550311269636, z 13964410, yaw 0.02; inspect player at 22:46:02 showed the same pos and body_yaw 0.0197823. Its hp was 0 by then: the player had been hit meanwhile (data.last_hit_time 300410 to 388589; both screenshots show 265/265), so hp matched in reads 1 and 2 only",
+    "read 3's console step did not run before the script's 100-s window closed (the console steps came 30 s and 88 s after their log lines), so the record has three read/inspect pairs, not four; the handle was the same in every read (one handle per creature per side)",
+]
+
+[[confirms]]
+entry = "cube::World.local_player"
+observed = "creature_player's handle read the creature inspect player shows through cube::GameController.player: id 1, the same position, facing and type three times (hp twice; the player was hit before the third inspect)"
+
+[[confirms]]
+entry = "cube::CreatureData.pos"
+observed = "read through creature_get it matched inspect player exactly at three places (int64 units), and changed along +y when W was held (the watches held)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 4.2: read 1", "console entity_spawner:spawner where 30",
+    "until 4.2: walk 1", "hold w 6", "wait 5", "shot walk-1",
+    "until 4.2: read 2", "console entity_spawner:spawner where 30",
+    "until 4.2: walk 2", "hold w 6", "wait 5", "shot walk-2",
+    "until 4.2: read 3", "console entity_spawner:spawner where 30",
+]
+script = """
+log the player's position through the game API (task 4.2 of add-entity-spawner), next to inspect player
+wait world
+wait 15
+# each read: the mod's `spawner where 30` (the console step runs 20 to 40 s late under Wine; the mod reads at once and
+# 30 s later) and, 100 s after the log line, inspect player; the player stands still from the later read on
+log 4.2: read 1
+wait 100
+inspect player [@0x7691C8]
+# each walk: W for 6 s (along +y in a new world); the watches sample the low words of pos.x and pos.y
+watch pos_x i32 [[@0x7691C8] + 0x8006C8] + 0x10
+watch pos_y i32 [[@0x7691C8] + 0x8006C8] + 0x18
+log 4.2: walk 1
+wait 40
+watch
+expect cube::CreatureData.pos watch pos_y changed
+watch clear
+log 4.2: read 2
+wait 100
+inspect player [@0x7691C8]
+watch pos_x i32 [[@0x7691C8] + 0x8006C8] + 0x10
+watch pos_y i32 [[@0x7691C8] + 0x8006C8] + 0x18
+log 4.2: walk 2
+wait 40
+watch
+expect cube::CreatureData.pos watch pos_y changed
+watch clear
+log 4.2: read 3
+wait 100
+inspect player [@0x7691C8]
+log 4.2: end
+wait 5
+"""

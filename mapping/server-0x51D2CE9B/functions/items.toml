@@ -1,0 +1,229 @@
+# Server.exe: the item stats (read statically on 2026-09-30). Each entry is Cube.exe's function of the same name with
+# the same length and callees; the method is in kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+# Server.exe has no item strings, so the names come from the Cube.exe twins.
+
+[[function]]
+name = "stat_scale"
+address = 0x410890
+convention = "cdecl"
+prototype = "float __cdecl stat_scale(float level, int32_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:stat_scale", "xref:item_hp"]
+source = "kyubu"
+notes = "the same length (0x90) as Cube.exe's, 85% of the bytes equal, with the same two pow calls"
+
+[[function]]
+name = "item_armor"
+address = 0x413350
+convention = "fastcall"
+prototype = "float __fastcall item_armor(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_armor", "xref:cube::Creature::armor"]
+source = "kyubu"
+notes = "the same length (0xF0) as Cube.exe's, 84% of the bytes equal; calls stat_scale"
+
+[[function]]
+name = "item_hp"
+address = 0x413680
+convention = "fastcall"
+prototype = "float __fastcall item_hp(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_hp", "xref:cube::Creature::maxHp"]
+source = "kyubu"
+notes = "the same length (0x110) as Cube.exe's, 91% of the bytes equal; calls stat_scale"
+
+[[function]]
+name = "item_resistance"
+address = 0x413C00
+convention = "fastcall"
+prototype = "float __fastcall item_resistance(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_resistance", "xref:cube::Creature::resistance"]
+source = "kyubu"
+notes = "the same length (0xF0) as Cube.exe's, 86% of the bytes equal; calls stat_scale"
+
+[[function]]
+name = "item_damage"
+address = 0x413EF0
+convention = "fastcall"
+prototype = "float __fastcall item_damage(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_damage", "xref:creature_damage"]
+source = "kyubu"
+notes = "the same length (0x1D0) as Cube.exe's, 89% of the bytes equal; calls stat_scale five times"
+
+# Added 2026-10-01 (kyubu-mapping/evidence/item-formulas-2026-10-01/): reached through the creature twins' calls.
+
+[[function]]
+name = "item_crit"
+address = 0x413460
+convention = "fastcall"
+prototype = "float __fastcall item_crit(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_crit", "xref:creature_crit"]
+source = "kyubu"
+notes = "the CRIT getter: called by the Server.exe creature_crit (0x4096B0), as Cube.exe's item_crit is by its creature_crit. The same length (0x120)"
+
+
+[[function]]
+name = "item_heal"
+address = 0x413580
+convention = "fastcall"
+prototype = "float __fastcall item_heal(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_heal", "manual:length 0x100 and three stat_scale calls, like Cube.exe's"]
+source = "kyubu"
+notes = "the heal getter of a consumable: the same length (0x100) and the same three calls of stat_scale as Cube.exe's item_heal. Matched by shape only"
+
+
+[[function]]
+name = "item_tempo"
+address = 0x413CF0
+convention = "fastcall"
+prototype = "float __fastcall item_tempo(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_tempo", "xref:creature_tempo"]
+source = "kyubu"
+notes = "the TEMPO getter: called by the Server.exe creature_tempo (0x411C90), as Cube.exe's item_tempo is by its creature_tempo. The same length (0x120)"
+
+# Server twins of the item-level sites (task 8.1, S6). The server makes the items of drops and zone loot, so the generators are here; no item box and no adaption are.
+
+[[function]]
+name = "item_generate"
+address = 0x52C2B0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate(void* this, cube::ItemData* out, int16_t level, uint8_t rarity, int32_t category)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_generate", "manual:same first 40 bytes as Cube.exe's", "probe:server-level-sites-items", "probe:server-kill-drop-sites"]
+source = "kyubu"
+notes = "makes one random item; the level is the 2nd stack argument. Twin of item_generate_alt (0x5289C0); callers pick one by a coin flip. Twin of Cube.exe's item_generate (0x5F74E0)."
+
+[[function]]
+name = "item_generate_alt"
+address = 0x5289C0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_alt(void* this, cube::ItemData* out, int16_t level, uint8_t rarity, int32_t category)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_generate_alt", "manual:the same as Cube.exe's 0x5F3BF0", "probe:server-level-sites-items", "probe:server-kill-drop-sites"]
+source = "kyubu"
+notes = "the twin of item_generate, another template list, same arguments. Twin of Cube.exe's item_generate_alt (0x5F3BF0)."
+
+[[function]]
+name = "item_generate_any"
+address = 0x52A530
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_any(void* this, cube::ItemData* out, int16_t level, uint8_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_generate_any", "manual:the same as Cube.exe's 0x5F5760", "probe:server-level-sites-items"]
+source = "kyubu"
+notes = "front end of the pair, any category; the level is the 2nd stack argument. Twin of Cube.exe's (0x5F5760). Callers: 0x4D354A (kill drop), 0x506FCF and 0x52BC8E (area level)."
+
+[[function]]
+name = "item_generate_level_one"
+address = 0x52B1C0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_level_one(void* this, cube::ItemData* out, int16_t level, uint8_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_generate_level_one", "manual:the same as Cube.exe's 0x5F63F0"]
+source = "kyubu"
+notes = "the third generator of a kill drop: a type 0x14 item whose level word is always 1. Twin of Cube.exe's (0x5F63F0)."
+
+[[function]]
+name = "item_level_reroll"
+address = 0x413E10
+convention = "thiscall"
+prototype = "void __thiscall item_level_reroll(cube::ItemData* this, float window, bool upper)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:item_level_reroll", "manual:97% of instructions equal Cube.exe's, same size", "probe:server-level-sites-items"]
+source = "kyubu"
+notes = "re-rolls a stored level in the power domain (window 0.05). Twin of Cube.exe's (0x4C7D20). Callers: 0x4D2DA9 and 0x4D2EAF (kill drop), six from 0x52127B (worn gear)."
+
+[[function]]
+name = "kill_drop_level_site"
+address = 0x4D2D35
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:kill_drop_level_site", "probe:server-kill-drop-sites"]
+source = "kyubu"
+notes = "in the kill drop (Cube.exe 0x5999D0): the gear drop has ESI = the victim's level here, then level - 1 + a coin flip. Twin of Cube.exe's (0x599CB5)."
+
+[[function]]
+name = "kill_drop_typed_item_site"
+address = 0x4D3000
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:kill_drop_typed_item_site", "probe:server-level-sites", "probe:server-kill-drop-sites"]
+source = "kyubu"
+notes = "the 1 to 3 other drops of a kill get ESI as their level word. Twin of Cube.exe's (0x599F80)."
+
+[[function]]
+name = "spawn_loot_site"
+address = 0x50D3BA
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:spawn_loot_site"]
+source = "kyubu"
+notes = "the spawn builder rolls two items into a new Spawn's list at +0xF6C: item_generate here (return 0x50D3BF), item_generate_alt at 0x50D41B. Level is Spawn+0x34. Twin of Cube.exe's (0x5D827A)."
+
+[[function]]
+name = "spawn_elite_item_site"
+address = 0x520F0B
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:spawn_elite_item_site", "manual:the same 17 bytes as Cube.exe's", "probe:server-level-sites-items"]
+source = "kyubu"
+notes = "an elite (flag 0x200) gets an extra type 0x0B item whose level word is Spawn+0x34. Twin of Cube.exe's (0x5EBDBB); its shift is 0xCAEB0, not 0xCAEC0 like the rest of its block."
+
+[[function]]
+name = "bonus_item_site"
+address = 0x4CF9E6
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:bonus_item_site"]
+source = "kyubu"
+notes = "applyHit's zone-completion block: item_generate here (0x4CF9E6) and the alt at 0x4CF9ED, level = the mission zone's, rarity = its +p. The quantity store is at 0x4CF8F2. Twin of Cube.exe's (0x5952A6)."
+
+[[function]]
+name = "stat_scale_eighth"
+address = 0x410920
+convention = "cdecl"
+prototype = "float __cdecl stat_scale_eighth(float level, int32_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:stat_scale_eighth", "manual:14 instructions match Cube.exe 0x4465F0 one for one; 3 callers"]
+source = "kyubu"
+notes = "stat_scale(level, rarity) / 8, twin of Cube.exe's (0x4465F0), found by instruction match, task 8.2 of add-level-rework. Three callers: two are mod sites (stat_eighth_site_1 and _3); the third is item_regeneration's, with no twin here. Not traced"
+
+[[function]]
+name = "spawn_equipment"
+address = 0x4FB220
+convention = "thiscall"
+prototype = "void __thiscall spawn_equipment(void* this, void* spawn, int32_t flag)"
+subsystem = "items"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:spawn_equipment", "manual:same bytes as 0x5C6170, shift 0xCAF50"]
+source = "kyubu"
+notes = "Server.exe twin of Cube.exe's (0x5C6170): gives the nine worn items of a Spawn the Spawn's level. level_rework rewrites the words to 2000 + N after it runs (task 6.9)."

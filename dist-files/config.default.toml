@@ -1,0 +1,24 @@
+# Kyubu configuration. This file is created on install and never overwritten by upgrades.
+# See docs/install.md for details.
+
+[loader]
+# Developer mode: debug logging, the diagnostics panel (Ctrl+F3), hot reload of mod assets and
+# scripts, and dev-only console commands (reload, lua). Same as starting with --kyubu-dev.
+dev_mode = false
+# Minimum log level for kyubu/logs/latest.log: "debug", "info", "warn" or "error".
+log_level = "info"
+# Key that opens the console: "grave" (the ` ~ key), "f1" .. "f12", "insert" or "home".
+console_key = "grave"
+# Log every asset key the game reads and which layer served it (very verbose).
+asset_trace = false
+
+[crash]
+# What to do after a crash in which a mod was implicated:
+#   "ask"     - ask whether to disable that mod on the next start (default)
+#   "disable" - disable it without asking
+#   "ignore"  - only log the crash report path
+on_mod_crash = "ask"
+
+# Per-mod switches. Mods not listed here are enabled.
+# [mods.example_mod]
+# enabled = false

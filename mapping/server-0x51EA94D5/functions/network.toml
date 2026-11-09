@@ -1,0 +1,192 @@
+# Server.exe: the listening server, its connections and the packet loop.
+
+[[function]]
+name = "cube::Server::Server"
+address = 0x422E80
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Server", "xref:main", "correlated:server-0x51D2CE9B:cube::Server::Server"]
+source = "kyubu"
+notes = "stores the vtable; 84 bytes"
+
+[[function]]
+name = "cube::Server::~Server"
+address = 0x423880
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Server", "string:\"Stopping server...\"", "correlated:server-0x51D2CE9B:cube::Server::~Server"]
+source = "kyubu"
+notes = "called by vtable slot 0 (the deleting destructor); closes the socket and waits for the threads"
+
+[[function]]
+name = "cube::Connection::Connection"
+address = 0x422910
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Connection", "xref:server_accept_loop", "correlated:server-0x51D2CE9B:cube::Connection::Connection"]
+source = "kyubu"
+notes = "stores the vtable; 176 bytes, one per client"
+
+[[function]]
+name = "cube::Connection::~Connection"
+address = 0x4237B0
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+evidence = ["rtti:cube::Connection", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:server-0x51D2CE9B:cube::Connection::~Connection"]
+source = "kyubu"
+
+[[function]]
+name = "server_accept_loop"
+address = 0x4254A0
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!accept", "string:\"Waiting for connection.\"", "correlated:server-0x51D2CE9B:server_accept_loop"]
+source = "kyubu"
+notes = "thread: accept, read the client's packet id (17) and version, print it, refuse full or wrong-version clients, send the join, build a cube::Creature and a cube::Connection, start its receive loop. A version other than 3 (compare at 0x42575E) gets a bare 3, not 17 (static, see probe:protocol-version)"
+
+[[function]]
+name = "connection_receive_loop"
+address = 0x426020
+convention = "fastcall"
+subsystem = "network"
+status = "candidate"
+evidence = ["import:ws2_32.dll!recv", "cuwo:cuwo/packet.py", "correlated:server-0x51D2CE9B:connection_receive_loop"]
+source = "kyubu"
+notes = "thread per client: switches on 0 and 6-12, cuwo's client-to-server packets; 0 merges the client's creature data, 7-9 queue hits, passives and shots, 10 sends the chat to every connection"
+
+[[function]]
+name = "connection_send_loop"
+address = 0x423DD0
+convention = "thiscall"
+subsystem = "network"
+status = "verified"
+evidence = ["probe:channel-transport-server", "import:ws2_32.dll!send", "xref:server_accept_loop", "manual:body of a std::function lambda; slot 2 of vtable 0x55B220 jumps here", "correlated:server-0x51D2CE9B:connection_send_loop"]
+source = "kyubu"
+aliases = ["Server::simLoop"]
+notes = "resolved in 7.5, formerly sim_loop: a thread per client, not the simulation. While its connection is open it locks the World, collects changes, unlocks, sends them to that client's socket, then paces to 20 ms"
+
+[[function]]
+name = "connection_send_pass_site"
+address = 0x425118
+convention = "cdecl"
+kind = "site"
+sig_len = 12
+subsystem = "network"
+status = "verified"
+evidence = ["xref:connection_send_loop", "manual:jge target of the 20 ms pacing: every pass that sent, after any Sleep", "correlated:server-0x51D2CE9B:connection_send_pass_site"]
+source = "kyubu"
+aliases = ["Server::tickSite"]
+notes = "resolved in 7.5, formerly sim_loop_tick_site: once per pass of one client's send loop, not a server tick (that is main's loop). lea ecx,[ebp-0xA0]; mov [0x583DCC],esi"
+
+[[function]]
+name = "creature_update_read"
+address = 0x415DD0
+convention = "cdecl"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:connection_receive_loop", "cuwo:cuwo/entity.pyx", "correlated:server-0x51D2CE9B:creature_update_read"]
+source = "kyubu"
+notes = "packet 0 on the server: reads the mask and each masked field into a copy of the player's creature data, spare fields included (data+0x144, 0x17C, 0x17D, 0x19C, 0x1CC...)"
+
+[[function]]
+name = "Net::acceptVersionSite"
+address = 0x42575E
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:cmp dword [ebp-0x1BC],3; je", "correlated:server-0x51D2CE9B:Net::acceptVersionSite"]
+source = "kyubu"
+notes = "in server_accept_loop: the client's version against 3. The 3 is an imm8 (83 BD 44 FE FF FF 03): 0x4B4C0001 does not fit, so D7's byte patch is impossible here; 8.3 needs a mid hook. A wrong version gets the bare reply below."
+
+[[function]]
+name = "Net::acceptWrongVersionReplySite"
+address = 0x42576F
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:mov dword [ebp-0x198],3, send, Sleep 500, close", "correlated:server-0x51D2CE9B:Net::acceptWrongVersionReplySite"]
+source = "kyubu"
+notes = "the refusal of a wrong version: sends a 4-byte 3 (imm32 at 0x425775), waits 500 ms, closes. Vanilla never sends the 17 the client's version text belongs to; the mod (task 8.3) patches it to 17 and sends 8 bytes, so probes trace 0x42577E."
+
+[[function]]
+name = "Net::acceptJoinSite"
+address = 0x4257BC
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:server_accept_loop", "manual:je target at 0x425765: the join reply", "correlated:server-0x51D2CE9B:Net::acceptJoinSite", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+notes = "in server_accept_loop: the join. Reached when the client's version equals 3 (task 8.3: the mod's hook at 0x42575E turns the mod's version into 3 and vanilla's 3 into 0, so only a modded client gets here on a modded server). Sends the 4-byte 0x10 reply."
+
+[[function]]
+name = "creature_update_level_site"
+address = 0x4160C5
+convention = "cdecl"
+kind = "site"
+subsystem = "network"
+status = "candidate"
+evidence = ["xref:creature_update_read", "manual:the call at 0x4160C0 reads data+0x180", "correlated:server-0x51D2CE9B:creature_update_level_site"]
+source = "kyubu"
+notes = "in creature_update_read: the call at 0x4160C0 reads the level (data+0x180) into the copy of the player's data, ESI. This is the next instruction: the level check (D7) goes here. Corrected 2026-10-04 (task 8.3) from 0x416107, which follows the read of a different field (+0x190)."
+
+# Task 10.4 of add-skills-unleashed-multiplayer (design D10): where the loader reads Kyubu packets (it writes them at
+# connection_send_pass_site).
+
+[[function]]
+name = "Net::connectionReceiveNextSite"
+address = 0x4266DD
+convention = "cdecl"
+kind = "site"
+sig_len = 6
+subsystem = "network"
+status = "verified"
+evidence = ["probe:channel-transport-server", "xref:connection_receive_loop", "manual:switch default (ids above 12, 1-5) and every case end"]
+source = "kyubu"
+notes = "after each packet, at the loop test (6 bytes: loads the disconnected byte at [EBP-0x13A5]). [EBP-0x13C8] the u32 packet id just read; EDI the closure: +4 the std::vector<cube::Connection*>, +8 the slot. An unknown id reads nothing more"
+
+# Task 10.9a of add-skills-unleashed-multiplayer (design D16): a joined player's projectile (packet 9). The receive thread
+# queues it on cube::Server's list (Server+0x44, a std::list of 0x70-byte cube::Projectile, nodes 0x78); the main loop hands
+# the list to the step output after cube::World::update. Nothing pushes it into cube::World.projectiles: the server relays a
+# player's arrow and does not fly it.
+
+[[function]]
+name = "Net::receiveProjectileSite"
+address = 0x4265B3
+convention = "cdecl"
+kind = "site"
+sig_len = 9
+subsystem = "network"
+status = "verified"
+evidence = ["xref:connection_receive_loop", "manual:case 9 (0x426560): receives 0x70 bytes, locks, push_back on [EDI+0x20]", "probe:server-projectile-packet-0720"]
+source = "kyubu"
+notes = "packet 9 on the connection's thread, World lock held, before the push on the Server's list: EBP-0x110 the cube::Projectile the client sent; EDI the closure (+4 the connections, +8 the slot, +0x20 the list, cube::Server+0x44)"
+
+[[function]]
+name = "cube::Server::takeBullets"
+address = 0x4281D0
+convention = "thiscall"
+subsystem = "network"
+status = "candidate"
+prototype = "void __thiscall cube::Server::takeBullets(cube::Server* this, void* projectiles_out)"
+evidence = ["xref:main", "manual:main loop, 0x54A0C2: after cube::World::update, before the broadcast", "manual:locks the World, splices this+0x44 into the argument, empties it"]
+source = "kyubu"
+notes = "the argument is the step output's projectile list (step_out+0x20), which the broadcast sends to every client. Infinite-Cubes calls it Server::takeBullets. Its neighbours 0x428230 and 0x428170 fill step_in's hits and buffs before the update"
+
+[[function]]
+name = "std_list_projectile_push_back"
+address = 0x428360
+convention = "thiscall"
+subsystem = "network"
+status = "verified"
+prototype = "void __thiscall std_list_projectile_push_back(void* list, const cube::Projectile* projectile)"
+evidence = ["xref:cube::World::projectileSpawnSite", "xref:Net::receiveProjectileSite", "manual:VC110 list push_back: 0x78-byte node, size cap 0x2222221"]
+source = "kyubu"
+notes = "std::list<cube::Projectile>::push_back, one copy of the 0x70 bytes. The monsters' shots push onto cube::World.projectiles (World+0x14) and the step output's list (+0x20) with it; packet 9 onto cube::Server+0x44. Call it with the World lock held"

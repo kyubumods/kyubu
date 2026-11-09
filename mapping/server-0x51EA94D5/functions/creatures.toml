@@ -1,0 +1,94 @@
+# Server.exe: creatures and their spawns.
+
+[[function]]
+name = "cube::Creature::Creature"
+address = 0x406400
+convention = "thiscall"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "correlated:cube-0x51EA955E:cube::Creature::Creature", "correlated:server-0x51D2CE9B:cube::Creature::Creature"]
+source = "kyubu"
+notes = "sizeof 7776 (operator new); callers server_accept_loop (a joining player's creature: probe:creature-server saw one construction more than the create-site passes as a client joined, and the player at id 1) and cube::World::update (the same four sites as the client)"
+
+[[function]]
+name = "cube::Creature::~Creature"
+address = 0x4072D0
+convention = "thiscall"
+prototype = "void __thiscall cube::Creature::~Creature(cube::Creature* this)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:server-0x51D2CE9B:cube::Creature::~Creature"]
+source = "kyubu"
+notes = "the deleting destructor is 0x407AA0 (it returns to 0x407AAB); the World's removal sites call it through vtable slot 0"
+
+[[function]]
+name = "cube::Spawn::Spawn"
+address = 0x4E0F40
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "correlated:cube-0x51EA955E:cube::Spawn::Spawn", "correlated:server-0x51D2CE9B:cube::Spawn::Spawn"]
+source = "kyubu"
+notes = "sizeof 4336 (operator new); one caller is 0x518630, the size match of cube::World::generateZone"
+
+[[function]]
+name = "cube::Spawn::~Spawn"
+address = 0x4E10C0
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "manual:only caller is vtable slot 0 (the deleting destructor)", "correlated:server-0x51D2CE9B:cube::Spawn::~Spawn"]
+source = "kyubu"
+
+# Creature levels (read statically on 2026-09-30).
+
+[[function]]
+name = "creature_level_range"
+address = 0x40F0A0
+convention = "cdecl"
+prototype = "void __cdecl creature_level_range(uint32_t entity_type, int32_t* min_level, int32_t* max_level)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:cube::World::generateZone", "manual:switch on the entity type, writes a fixed level range", "correlated:server-0x51D2CE9B:creature_level_range"]
+source = "kyubu"
+notes = "67 types in 9 tiers plus a default (2-4), 68 entries: 3-6, 6-9, 9-14, 14-21, 21-31, 31-47, 47-81, 81-180, 180-19981 (Mosquito, Minotaur, Imp, Vampire, HellDemon, EmberGolem). Callers roll uniformly in the range: generateZone and site_generate. Same table as Cube.exe's"
+
+# Creature stats (read statically on 2026-09-30); see Cube.exe's functions/combat.toml and
+# kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+
+[[function]]
+name = "cube::Creature::maxHp"
+address = 0x40FDA0
+convention = "thiscall"
+prototype = "float __thiscall cube::Creature::maxHp(cube::Creature* this)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["correlated:cube-0x51EA955E:cube::Creature::maxHp", "xref:cube::World::applyHit", "correlated:server-0x51D2CE9B:cube::Creature::maxHp"]
+source = "kyubu"
+notes = "the same length (0x240) and callees as Cube.exe's, 86% of the bytes equal; calls item_hp six times. 24 call sites"
+
+# Added 2026-11-07 (add-skills-unleashed-multiplayer 5.1a): the twins that lib/combat needs on Server.exe, found by matching the
+# first 36 bytes of Cube.exe's function (creature_map_slot 0x468AD0) and the shape of the erase (0x43EDE0) with relative calls
+# masked; each matched once in Server.exe.
+
+[[function]]
+name = "creature_map_slot"
+address = 0x402B10
+convention = "thiscall"
+prototype = "cube::Creature** __thiscall creature_map_slot(std::map* this, const uint64_t* id)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["correlated:cube-0x51EA955E:creature_map_slot", "manual:the same first 36 bytes as Cube.exe's, the only match in Server.exe"]
+source = "kyubu"
+notes = "std::map operator[] on 8-byte keys (World+4, or a creature's threat map +0x13A4); not run in a probe on the server"
+
+[[function]]
+name = "creature_map_erase"
+address = 0x40A1D0
+convention = "thiscall"
+prototype = "void* __thiscall creature_map_erase(std::map* this, void** out_next, void* node)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["correlated:cube-0x51EA955E:creature_map_erase", "manual:the same shape as Cube.exe's, the only match"]
+source = "kyubu"
+notes = "erase(iterator) of a map with 8-byte keys; not run in a probe on the server"

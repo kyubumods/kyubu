@@ -1,0 +1,46 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay, setup menu with clicks as input steps, with the mod level_rework beside
+# kyubu_probe. The sandbox's Save/ held a prepared characters.db with ONE character, the marked `Tester` of record character-marker
+# whose blob was edited to level 105 and XP 12345 (evidence/character-level-clamp-2026-10-04/mkdb.py), and the world "testopia".
+# Task 7.4 of add-level-rework (level-compat, "A hand-edited level"). The mod hooks load_character, so the probe cannot trace it: the
+# clamp is read from the mod's log lines, the screenshots and the player's level and XP in memory once the world is up.
+id = "character-level-clamp"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Built a Wine sandbox and copied a prepared characters.db (one marked character, level 105, XP 12345) and the testopia world files into its Save/",
+    "Replay with setup menu and input steps: Start, a hover on the first card, SELECT, then testopia in the world list",
+    "Read the mod's log, the screenshots, and the player's level and XP in memory after the world loaded",
+]
+observations = [
+    "runs 1 to 3 passed (2 of 2 expectations): SELECT on the marked level-105 character logged `SELECT on character slot 0: marker ok`, `character slot 0 loaded: level 105, XP 12345 (out of range)` and the warning `level 105 -> 100, XP 12345 -> 0: The level of this character was clamped to 1-100. Its XP was lowered to fit its level.`",
+    "in the world the player's level was 100 and its XP 0 (read from memory)",
+    "the screenshots show the list at 6 to 12 s after the click (software rendering lags the input): the card still says LVL 105, because it reads the list's own creature, which the clamp does not touch; the overlay window with the message was not caught on a screenshot",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "a marked character saved at level 105 played at level 100 after load_character (read at player + 0x190 in the world)"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "its saved XP of 12345 played as 0 (read at player + 0x194)"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 200
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "click 511 457", "wait 10", "shot 01-list", "move 512 119", "wait 3", "click 691 205", "wait 6", "shot 02a-select", "wait 2", "shot 02b-select", "wait 2", "shot 02c-select", "wait 2", "shot 02d-select",
+    "wait 2", "move 512 230", "wait 3", "click 691 322", "wait 20", "shot 03-world",
+]
+script = """
+log character-level-clamp (task 7.4 of add-level-rework): a marked character saved at level 105 is loaded
+wait 60
+expect cube::CreatureData.level value i32 == 100 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+wait 40
+log character-level-clamp: done
+"""

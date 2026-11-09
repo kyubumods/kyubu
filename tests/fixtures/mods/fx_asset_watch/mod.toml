@@ -1,0 +1,9 @@
+id = "fx_asset_watch"
+name = "Fixture: asset requests"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+trust = "restricted"
+description = "Subscribes to asset.request during PreInit and reports how many requests arrived and in which phase the first one did (game-events/Observing model requests)."
+[scripts]
+client = "scripts/client.lua"

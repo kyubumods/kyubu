@@ -1,0 +1,54 @@
+# A loader check, not a game observation: add-ability-animation task 6.7, "Seeing a clip in the game". A clip file that is replaced
+# while the game runs in dev mode is the one drawn at the next press of the ability's key.
+# Recorded with the Kyubu loader and mods-examples/fourth_ability_demo (trust full, Lua; its `burst` is bound to the clip burst.anim.toml),
+# unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay, setup new-world. The `modfile` step copies the mod's
+# edits/burst_wide.anim.toml over assets/animations/burst.anim.toml, which is what the Animator's Save does (a temp file, then a replace).
+id = "anim-save-then-press"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-10"
+steps = [
+    "Start in dev mode with fourth_ability_demo; make a character (a human warrior) and a world; mp 1",
+    "Set the ability's rank to 3 with the console (a new character has not learned it), hold key 4 for 0.7 s and take a screenshot",
+    "Copy the wider clip over burst.anim.toml, wait for the hot reload line, wait for the cooldown (4.5 s at rank 3)",
+    "Hold key 4 for 0.7 s again and take a screenshot",
+]
+observations = [
+    "Wine run 5 passed (runs 1 to 4 failed before the ability started: the first two held key 4 too short for the 4 fps frame, the third had no game window, the fourth did not set the rank; a new character has not learned the ability, `ability rank <id> 3` on the console sets it). Evidence: evidence/animator-files-2026-10-10/replay-run5/",
+    "Before the copy: `on_start fourth_ability_demo:burst number 112 rank 3`, then `on_end done after 44 steps, 811 ms`; the clip set hash is 9e86eca3...",
+    "The copy, 0.9 s after it: `animation: hot reload: reloaded the clip 'fourth_ability_demo:burst'` and a new set hash. After the 8 s wait the second press logs `on_start ... rank 3` and `on_end done after 43 steps, 818 ms`: the ability's real duration, as before. mp cost 0 and the cooldown are the demo's own (4.5 s at rank 3; the wait is longer)",
+    "02-after-edit.png and 02b: the weapon arm is drawn far above the shoulder; 01-before-edit.png: the arm is lower. The shots are taken at unequal times of the swing, so they show that the saved clip is drawn, not the ratio of the two angles",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "the player is the warrior (class_type 1), so key 4 is the demo ability and the clip bound to it is the one drawn"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-examples/fourth_ability_demo"]
+input = [
+    "until savepress ready",
+    "console ability rank fourth_ability_demo:burst 3",
+    "wait 3",
+    "hold 4 0.7", "shot 01-before-edit", "shot 01b-before-edit",
+    "modfile fourth_ability_demo edits/burst_wide.anim.toml assets/animations/burst.anim.toml",
+    "until hot reload: reloaded the clip 'fourth_ability_demo:burst'",
+    "wait 8",
+    "hold 4 0.7", "shot 02-after-edit", "shot 02b-after-edit",
+]
+script = """
+log anim-save-then-press: task 6.7 of add-ability-animation, a saved clip is drawn at the next press
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+watch mp f32 [[@0x7691C8] + 0x8006C8] + 0x170
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+inspect set data.mp 1
+log savepress ready
+wait 40
+log savepress end
+"""

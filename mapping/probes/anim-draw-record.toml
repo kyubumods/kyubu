@@ -1,0 +1,81 @@
+# Recorded with kyubu_probe, mods-dev/draw_record_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human
+# warrior "Tester" and a new world. Task 2.1 of add-ability-animation: the draw record that draw_creature (0x4129C0) takes
+# as `this`. The mod passes every call through and logs the record (+0 creature, +4 mode time, +8 mode id) beside the
+# creature's own current_mode (Creature + 0x68) and mode_start_time (Creature + 0x6C), per caller, for the player and others.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its draw record is P + 0x1498.
+id = "anim-draw-record"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Idle 6 s, then walked (W) 4 s, then held mouse 1 for 2 s, mouse 2 for 1.5 s, and pressed keys 1, 2 and 3",
+]
+observations = [
+    "Wine replay 1 passed, 4 of 4 expectations held; the mod's two mid hooks (0x4129C0 and the ret 0x28 at 0x423E16) installed",
+    "every draw_creature call (about 3,500 in 2 minutes: the player and the other creatures near it) returned to 0x4B5D97, the second GameController::render site",
+    "the record is a member of the creature: this == Creature + 0x1498 in every call, and its +0 word is that creature",
+    "record +4 equalled the creature's mode_start_time (Creature + 0x6C) in every call, idle, walking and attacking",
+    "record +8 is not current_mode: idle 0 and 0; current_mode 57 (the mouse 1 swing) gave 2, and 67 (its follow-up) gave 37, as the static map of render's switch says",
+    "the draw wrote 0 to record +8 after a call in 24 of 29 calls with pose 37 and in all 50 of the next window, while the creature's current_mode stayed 67: the draw resets the record's pose, not the mode",
+    "walking and holding mouse 2 and keys 1, 2, 3 started no other mode on the level-1 warrior: the player's pose stayed 0; the other creatures were idle (pose 0) throughout",
+    "draw_creature's argument 5 is an integer (69, 116, 120 for the player, 27 for another creature), not a float; the hide mask (argument 9) and argument 10 were 0 in every call",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "this is Creature + 0x1498: +0 the creature, +4 a copy of mode_start_time, +8 a pose id mapped from current_mode (57 to 2, 67 to 37) that the draw resets to 0 when the pose ends; every call came from 0x4B5D97"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/draw_record_proto"]
+input = [
+    "until anim-record idle",
+    "wait 4",
+    "shot 01-idle",
+    "until anim-record walk",
+    "hold w 4",
+    "until anim-record mouse1",
+    "hold mouse1 2",
+    "shot 02-mouse1",
+    "until anim-record mouse2",
+    "hold mouse2 1.5",
+    "until anim-record key1",
+    "hold 1 0.6",
+    "until anim-record key2",
+    "hold 2 0.6",
+    "until anim-record key3",
+    "hold 3 0.6",
+]
+script = """
+log anim-record: task 2.1, the draw record of draw_creature
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch recmode u32 [[@0x7691C8] + 0x8006C8] + 0x14A0
+watch rectime u32 [[@0x7691C8] + 0x8006C8] + 0x149C
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+log anim-record idle
+wait 8
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+expect draw_creature value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+expect draw_creature watch recmode unchanged
+log anim-record walk
+wait 7
+log anim-record mouse1
+wait 6
+log anim-record mouse2
+wait 6
+log anim-record key1
+wait 3
+log anim-record key2
+wait 3
+log anim-record key3
+wait 4
+watch
+expect draw_creature watch recmode changed
+watch clear
+"""

@@ -1,0 +1,190 @@
+# A Wine replay with skills_unleashed (and emtweaks, its dependency): the same target, at three armour factors, is hit by a
+# vanilla attack (the warrior's cyclone, forced as in hit-damage) and by the mod's Berserker (key 4), to see whether the mod's
+# damage falls with the target's armour as the vanilla damage does. Since 2026-10-26 lib/combat's hit goes through
+# cube::World::hitCreature, which subtracts the armour; before, it called applyHit with the raw damage.
+# T is the creature with the top id, [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]; P the player, [[@0x7691C8] + 0x8006C8].
+# Each phase resets T (hp 1000, hit counter 0, stunned) and watches its hp alone: the drop over the phase is the damage taken.
+id = "su-armor-compare"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-26"
+steps = [
+    "Wine replay with emtweaks and skills_unleashed: gamepilot made the warrior Tester and a world; Berserker rank 3 on the console",
+    "For armour factors 0, 1 and 10 of T: a forced cyclone (mode 86) for 3 s with T half a block along +x, then the Berserker (hold 4) with T 2.5 blocks along +y and P's yaw 0",
+    "hitCreature cannot be traced here: skills_unleashed (lib/bow) detours it, and the tracer refuses a function that starts with a jump",
+]
+observations = [
+    "run 1: the cyclone at factor 0 took 98.1 hp in 11 hits; the Berserker struck (log) after the watch window had closed, and its second press came inside the cooldown; no numbers for the mod",
+    "Wine replay 2 passed, 7 of 7 checks; evidence/su-armor-compare-2026-10-26/replay-run2/",
+    "hp lost by T (armour factor 0 / 1 / 10): cyclone 100.0 in 11 hits / 106.5 in 12 / 29.7 in 9 (9.09, 8.88, 3.30 a hit); Berserker 136.08 / 134.68 / 121.58, 2 hits each (strike and landing)",
+    "the Berserker's damage has no random part, so the drops give T's armour: 0.70 a hit at factor 1 (136.08 - 134.68 = 2 x 0.70) and 7.25 at factor 10 (2 x 7.25 = 14.50), ten times as much; the strike is 34.02 and the landing 102.06 before armour (the 25/75 split of tuning)",
+    "the cyclone's per-hit loss falls by about 5.8 from factor 0 to 10, the same armour within its random 0.75-1.25 and the hit counter: mod and vanilla hits both lose the target's armour once per hit",
+    "Wine replay 3, the before case: the same record with lib/combat's hitCreature lookup forced to nil (the old path, applyHit alone), restored right after; passed 7 of 7; evidence/su-armor-compare-2026-10-26/replay-run3-old-code/",
+    "run 3: the Berserker took 136.08 at factors 0, 1 and 10 alike (the raw damage, armour ignored), while the cyclone fell as before (112.0 in 12 hits, 90.2 in 11, 26.3 in 10)",
+]
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "called by the vanilla cyclone and by the mod's Berserker hits"
+
+[[confirms]]
+entry = "cube::Creature::armor"
+observed = "T's hp drop per phase, for the same attack, falls as its armour factor rises"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed"]
+input = [
+    "until armor ready",
+    "console ability rank skills_unleashed:berserker 3",
+    "wait 3",
+    "until armor B0", "hold 4 0.7", "wait 1", "shot 01-berserker-a0",
+    "until armor B1", "hold 4 0.7", "wait 1", "shot 02-berserker-a1",
+    "until armor B10", "hold 4 0.7", "wait 1", "shot 03-berserker-a10",
+]
+script = """
+log su-armor-compare: vanilla cyclone and the Berserker on one target at armour factors 0, 1 and 10
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World::hitCreature value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+log armor ready
+wait 8
+# ---- armour factor 0 -------------------------------------------------------------------------------------------------
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 1
+inspect set data.max_hp_multiplier 10000
+inspect set data.armor_multiplier 0
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch v0 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace start
+log armor V0
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect cube::Creature::armor watch v0 decreased
+watch clear
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x28000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch b0 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.body_yaw 0
+trace start
+log armor B0
+wait 1
+inspect set data.body_yaw 0
+wait 24
+trace stop
+trace report
+expect cube::World::hitCreature watch b0 decreased
+watch clear
+wait 40
+# ---- armour factor 1 -------------------------------------------------------------------------------------------------
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.armor_multiplier 1
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch v1 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace start
+log armor V1
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect cube::Creature::armor watch v1 changed
+watch clear
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x28000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch b1 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.body_yaw 0
+trace start
+log armor B1
+wait 1
+inspect set data.body_yaw 0
+wait 24
+trace stop
+trace report
+expect cube::World::hitCreature watch b1 decreased
+watch clear
+wait 40
+# ---- armour factor 10 ------------------------------------------------------------------------------------------------
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.armor_multiplier 10
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch v10 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.mp 1
+trace start
+log armor V10
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect cube::Creature::armor watch v10 changed
+watch clear
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hp 10000
+inspect set data.hit_counter 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18 plus 0x28000
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+watch b10 f32 [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x16C
+inspect player [@0x7691C8]
+inspect set data.body_yaw 0
+trace start
+log armor B10
+wait 1
+inspect set data.body_yaw 0
+wait 24
+trace stop
+trace report
+expect cube::World::hitCreature watch b10 decreased
+watch clear
+log armor end
+"""

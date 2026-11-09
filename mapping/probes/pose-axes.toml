@@ -1,0 +1,124 @@
+# Task 2.8 of add-ability-animation (the rig reference): mods-dev/pose_axes_proto writes the euler of one part of the local player's draw record at the join site
+# 0x41F135 (found by task 2.4; EDI is the record, a write goes through a float*) on every draw, plus or minus 30 degrees on one axis, in phases of 5 s, and logs a
+# "poseaxes: shotNN" line 2 s into each phase, where the input takes a screenshot (the camera zoomed out by 3 wheel ticks first). Each part starts with a baseline phase
+# (no write). The 42 phases of the front view (the player's own yaw) come first, then the same 42 in the left profile (the mod writes body_yaw 90, at Creature + 0x30).
+# The parts are root, body, head, hand A, hand B and tail (the record offsets of the task 2.3 table).
+id = "pose-axes"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 40 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; 84 phases of 5 s, a screenshot 2 s into each (see the header)",
+]
+observations = [
+    "Wine replay 1 passed (evidence/ability-animation-2026-10-06/pose-axes-run1/: 84 screenshots, sheet-front.png, sheet-left.png, latest.log): all 84 shot lines appeared, no fault, the player stayed on the ground with the yaw write at Creature + 0x30",
+    "head, body and root axes read plainly: x pitches (positive tips the top back), y rolls (positive tips the top toward the player's right), z turns (positive turns counter-clockwise from above, toward the player's left); the head moves alone, the trunk carries the hands and the club, the root carries everything",
+    "hand A is the player's left hand (the right of the screen in the front view, the near hand in the left profile), hand B the right hand; a 30 degree write on a hand changes the fist's face and moves it by less than its width; the club on the back never followed a hand at idle",
+    "the player's slot mask is 0x197: head, hair, body, hands, feet, the club; no tail slot, and the tail writes changed nothing in 14 phases; one other creature drawn had only the body slot",
+    "the front view's root row starts in a turned view (about a third of a turn) and is frontal from the z-30 phase on; the cause is not known",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "an euler written at 0x41F135 for each of the six parts turns that part in the same frame (the sheets of the replay, one per view)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1200
+mods = ["mods-dev/pose_axes_proto"]
+input = [
+    "until poseaxes: first draw", "wheel down 3",
+    "until shot01", "shot 01-front_root_baseline",
+    "until shot02", "shot 02-front_root_xp30",
+    "until shot03", "shot 03-front_root_xm30",
+    "until shot04", "shot 04-front_root_yp30",
+    "until shot05", "shot 05-front_root_ym30",
+    "until shot06", "shot 06-front_root_zp30",
+    "until shot07", "shot 07-front_root_zm30",
+    "until shot08", "shot 08-front_body_baseline",
+    "until shot09", "shot 09-front_body_xp30",
+    "until shot10", "shot 10-front_body_xm30",
+    "until shot11", "shot 11-front_body_yp30",
+    "until shot12", "shot 12-front_body_ym30",
+    "until shot13", "shot 13-front_body_zp30",
+    "until shot14", "shot 14-front_body_zm30",
+    "until shot15", "shot 15-front_head_baseline",
+    "until shot16", "shot 16-front_head_xp30",
+    "until shot17", "shot 17-front_head_xm30",
+    "until shot18", "shot 18-front_head_yp30",
+    "until shot19", "shot 19-front_head_ym30",
+    "until shot20", "shot 20-front_head_zp30",
+    "until shot21", "shot 21-front_head_zm30",
+    "until shot22", "shot 22-front_handA_baseline",
+    "until shot23", "shot 23-front_handA_xp30",
+    "until shot24", "shot 24-front_handA_xm30",
+    "until shot25", "shot 25-front_handA_yp30",
+    "until shot26", "shot 26-front_handA_ym30",
+    "until shot27", "shot 27-front_handA_zp30",
+    "until shot28", "shot 28-front_handA_zm30",
+    "until shot29", "shot 29-front_handB_baseline",
+    "until shot30", "shot 30-front_handB_xp30",
+    "until shot31", "shot 31-front_handB_xm30",
+    "until shot32", "shot 32-front_handB_yp30",
+    "until shot33", "shot 33-front_handB_ym30",
+    "until shot34", "shot 34-front_handB_zp30",
+    "until shot35", "shot 35-front_handB_zm30",
+    "until shot36", "shot 36-front_tail_baseline",
+    "until shot37", "shot 37-front_tail_xp30",
+    "until shot38", "shot 38-front_tail_xm30",
+    "until shot39", "shot 39-front_tail_yp30",
+    "until shot40", "shot 40-front_tail_ym30",
+    "until shot41", "shot 41-front_tail_zp30",
+    "until shot42", "shot 42-front_tail_zm30",
+    "until shot43", "shot 43-left_root_baseline",
+    "until shot44", "shot 44-left_root_xp30",
+    "until shot45", "shot 45-left_root_xm30",
+    "until shot46", "shot 46-left_root_yp30",
+    "until shot47", "shot 47-left_root_ym30",
+    "until shot48", "shot 48-left_root_zp30",
+    "until shot49", "shot 49-left_root_zm30",
+    "until shot50", "shot 50-left_body_baseline",
+    "until shot51", "shot 51-left_body_xp30",
+    "until shot52", "shot 52-left_body_xm30",
+    "until shot53", "shot 53-left_body_yp30",
+    "until shot54", "shot 54-left_body_ym30",
+    "until shot55", "shot 55-left_body_zp30",
+    "until shot56", "shot 56-left_body_zm30",
+    "until shot57", "shot 57-left_head_baseline",
+    "until shot58", "shot 58-left_head_xp30",
+    "until shot59", "shot 59-left_head_xm30",
+    "until shot60", "shot 60-left_head_yp30",
+    "until shot61", "shot 61-left_head_ym30",
+    "until shot62", "shot 62-left_head_zp30",
+    "until shot63", "shot 63-left_head_zm30",
+    "until shot64", "shot 64-left_handA_baseline",
+    "until shot65", "shot 65-left_handA_xp30",
+    "until shot66", "shot 66-left_handA_xm30",
+    "until shot67", "shot 67-left_handA_yp30",
+    "until shot68", "shot 68-left_handA_ym30",
+    "until shot69", "shot 69-left_handA_zp30",
+    "until shot70", "shot 70-left_handA_zm30",
+    "until shot71", "shot 71-left_handB_baseline",
+    "until shot72", "shot 72-left_handB_xp30",
+    "until shot73", "shot 73-left_handB_xm30",
+    "until shot74", "shot 74-left_handB_yp30",
+    "until shot75", "shot 75-left_handB_ym30",
+    "until shot76", "shot 76-left_handB_zp30",
+    "until shot77", "shot 77-left_handB_zm30",
+    "until shot78", "shot 78-left_tail_baseline",
+    "until shot79", "shot 79-left_tail_xp30",
+    "until shot80", "shot 80-left_tail_xm30",
+    "until shot81", "shot 81-left_tail_yp30",
+    "until shot82", "shot 82-left_tail_ym30",
+    "until shot83", "shot 83-left_tail_zp30",
+    "until shot84", "shot 84-left_tail_zm30"
+]
+script = """
+log pose-axes: task 2.8, one euler axis of one part written at the join site 0x41F135
+wait world
+wait 20
+wait 700
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

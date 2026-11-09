@@ -1,0 +1,10 @@
+id = "anim_capture"
+name = "Animation capture"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Developer tool, the game side of the Animator (tools/animator). It has no window and draws nothing: `anim preview <clip> <t_ms>` holds a clip's pose on the local player, `anim preview off` gives the draw back, `anim capture <clip> [times_ms] [views]` writes a labelled sheet and pose.json of the clip on the local player under kyubu/capture/, `anim rig` writes the local player at rest with the model of each slot, and `anim bake <pose id> [duration_ms]` bakes a vanilla pose (every draw, replayed as a set clip and compared). It also polls kyubu/inbox/ for request files holding one of these `anim` lines and answers each with a .reply file. It fails to load without dev mode."
+
+[native]
+common = "bin/anim_capture.dll"

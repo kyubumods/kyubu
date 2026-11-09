@@ -1,0 +1,135 @@
+# Server.exe: program entry, server loop, asset database.
+
+[[function]]
+name = "main"
+address = 0x549AD0
+convention = "cdecl"
+prototype = "int32_t __cdecl main(int32_t argc, char** argv, char** envp)"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:mainCRTStartup", "manual:called by __tmainCRTStartup with argc, argv and envp"]
+source = "kyubu"
+notes = "calls WSAStartup(2.2), then run_server"
+
+[[function]]
+name = "run_server"
+address = 0x428500
+convention = "cdecl"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:main", "string:\"Server started. Enter Q to quit.\""]
+source = "kyubu"
+aliases = ["Server::main"]
+notes = "prints Starting server... and Server started. Enter Q to quit.; socket, bind, listen"
+
+[[function]]
+name = "cube::Database::Database"
+address = 0x412300
+convention = "thiscall"
+prototype = "cube::Database* __thiscall cube::Database::Database(cube::Database* this)"
+subsystem = "core"
+status = "verified"
+evidence = ["rtti:cube::Database", "correlated:cube-0x51D2CE9C:cube::Database::Database"]
+source = "kyubu"
+aliases = ["Database::Database"]
+
+[[function]]
+name = "cube::Database::open"
+address = 0x4129B0
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::open(cube::Database* this, const std::string* path)"
+subsystem = "core"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Database::open", "xref:sqlite3_close"]
+source = "kyubu"
+aliases = ["Database::open"]
+notes = "same code as Cube.exe 0x449D30"
+
+[[function]]
+name = "cube::Database::get"
+address = 0x412A10
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::get(cube::Database* this, const std::string* key, void** out_data, uint32_t* out_len)"
+subsystem = "core"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Database::get", "string:\"SELECT value FROM blobs WHERE key = ?\""]
+source = "kyubu"
+aliases = ["Database::get"]
+notes = "same code as Cube.exe 0x449D90"
+
+[[function]]
+name = "cube::Database::getBuffer"
+address = 0x412AD0
+convention = "thiscall"
+prototype = "bool __thiscall cube::Database::getBuffer(cube::Database* this, const std::string* key, std::vector<char>* out)"
+subsystem = "core"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Database::getBuffer", "xref:cube::Database::get"]
+source = "kyubu"
+aliases = ["Database::getBuffer"]
+notes = "same code as Cube.exe 0x449E50"
+
+[[function]]
+name = "asset_decode"
+address = 0x412920
+convention = "thiscall"
+prototype = "void __thiscall asset_decode(std::vector<char>* buf)"
+subsystem = "core"
+status = "verified"
+evidence = ["correlated:cube-0x51D2CE9C:asset_decode", "manual:same byte-invert and key-swap loop as in Cube.exe"]
+source = "kyubu"
+notes = "same code as Cube.exe 0x449C20"
+
+[[function]]
+name = "cube::Database::set"
+address = 0x412BE0
+convention = "thiscall"
+subsystem = "core"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Database::set", "string:\"INSERT INTO blobs(key, value) VALUES(?, ?)\""]
+source = "kyubu"
+
+[[function]]
+name = "cube::Database::setBuffer"
+address = 0x412BB0
+convention = "thiscall"
+subsystem = "core"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Database::setBuffer", "xref:cube::Database::set"]
+source = "kyubu"
+notes = "same bytes as Cube.exe 0x449F40"
+
+# The game's allocator (7.4), as in Cube.exe: jmp [IAT] thunks to MSVCR110.dll's operator new and delete.
+
+[[function]]
+name = "operator_new"
+address = 0x54A636
+convention = "cdecl"
+prototype = "void* __cdecl operator_new(uint32_t size)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??2@YAPAXI@Z", "correlated:cube-0x51D2CE9C:operator_new"]
+source = "kyubu"
+notes = "jmp [0x5582CC]; about 100 callers. Kyubu's game_alloc calls the same export"
+
+[[function]]
+name = "operator_delete"
+address = 0x54A63C
+convention = "cdecl"
+prototype = "void __cdecl operator_delete(void* p)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??3@YAXPAX@Z", "correlated:cube-0x51D2CE9C:operator_delete"]
+source = "kyubu"
+notes = "jmp [0x5582D0]; about 420 callers. Kyubu's game_free calls the same export"
+
+[[function]]
+name = "operator_delete_array"
+address = 0x54ABBC
+convention = "cdecl"
+prototype = "void __cdecl operator_delete_array(void* p)"
+subsystem = "core"
+status = "verified"
+evidence = ["import:MSVCR110.dll!??_V@YAXPAX@Z"]
+source = "kyubu"
+notes = "jmp [0x558324]; 10 callers"

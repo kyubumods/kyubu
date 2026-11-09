@@ -1,0 +1,119 @@
+# Cube.exe: keyboard and mouse. WinMain polls DirectInput 8 (a keyboard and a mouse device) and forwards the window
+# messages; cube::Controller keeps the key and button state, and cube::GameController overrides its handlers.
+# Server.exe has no input.
+
+[[function]]
+name = "cube::Controller::Controller"
+address = 0x43B4C0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["rtti:cube::Controller", "xref:cube::GameController::GameController", "correlated:cube-0x51D2CE9C:cube::Controller::Controller"]
+source = "kyubu"
+notes = "stores the vtable and clears the key and button arrays (memset); the game controller's base"
+
+[[function]]
+name = "cube::Controller::onKeyDown"
+address = 0x43B5C0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::Controller:2", "manual:sets this[0x19 + key] = 1", "correlated:cube-0x51D2CE9C:cube::Controller::onKeyDown"]
+source = "kyubu"
+notes = "(uint8 key); the key array is 256 bytes at +0x19"
+
+[[function]]
+name = "cube::Controller::onKeyUp"
+address = 0x43B5D0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::Controller:3", "manual:sets this[0x19 + key] = 0", "correlated:cube-0x51D2CE9C:cube::Controller::onKeyUp", "manual:placed in 07-20 by aligned instructions; the code nearby changed"]
+source = "kyubu"
+
+[[function]]
+name = "cube::Controller::onMouseDown"
+address = 0x43B580
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::Controller:7", "manual:sets this[0x119 + button] = 1", "correlated:cube-0x51D2CE9C:cube::Controller::onMouseDown"]
+source = "kyubu"
+notes = "(int button); the button array is at +0x119"
+
+[[function]]
+name = "cube::Controller::onMouseUp"
+address = 0x43B5A0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::Controller:8", "manual:sets this[0x119 + button] = 0", "correlated:cube-0x51D2CE9C:cube::Controller::onMouseUp"]
+source = "kyubu"
+
+[[function]]
+name = "cube::GameController::onKeyDown"
+address = 0x47E1B0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:2", "xref:cube::Controller::onKeyDown", "correlated:cube-0x51D2CE9C:cube::GameController::onKeyDown"]
+source = "kyubu"
+notes = "calls the base, then handles the chat line: /connect, /disconnect, /namepet"
+
+[[function]]
+name = "cube::GameController::onKeyUp"
+address = 0x47E9D0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:3", "xref:cube::Controller::onKeyUp", "correlated:cube-0x51D2CE9C:cube::GameController::onKeyUp"]
+source = "kyubu"
+
+[[function]]
+name = "cube::GameController::onResize"
+address = 0x482A40
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:4", "xref:reset_device", "correlated:cube-0x51D2CE9C:cube::GameController::onResize"]
+source = "kyubu"
+notes = "(width, height) after a device reset; lays the widgets out again (5 KB); the base slot is empty"
+
+[[function]]
+name = "cube::GameController::onMouseMove"
+address = 0x47EA00
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:6", "manual:WinMain calls slot 6 with the cursor x and y as floats", "correlated:cube-0x51D2CE9C:cube::GameController::onMouseMove"]
+source = "kyubu"
+notes = "the base slot is empty; reads timeGetTime (the camera?)"
+
+[[function]]
+name = "cube::GameController::onMouseDown"
+address = 0x47B600
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:7", "xref:cube::Controller::onMouseDown", "correlated:cube-0x51D2CE9C:cube::GameController::onMouseDown"]
+source = "kyubu"
+notes = "10 KB; calls item_received_message and play_sound, so clicks on items and in the world are handled here (9.1)"
+
+[[function]]
+name = "cube::GameController::onMouseUp"
+address = 0x47DDD0
+convention = "thiscall"
+subsystem = "input"
+status = "candidate"
+evidence = ["vtable:cube::GameController:8", "xref:cube::Controller::onMouseUp", "correlated:cube-0x51D2CE9C:cube::GameController::onMouseUp"]
+source = "kyubu"
+
+[[function]]
+name = "window_proc"
+address = 0x4C83F0
+convention = "stdcall"
+subsystem = "input"
+status = "candidate"
+evidence = ["xref:WinMain", "manual:lpfnWndProc of the Cube window class", "correlated:cube-0x51D2CE9C:window_proc"]
+source = "kyubu"
+notes = "forwards the messages to three plasma engine functions (0x652710, 0x652730, 0x652790); DestroyWindow on close"

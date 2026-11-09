@@ -1,0 +1,9 @@
+id = "pose_write_proto"
+name = "Pose write prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe pose-write): a mid hook at the join site of draw_creature (0x41F135) that writes one pose vector of the local player's draw record per phase (hand euler, hand position), so that a screenshot shows what the write does. It steps through the phases by wall clock and logs a line per phase and per screenshot."
+[scripts]
+client = "scripts/client.lua"

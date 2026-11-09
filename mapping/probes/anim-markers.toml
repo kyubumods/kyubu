@@ -1,0 +1,51 @@
+# Recorded with kyubu_probe, mods-dev/markers_proto and the Kyubu loader of task 7.8 of add-ability-animation (ctx:marker() from the step
+# runner's mode time), unattended under Wine 9.0 (WSL, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world. markers_proto defines markers_proto:swing (number 112, 800 ms, no mp cost) on the
+# warrior's slot 4, bound to a clip with the markers start (0), wind (0.25), hit (0.5) and done (1.0). P below is the player's
+# cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "anim-markers"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "key 4 held 1.5 s as the warrior: markers_proto:swing runs for 800 ms and ends done; every callback that is told a marker logs its names",
+]
+observations = [
+    "Wine replay 2 passed (run 1 failed: a new character has rank 0, so slot 4 was empty; the record now sets the rank from the console). Evidence: evidence/anim-markers-2026-10-11/",
+    "a real press (key 4 held 0.8 s after `ability rank markers_proto:swing 1`): on_start once at 0 ms told no marker; on_step 1 (elapsed 0, the first step) was told [start]; on_step 12 (219 ms, dt 20) [wind]; on_step 23 (417 ms) [hit]; the 40 other steps were told none",
+    "the end: 43 steps, `ends done` at 818 ms; on_end was told [done], the marker at t = 1.0 (800 ms); no on_step was told it, as the mode time moves on after the hook reads it and the ability ends in the same World step",
+    "each marker came once, in the order of the clip's times although the file wrote them as hit, done, start, wind",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "1 for the warrior, whose slot 4 holds markers_proto:swing (the bar's index 5 is 112)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+mods = ["mods-dev/markers_proto"]
+input = [
+    "until marks ready",
+    "console ability rank markers_proto:swing 1",
+    "wait 3",
+    "hold 4 0.8", "shot 01-after-swing",
+]
+script = """
+log marks: task 7.8 of add-ability-animation, ctx:marker()
+wait world
+wait 20
+inspect player [@0x7691C8]
+watch mode u8 [[@0x7691C8] + 0x8006C8] + 0x68
+expect cube::CreatureData.class_type value u8 == 1 [[@0x7691C8] + 0x8006C8] + 0x140
+inspect set data.mp 1
+# A: the rank is set from the console, then a real press: on_start once with no marker, the step at 0 ms is told start, wind and hit
+# follow in later steps, on_end is told done
+log marks ready
+wait 30
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+watch clear
+log marks done
+"""

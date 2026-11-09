@@ -1,0 +1,9 @@
+id = "sound_ids_proto"
+name = "play_sound ids prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe sound-ids): a mid hook on play_sound (0x484820) that logs every sound id with the local player's current_mode and the caller. It only reads."
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,57 @@
+# Written 2026-11-05 for task 2.1 of add-dragon-boss (M1). Question: can a mod draw one of the game's models at a matrix of its own
+# with the game's own calls (cube::CubeShader::setColour, cube::CubeShader::setMatrices, Model::draw), from draw_creature_end_site,
+# so that it is lit, fogged and placed like a creature part? The dev mod mods-dev/model_draw_proto draws the quiver (model 0x347)
+# next to every creature the game draws, with the last part's matrix (draw record + 0x4EC) moved up in its own space.
+id = "model-part-draw"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-11-05"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there",
+    "`spawner PINK_SLIME 1 still` puts one pink slime 4 blocks from the player",
+    "model_draw_proto hooks draw_creature_end_site and, for each call, draws model 0x347 with setColour, setMatrices and Model::draw",
+]
+observations = [
+    "run 1 (shift in the part's own space, 60 voxels) drew nothing visible; the hook was reached 255 times and the log shows the calls (the player's record: matrix translation -0.25, 0.01, 146.01, so the matrix is in world blocks, z up)",
+    "run 2 passed (evidence/dragon-model-draw-2026-11-05/run2): with the translation moved +2 blocks x and +3 blocks up in the world, the quiver (model 0x347) is drawn as a large brown model at the right of the player, lit and fogged like the scene and hidden behind the terrain edge (02-slime.png); 797 hook calls, 389 drawn (the rest had a matrix with w != 1)",
+    "the calls setColour (the colour vec4 of draw_creature's arg 6), setMatrices (arg 1 the shader, arg 2 the view, arg 3 the projection from the frame) and Model::draw (0x4E6DF0, no arguments) from the hook at 0x423D33 were enough: no crash, no change to the creatures drawn after",
+    "the pink slime put 4 blocks away did not appear in the frame, so the model was seen next to the player, not next to a slime; the hook ran for every creature drawn",
+    "the world matrix read from the draw record at +0x4EC (the last part's, incl. its scale) carries the creature's own scale: the quiver came out much larger than the player's, so a mod must build its own scale",
+]
+
+[[confirms]]
+entry = "draw_creature_end_site"
+observed = "reached for every creature drawn (797 calls in 100 s); setColour, setMatrices and Model::draw called there drew a model in the world, lit and fogged"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 200
+mods = ["mods-dev/model_draw_proto", "mods-examples/entity_spawner"]
+input = [
+    "until mpd: A", "wait 3", "shot 01-player",
+    "console entity_spawner:spawner PINK_SLIME 1 still", "wait 5", "shot 02-slime",
+    "until mpd: B",
+]
+script = """
+log model-part-draw: model_draw_proto
+wait world
+wait 15
+inspect player [@0x76B1C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log mpd: A
+wait 30
+log mpd: B
+wait 10
+expect draw_creature_end_site hooks == 0
+"""
+
+[[confirms]]
+entry = "Model::draw"
+observed = "called with the model from ModelLoader::get(0x347) after setColour and setMatrices; the model was drawn at the matrix set"
+
+[[confirms]]
+entry = "cube::CubeShader::setColour"
+observed = "called with draw_creature's colour vec4 (arg 6, [EBP+0x1C] at the end site) before the draw; the model took the scene's light and fog"

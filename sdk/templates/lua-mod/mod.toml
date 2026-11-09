@@ -1,0 +1,13 @@
+id = "my_lua_mod"
+name = "My Lua Mod"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+authors = ["you"]
+description = "A Lua Kyubu mod."
+trust = "restricted"          # no FFI, hooks or raw memory; change to "full" if you need them
+
+[scripts]
+common = "scripts/common.lua"
+client = "scripts/client.lua"
+server = "scripts/server.lua"

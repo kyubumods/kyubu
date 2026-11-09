@@ -1,0 +1,12 @@
+duration = 300
+blend_in = 60
+blend_out = 120
+
+[[track]]
+part = "hand_r"
+channel = "rot"
+keys = [
+  { t = 0.0, v = [0, 0, 0] },
+  { t = 0.5, v = [-45, 0, 0], ease = "ease_out" },
+  { t = 1.0, v = [0, 0, 0], ease = "smooth" },
+]

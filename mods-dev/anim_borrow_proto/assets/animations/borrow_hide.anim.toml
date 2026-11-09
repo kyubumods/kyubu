@@ -1,0 +1,10 @@
+# The same pose with the head and the weapons hidden for the whole clip.
+duration = 800
+
+[borrow]
+mode = 2
+
+[[hide]]
+from = 0.0
+to = 1.0
+parts = ["head", "weapons"]

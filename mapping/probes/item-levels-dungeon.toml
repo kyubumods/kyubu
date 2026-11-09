@@ -1,0 +1,51 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, as item-level-sites-dungeon, with the generator hooks of task 6.2 of
+# add-level-rework in level_rework: the level of the one generator call that a visit to a level-61 dungeon makes (through 0x5F6EC3).
+# Superseded on 2026-10-04 by task 6.6: the item-level rule recorded here (stored level item_level(N), 61 -> 32) was replaced by item_stored_level(N) = 2000 + N (61 -> 2061); see the item-scale and item-scale-kills records. The observations below stay as they were made.
+id = "item-levels-dungeon"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester and a new world with the mods teleport and level_rework; waited 20 s there",
+    "the input turned dev_commands on, went to the nearest level-61 dungeon (`teleport:tp dungeon 61`), landed, and ran `level_rework:levels creatures`",
+]
+observations = [
+    "Wine replay 1 passed, no fault. The dungeon at x 8400000, y 8389504 (+p 2), as item-level-sites-dungeon: the mod logged `item level 61 -> 32 (caller 0x005F6EC3)` once, 2 s after the player arrived: item_generate_any in 0x5F6470, called with the area's level 61, got item_level(61) = 32. `levels creatures` listed 3 chests (type 143) at level 61",
+    "not shown: that this call is a chest's loot (the trigger was not identified in task 6.1 either), and the power of the finished item. Opening a chest was not tried (a manual check)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-gameplay/level_rework"]
+input = [
+    "until tp: start",
+    "console config level_rework dev_commands true",
+    "console teleport:tp dungeons 61",
+    "console teleport:tp dungeon 61",
+    "wait 50", "shot 01-hover",
+    "console teleport:tp",
+    "console teleport:tp land",
+    "wait 60", "shot 02-landed",
+    "console teleport:tp",
+    "console level_rework:levels creatures",
+    "until tp: done",
+]
+script = """
+log item level sites in a dungeon (task 6.2 of add-level-rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log tp: start
+wait 330
+log tp: done
+wait 5
+expect - hooks == 0
+"""

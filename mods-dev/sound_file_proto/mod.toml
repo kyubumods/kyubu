@@ -1,0 +1,10 @@
+id = "sound_file_proto"
+name = "Sound file prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe sound-file): ships assets/sounds/su_bow_test.wav and plays it through the game's own sound engine, with the engine's load and play calls that play_sound makes, when the player is a ranger of specialization 3. Logs the handle the engine returns."
+
+[scripts]
+client = "scripts/client.lua"

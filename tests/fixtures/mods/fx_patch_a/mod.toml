@@ -1,0 +1,7 @@
+id = "fx_patch_a"
+name = "Fixture: overlapping patch a"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client"]
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,59 @@
+# A loader and mod check, not a game observation: the capture mod's console command `anim preview <clip> <t_ms>` and `anim preview off`
+# (add-ability-animation task 7.1). The loader's `anim` builtin hands the word `preview` on to the mod's command `anim_capture:anim.preview`;
+# the mod calls the editor's animation_preview and animation_preview_clear (3.5), and the pose provider (4.2) draws the clip's pose on the
+# local player. Recorded with kyubu_probe, mods-dev/anim_capture and mods-dev/anim_preview_proto (two clips and no script: `hidden` is pose 2 with
+# the head and the weapons hidden, `arm` sends the weapon arm out, so a picture shows at once whether the preview is held), unattended under Wine 9.0
+# (WSL, Xvfb). The first run used anim_borrow_proto, whose own script forces modes and starts abilities during the check: not used.
+id = "anim-preview"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-11"
+steps = [
+    "Wine replay in dev mode: gamepilot made the character Tester and a new world; 20 s after the world loaded: screenshot 00-idle",
+    "anim preview anim_preview_proto:hidden 400, screenshot 01-hidden; anim preview anim_preview_proto:arm 500, screenshot 02-arm (the clock moves to another clip); then anim preview off, screenshot 03-off",
+    "the wrong input: an unknown clip, a negative time, a missing time; then the bare `anim` (the usage and the mod's subcommand)",
+]
+observations = [
+    "Wine replay 2 passed (run 1 used anim_borrow_proto, whose own script forces modes and starts abilities during the check: not kept). Evidence: evidence/anim-preview-2026-10-11/ (00-idle.png to 03-off.png, latest.log, nodev-latest.log, README.md). The loader's `anim` builtin handed `preview` on to the mod's command anim_capture:anim.preview; every reply is in the log",
+    "00-idle.png: the player in the game's idle pose (head, club on the back). 01-hidden.png after `anim preview anim_preview_proto:hidden 400`: pose 2 with the head and the weapons hidden, no ability running. 02-arm.png after `anim preview anim_preview_proto:arm 500` (the clock moved to a tracks clip): the weapon arm raised beside the head. 03-off.png after `anim preview off`: the idle pose again, the club on the back",
+    "the wrong input answered with one line each: an unknown clip (the loader logs a WARN for the refused call), a negative time, a missing time (the usage line); the bare `anim` listed `anim preview (mod command anim_capture:anim.preview)` under its own usage line",
+    "the same mod in a sandbox started without --kyubu-dev (wine_sandbox.sh, no arguments): `not loaded: kyubu_mod_init(client) returned 1` in the log and a start-menu notice 'some mods did not load: anim_capture'",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "with the preview held through animation_preview, the local player is drawn in the clip's pose whatever its real mode (anim_preview_proto:hidden at 400 ms: head and weapons hidden; arm at 500 ms: the weapon arm out), and in the game's pose again after `anim preview off`"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 480
+mods = ["mods-dev/anim_capture", "mods-dev/anim_preview_proto"]
+input = [
+    "until anim-preview: ready",
+    "shot 00-idle",
+    "console anim preview anim_preview_proto:hidden 400",
+    "wait 3",
+    "shot 01-hidden",
+    "console anim preview anim_preview_proto:arm 500",
+    "wait 3",
+    "shot 02-arm",
+    "console anim preview off",
+    "wait 3",
+    "shot 03-off",
+    "console anim preview anim_preview_proto:nope 5",
+    "console anim preview anim_preview_proto:hidden -1",
+    "console anim preview anim_preview_proto:hidden",
+    "console anim",
+    "console anim preview off",
+    "until anim-preview: done",
+]
+script = """
+log anim-preview: task 7.1 of add-ability-animation
+wait world
+wait 20
+log anim-preview: ready
+wait 200
+log anim-preview: done
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

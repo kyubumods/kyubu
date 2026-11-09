@@ -1,0 +1,1383 @@
+# Recorded with kyubu_probe, mods-dev/slot4_proto (full trust) and the Kyubu 1.0.1 loader, unattended under Wine 9.0
+# (task 2.7 of add-ability-api): what ends or holds a mode besides time: the stun, the Creature+0x130 timer and a dodge
+# roll. P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]; its current_mode is the byte at +0x68, mode
+# time the dword at +0x6C, data.stun_time the dword at +0x12C, data.slowed_time the dword at +0x130 (the timer that
+# World::update counts down at 0x610654), data.roll_time the dword at +0x128 and stamina the float at +0x1194.
+# The roll needs the middle button (GameController+0xA) and W (+0xB) together: `hold w+mouse2` presses both.
+id = "ability-interrupts"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the level-1 warrior Tester and a new world; slot4_proto pushed 115 as slot 4",
+    "Phase 1: field finder on the player's i32 fields, stun_time written 4000 (a sanity check of the finder)",
+    "Phase 2: forced mode 57, then data.slowed_time 4000 (the +0x130 timer), with 0x610654 and 0x61066A traced",
+    "Phase 3: forced mode 115 (not in modeDuration's switch), then data.slowed_time 4000",
+    "Phase 4: forced mode 115, then the middle mouse button held 0.6 s alone: GameController+0xA, and the roll block's gates",
+    "Phase 4b: forced mode 115, then W alone; then W and the middle button together (the dodge roll); then the same chord with mode 0",
+    "Phase 5: a hostile level-50 creature next to the player forced into each mode in turn (all but 0, 49, 92, 105): which hits stun the player?",
+]
+observations = [
+    "Wine replay 10 passed, 22 of 22 checks held (replays 1 to 9 were development runs; the reports of 2, 5, 9 and 10 are in the evidence folder; replays 7 and 8 died when another session's replay used the same Wine prefix)",
+    "phase 1: the finder lists +0x12C among the increases after stun_time was written 4000 (a sanity check, not the natural stun)",
+    "phase 2 and 3: data.slowed_time 4000 was 3483 after 0.5 s and 0 after 5.5 s, a countdown in ms clamped to 0 (World::update 0x610654, 5100 calls, every creature)",
+    "phase 2 and 3: while it was above 0 the branch at 0x61066A ran (216 calls, modeDuration + 1 stored in the mode time), but modes 57 and 115 were still running at 5.5 s and the mode time kept counting (1383, then 2918)",
+    "phase 4: the middle mouse button alone moved the byte GameController+0xA (kb: 2 changes) but the roll block 0x4A70CA was not entered: GameController+0xB (W) read 0",
+    "phase 4b: W alone with 115 running: mode stayed 115, roll_time unchanged. W and the middle button together (hold w+mouse2 0.6): current_mode went 115 -> 0, roll_time changed 7 times (600 ms counting down to 0), stamina fell from 1 to 0.837 (the 0.25 drop, then the refill); the store at 0x4A723F ran once",
+    "phase 4b control: the same chord with mode 0 and roll_time 0 rolled too (roll_time changed 6 times); 0x4A723F ran 2 times in all",
+    "phase 5: a hostile level-50 creature forced into mode 54 (SMASH) raised the player's stun_time from below 0 to about +1150 within 0.7 s (about 2000 ms at the hit) in 4 of 4 sweeps; modes 9 and 74 in 3 of 4, 20 and 88 once each; the other modes (all but 0, 49, 92, 105) not in replay 2",
+    "phase 5: the stun is the same World::update 0x616DBD stun that cleared mode 115 in probe ability-mode-end"
+]
+
+[[confirms]]
+entry = "cube::CreatureData.stun_time"
+observed = "raised from below 0 to about +1200 within 0.7 s by a hostile creature's mode 54 (SMASH) in 4 of 4 sweeps; modes 9 and 74 in 3 of 4, 20 and 88 once each"
+
+[[confirms]]
+entry = "cube::CreatureData.slowed_time"
+observed = "the timer at Creature+0x130, in ms: written 4000, it was 3483 after 0.5 s and 0 after 5.5 s; World::update 0x610654 counts it down"
+
+[[confirms]]
+entry = "cube::CreatureData.roll_time"
+observed = "set to 600 ms by a dodge roll (W and the middle button held): the store at 0x4A723F ran once for each chord"
+
+[[confirms]]
+entry = "cube::CreatureData.current_mode"
+observed = "a dodge roll writes 0 to it while mode 115 runs (the store at 0x4A7251)"
+
+[[confirms]]
+entry = "cube::Creature.stamina"
+observed = "a dodge roll takes 0.25 of it"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/slot4_proto"]
+input = [
+    "until interrupts keymap mouse2",
+    "hold mouse2 0.6",
+    "until interrupts roll w",
+    "hold w 0.6",
+    "until interrupts roll chord",
+    "hold w+mouse2 0.6",
+    "until interrupts roll control",
+    "hold w+mouse2 0.6",
+]
+script = """
+log interrupts: task 2.7 of add-ability-api, stun, slowed_time and the dodge roll against a running mode
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.mp 1
+# phase 1: the finder on the player's i32 fields: a stun written between two snapshots (a sanity check)
+find clear
+find new i32 cube::Creature [[@0x7691C8] + 0x8006C8]
+find snap
+inspect set data.stun_time 4000
+find snap
+find increased
+find list 20
+expect cube::CreatureData.stun_time found 0x12C
+inspect set data.stun_time 0
+find clear
+wait 5
+# phase 2: slowed_time against a mode with a length (57). 0x610654 is the countdown, 0x61066A the branch that runs
+# while the timer is above 0
+trace args 1
+trace add @0x610654
+trace add @0x61066A
+inspect set data.mode_start_time 0
+inspect set data.current_mode 57
+log interrupts phase2 mode 57 written
+wait 1
+expect - value u8 == 57 [[@0x7691C8] + 0x8006C8] + 0x68
+trace start
+inspect set data.slowed_time 4000
+log interrupts phase2 slowed_time 4000 written
+wait 0.5
+log interrupts phase2 0.5 s after
+inspect player [@0x7691C8]
+wait 5
+trace stop
+trace report
+log interrupts phase2 5.5 s after
+inspect player [@0x7691C8]
+expect - calls @0x610654 > 0
+expect - calls @0x61066A > 0
+expect cube::CreatureData.slowed_time value u32 == 0 [[@0x7691C8] + 0x8006C8] + 0x130
+expect - value u8 == 57 [[@0x7691C8] + 0x8006C8] + 0x68
+inspect set data.slowed_time 0
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+# phase 3: the same against 115, which modeDuration (stops at 105) does not know
+inspect set data.current_mode 115
+log interrupts phase3 mode 115 written
+wait 1
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+inspect set data.slowed_time 4000
+wait 0.5
+log interrupts phase3 0.5 s after
+inspect player [@0x7691C8]
+wait 5
+log interrupts phase3 5.5 s after
+inspect player [@0x7691C8]
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+inspect set data.slowed_time 0
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 2
+# phase 4: the middle mouse button alone, with 115 running: GameController+0xA follows it; the roll block (0x4A70CA)
+# sits behind GameController+0xB (W) and is not entered
+inspect set stamina 1
+inspect set data.roll_time 0
+inspect set data.mode_start_time 0
+inspect set data.current_mode 115
+wait 0.5
+trace add @0x4A6E9B
+trace add @0x4A70CA
+trace add @0x4A723F
+watch kb u32 [@0x7691C8] + 0x8
+log interrupts keymap mouse2
+trace start
+wait 2
+trace stop
+trace report
+expect - watch kb changed
+expect - value u8 == 0 [@0x7691C8] + 0xB
+expect - calls @0x4A6E9B > 0
+expect - calls @0x4A70CA == 0
+expect - calls @0x4A723F == 0
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+watch clear
+inspect set data.current_mode 0
+wait 1
+# phase 4b: W alone (no roll), then W and the middle button with 115 running (the roll), then the chord with mode 0
+inspect set stamina 1
+inspect set data.roll_time 0
+inspect set data.mode_start_time 0
+inspect set data.current_mode 115
+wait 0.5
+watch roll u32 [[@0x7691C8] + 0x8006C8] + 0x128
+log interrupts roll w
+wait 2
+expect - value u8 == 115 [[@0x7691C8] + 0x8006C8] + 0x68
+expect cube::CreatureData.roll_time watch roll unchanged
+watch clear
+inspect set data.current_mode 115
+inspect set data.mode_start_time 0
+inspect set stamina 1
+wait 0.5
+watch roll u32 [[@0x7691C8] + 0x8006C8] + 0x128
+watch stam f32 [[@0x7691C8] + 0x8006C8] + 0x1194
+trace start
+log interrupts roll chord
+wait 2
+expect cube::CreatureData.current_mode value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+expect cube::CreatureData.roll_time watch roll changed
+expect cube::Creature.stamina watch stam decreased
+watch clear
+inspect set stamina 1
+inspect set data.roll_time 0
+inspect set data.current_mode 0
+wait 0.5
+watch roll u32 [[@0x7691C8] + 0x8006C8] + 0x128
+log interrupts roll control
+wait 2
+expect cube::CreatureData.roll_time watch roll changed
+trace stop
+trace report
+expect - calls @0x4A723F == 2
+watch clear
+wait 1
+# phase 5: a hostile creature (hit-damage's setup, level 50) forced into each mode; P's stun_time is watched
+inspect set data.stun_time 0
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 9000
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 50
+log interrupts phase5 sweep
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 1
+inspect set data.mode_start_time 0
+log interrupts sweep mode 1
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 2
+inspect set data.mode_start_time 0
+log interrupts sweep mode 2
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 3
+inspect set data.mode_start_time 0
+log interrupts sweep mode 3
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+log interrupts sweep mode 4
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 5
+inspect set data.mode_start_time 0
+log interrupts sweep mode 5
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 6
+inspect set data.mode_start_time 0
+log interrupts sweep mode 6
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 7
+inspect set data.mode_start_time 0
+log interrupts sweep mode 7
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 8
+inspect set data.mode_start_time 0
+log interrupts sweep mode 8
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 9
+inspect set data.mode_start_time 0
+log interrupts sweep mode 9
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 10
+inspect set data.mode_start_time 0
+log interrupts sweep mode 10
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 11
+inspect set data.mode_start_time 0
+log interrupts sweep mode 11
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 12
+inspect set data.mode_start_time 0
+log interrupts sweep mode 12
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 13
+inspect set data.mode_start_time 0
+log interrupts sweep mode 13
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 14
+inspect set data.mode_start_time 0
+log interrupts sweep mode 14
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 15
+inspect set data.mode_start_time 0
+log interrupts sweep mode 15
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 16
+inspect set data.mode_start_time 0
+log interrupts sweep mode 16
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 17
+inspect set data.mode_start_time 0
+log interrupts sweep mode 17
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 18
+inspect set data.mode_start_time 0
+log interrupts sweep mode 18
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 19
+inspect set data.mode_start_time 0
+log interrupts sweep mode 19
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 20
+inspect set data.mode_start_time 0
+log interrupts sweep mode 20
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 21
+inspect set data.mode_start_time 0
+log interrupts sweep mode 21
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 22
+inspect set data.mode_start_time 0
+log interrupts sweep mode 22
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 23
+inspect set data.mode_start_time 0
+log interrupts sweep mode 23
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 24
+inspect set data.mode_start_time 0
+log interrupts sweep mode 24
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 25
+inspect set data.mode_start_time 0
+log interrupts sweep mode 25
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 26
+inspect set data.mode_start_time 0
+log interrupts sweep mode 26
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 27
+inspect set data.mode_start_time 0
+log interrupts sweep mode 27
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 28
+inspect set data.mode_start_time 0
+log interrupts sweep mode 28
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 29
+inspect set data.mode_start_time 0
+log interrupts sweep mode 29
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 30
+inspect set data.mode_start_time 0
+log interrupts sweep mode 30
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 31
+inspect set data.mode_start_time 0
+log interrupts sweep mode 31
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 32
+inspect set data.mode_start_time 0
+log interrupts sweep mode 32
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 33
+inspect set data.mode_start_time 0
+log interrupts sweep mode 33
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 34
+inspect set data.mode_start_time 0
+log interrupts sweep mode 34
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 35
+inspect set data.mode_start_time 0
+log interrupts sweep mode 35
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 36
+inspect set data.mode_start_time 0
+log interrupts sweep mode 36
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 37
+inspect set data.mode_start_time 0
+log interrupts sweep mode 37
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 38
+inspect set data.mode_start_time 0
+log interrupts sweep mode 38
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 39
+inspect set data.mode_start_time 0
+log interrupts sweep mode 39
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 40
+inspect set data.mode_start_time 0
+log interrupts sweep mode 40
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 41
+inspect set data.mode_start_time 0
+log interrupts sweep mode 41
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 42
+inspect set data.mode_start_time 0
+log interrupts sweep mode 42
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 43
+inspect set data.mode_start_time 0
+log interrupts sweep mode 43
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 44
+inspect set data.mode_start_time 0
+log interrupts sweep mode 44
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 45
+inspect set data.mode_start_time 0
+log interrupts sweep mode 45
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 46
+inspect set data.mode_start_time 0
+log interrupts sweep mode 46
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 47
+inspect set data.mode_start_time 0
+log interrupts sweep mode 47
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 48
+inspect set data.mode_start_time 0
+log interrupts sweep mode 48
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 50
+inspect set data.mode_start_time 0
+log interrupts sweep mode 50
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 51
+inspect set data.mode_start_time 0
+log interrupts sweep mode 51
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 52
+inspect set data.mode_start_time 0
+log interrupts sweep mode 52
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 53
+inspect set data.mode_start_time 0
+log interrupts sweep mode 53
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 54
+inspect set data.mode_start_time 0
+log interrupts sweep mode 54
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+expect cube::CreatureData.stun_time watch pst increased
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 55
+inspect set data.mode_start_time 0
+log interrupts sweep mode 55
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 56
+inspect set data.mode_start_time 0
+log interrupts sweep mode 56
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 57
+inspect set data.mode_start_time 0
+log interrupts sweep mode 57
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 58
+inspect set data.mode_start_time 0
+log interrupts sweep mode 58
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 59
+inspect set data.mode_start_time 0
+log interrupts sweep mode 59
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 60
+inspect set data.mode_start_time 0
+log interrupts sweep mode 60
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 61
+inspect set data.mode_start_time 0
+log interrupts sweep mode 61
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 62
+inspect set data.mode_start_time 0
+log interrupts sweep mode 62
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 63
+inspect set data.mode_start_time 0
+log interrupts sweep mode 63
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 64
+inspect set data.mode_start_time 0
+log interrupts sweep mode 64
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 65
+inspect set data.mode_start_time 0
+log interrupts sweep mode 65
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 66
+inspect set data.mode_start_time 0
+log interrupts sweep mode 66
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 67
+inspect set data.mode_start_time 0
+log interrupts sweep mode 67
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 68
+inspect set data.mode_start_time 0
+log interrupts sweep mode 68
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 69
+inspect set data.mode_start_time 0
+log interrupts sweep mode 69
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 70
+inspect set data.mode_start_time 0
+log interrupts sweep mode 70
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 71
+inspect set data.mode_start_time 0
+log interrupts sweep mode 71
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 72
+inspect set data.mode_start_time 0
+log interrupts sweep mode 72
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 73
+inspect set data.mode_start_time 0
+log interrupts sweep mode 73
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 74
+inspect set data.mode_start_time 0
+log interrupts sweep mode 74
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 75
+inspect set data.mode_start_time 0
+log interrupts sweep mode 75
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 76
+inspect set data.mode_start_time 0
+log interrupts sweep mode 76
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 77
+inspect set data.mode_start_time 0
+log interrupts sweep mode 77
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 78
+inspect set data.mode_start_time 0
+log interrupts sweep mode 78
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+log interrupts sweep mode 79
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 80
+inspect set data.mode_start_time 0
+log interrupts sweep mode 80
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 81
+inspect set data.mode_start_time 0
+log interrupts sweep mode 81
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 82
+inspect set data.mode_start_time 0
+log interrupts sweep mode 82
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 83
+inspect set data.mode_start_time 0
+log interrupts sweep mode 83
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 84
+inspect set data.mode_start_time 0
+log interrupts sweep mode 84
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 85
+inspect set data.mode_start_time 0
+log interrupts sweep mode 85
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+log interrupts sweep mode 86
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 87
+inspect set data.mode_start_time 0
+log interrupts sweep mode 87
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 88
+inspect set data.mode_start_time 0
+log interrupts sweep mode 88
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 89
+inspect set data.mode_start_time 0
+log interrupts sweep mode 89
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 90
+inspect set data.mode_start_time 0
+log interrupts sweep mode 90
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 91
+inspect set data.mode_start_time 0
+log interrupts sweep mode 91
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 93
+inspect set data.mode_start_time 0
+log interrupts sweep mode 93
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 94
+inspect set data.mode_start_time 0
+log interrupts sweep mode 94
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 95
+inspect set data.mode_start_time 0
+log interrupts sweep mode 95
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 96
+inspect set data.mode_start_time 0
+log interrupts sweep mode 96
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 97
+inspect set data.mode_start_time 0
+log interrupts sweep mode 97
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 98
+inspect set data.mode_start_time 0
+log interrupts sweep mode 98
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 99
+inspect set data.mode_start_time 0
+log interrupts sweep mode 99
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 100
+inspect set data.mode_start_time 0
+log interrupts sweep mode 100
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 101
+inspect set data.mode_start_time 0
+log interrupts sweep mode 101
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 102
+inspect set data.mode_start_time 0
+log interrupts sweep mode 102
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 103
+inspect set data.mode_start_time 0
+log interrupts sweep mode 103
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 104
+inspect set data.mode_start_time 0
+log interrupts sweep mode 104
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 106
+inspect set data.mode_start_time 0
+log interrupts sweep mode 106
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 107
+inspect set data.mode_start_time 0
+log interrupts sweep mode 107
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 108
+inspect set data.mode_start_time 0
+log interrupts sweep mode 108
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 109
+inspect set data.mode_start_time 0
+log interrupts sweep mode 109
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect set data.current_mode 110
+inspect set data.mode_start_time 0
+log interrupts sweep mode 110
+watch pst i32 [[@0x7691C8] + 0x8006C8] + 0x12C
+wait 0.7
+# no expectation: see the observations
+watch clear
+inspect set data.current_mode 0
+log interrupts done
+"""

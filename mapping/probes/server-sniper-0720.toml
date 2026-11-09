@@ -1,0 +1,77 @@
+# Task 10.9 of add-skills-unleashed-multiplayer (design D15, D16): the Sniper's Bow of Light on Server.exe with a joined client (kmap probe
+# replay, client = "join"). The client, made a Sniper by su_rank, holds key 4 (the summoning, 3.2 s), then holds the mouse (both buttons
+# charge, the release is the one arrow). The client's arrow flies and makes no hit (lib/bow, server_hits). The server takes the client's
+# shoot packet (kyubu.game.shots), checks it, and pushes its copy with the server's damage into its World's projectile list, which flies it
+# and stops it on the server's blocks. The client stands on the low side of the seed world's 1-block step, facing the high side (as
+# server-scout-0720), so the shot meets blocks. Written for 8.4 (the server's own arrow from the mode bytes), rewritten for 10.9.
+id = "server-sniper-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-09"
+steps = [
+    "native replay: Server.exe and a joined client, both with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Sniper at rank 3 (su_rank options), log_effects on; the client moved 4 blocks east and 4.6 north (teleport:tp rel) onto the low side of the seed world's 1-block step, facing the high side, held key 4 for 0.8 s, waited for the bow, then held mouse1 for 1.5 s",
+]
+observations = [
+    "watcher run 1 2026-11-09 (evidence/sniper-watch-2026-11-09/server-sniper-0720-run1) passed: a second joined client (the watcher, teleported 4.4 blocks behind the caster) saw the bow of light in the caster's hands after the summoning (watcher-02-bow); the server took the shot (charge 1.00, damage 188.9), hit su_dummy's monster 21 ms later and stopped the arrow on a block 0.4 s after the shot. The watcher's frame just after the release (watcher-03-arrow) shows the bow gone and white specks at the caster, no arrow in flight. The watcher has no Sniper log line (the arrow is the game's own, relayed by the server, design D16), so the screenshots are the only watcher check",
+    "task 10.9 run 6 2026-11-08 passed (evidence/sniper-shot-2026-11-08/server-sniper-0720-run6): the server saw the swap (holds the bow of light), the run end done with the bow held, then took the client's shoot packet (charge 1.00, velocity 1.8, -99.6, 8.7) and pushed its copy with damage 188.9; the World's projectile step hit su_dummy's monster 20 ms later for 188.9 and stopped the arrow on the server's blocks 0.41 s after the shot, about 41 blocks out (not the 1-block step: the levelled aim passed over it). The client cut its own arrow's hit on that monster (no hit here, the server makes it)",
+    "task 10.9 run 5 passed the same way with no creature on the line (stop only); runs 1 to 4 failed in the harness: the client never joined (no game_ready), and run 3's Server.exe started in safe mode (Shift seen held at its start)",
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/server-sniper-0720), passed in 26 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "run 1 2026-11-08 passed (evidence/sniper-mp-2026-11-08/server-sniper-0720-run1): the server saw the run end done with the bow held (3214 ms), then the client's hold of mouse1 and flew its own arrow: charge 1.00, damage 189.0 (21 x the damage stat 9, the same number the client logged), direction 1.00, -0.02, 0.09 (the game's aim from the ray_hit the client sends), and hit su_dummy's monster 2.0 blocks out for 189.0. The arrow ended at server_range (120 blocks) with no block. No 'dropped a hit' line: the client's own arrow hit did not reach the server (the monster was already hit, or the client sent none), so the receivedHitSite filter is covered by the unit test only, not by the game",
+    "on_start took 70.5 ms once (the first use installs the received-hit hook inside the World step)",
+]
+
+[[confirms]]
+entry = "cube::Server::takeBullets"
+observed = "the main loop takes the joined clients' projectiles while a Sniper shoots its bow"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy", "mods-dev/teleport"]
+input = [
+    "console config su_rank specialization sniper",
+    "console config su_rank ability skills_unleashed:sniper",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "click 820 384",
+    "console teleport:tp rel 4 4.6",
+    "console watcher teleport:tp rel 4 9",
+    "shot watcher 01-joined",
+    "hold 4 0.8",
+    "until the run ended",
+    "shot 02-client-summoned",
+    "shot watcher 02-bow",
+    "hold mouse1 1.5",
+    "shot watcher 03-arrow",
+    "until server: sniper: arrow",
+    "shot 03-client-shot",
+    "shot watcher 04-after",
+]
+log_expect = { latest = [
+    "player shots: installed at Net::receiveProjectileSite",
+    "skills_unleashed: server: sniper: creature",
+    "holds the bow of light",
+    "the bow is held",
+    "shot an arrow",
+    "skills_unleashed: server: sniper: arrow",
+], client = [
+    "su_rank: the character is class 2, specialization 0 (sniper)",
+] }
+# The server's script waits for the main loop's takeBullets (not hooked by anything; 400 s is a limit); the inputs end on the server's
+# first arrow line (a hit or the stop on a block).
+script = """
+log server-sniper-0720: task 10.9 of add-skills-unleashed-multiplayer
+trace add @0x4281D0
+trace start
+wait 400 until calls @0x4281D0 >= 1
+trace stop
+trace report
+expect cube::Server::takeBullets calls @0x4281D0 >= 1
+log server-sniper-0720: done
+"""

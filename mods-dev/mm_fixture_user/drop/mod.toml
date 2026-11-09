@@ -1,0 +1,10 @@
+id = "mm_fixture_dropped"
+name = "Fixture Dropped"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+authors = ["Kyubu tests"]
+description = "Copied into mods by the replay while the Mods page is open (task 6.5), as a player would."
+
+[scripts]
+common = "scripts/common.lua"

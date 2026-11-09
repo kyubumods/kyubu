@@ -1,0 +1,12 @@
+clip: design_example.anim.toml
+duration: from the ability: 900 ms
+end: hold
+blend: in 60 ms, out 120 ms
+tracks: 1
+  hand_r rot (add): x -110..30, y 0..0, z 0..10 deg
+    fastest: 2079.36 deg/s at 0.5 (450 ms), moving 140.36 deg from 0.35 to 0.5
+pops: none
+hide:
+  head from 0 to 0.2 (0 ms to 180 ms)
+markers:
+  hit at 0.5 (450 ms)

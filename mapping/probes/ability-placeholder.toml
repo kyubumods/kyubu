@@ -1,0 +1,47 @@
+# Recorded with kyubu_probe and the Kyubu loader of task 4.6 of add-ability-api (the placeholder), unattended under Wine 9.0 (WSL,
+# Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world. No mod
+# is installed: slot 4 holds kyubu:placeholder (111) for every class.
+# P below is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "ability-placeholder"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-05"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "class_type set to 3 (the mage); screenshot of the bar",
+    "key 4 held for 1 s; screenshots of the overlay and the slot, then 6 s later",
+]
+observations = [
+    "Wine run 2 passed (run 1 failed: 120 s was too short for the script, and `class_type` had no expect line); evidence: evidence/ability-placeholder-2026-10-05/. 2 expectations held",
+    "class_type 3: the bar's index 5 held 111 and slot 4 showed smash's blue hammer icon (01-bar.png), the stand-in icon, kyubu:placeholder's stat row has icon 54",
+    "key 4 held for 1 s: the log has `abilities: Mage ability 4: not made yet` and `notice: Mage ability 4: not made yet`, and 02-notice.png shows the text in the overlay's top-left box with slot 4's greyed icon and sweep; `kyubu:placeholder ends `done` ... 507 ms` 465 ms after it; mode 0 at the end",
+    "the overlay notice runs 3 s (kPlaceholderNoticeSeconds); the screenshot was taken within 1.5 s, so it shows the start only",
+]
+
+[[confirms]]
+entry = "cube::CreatureData.class_type"
+observed = "set to 3 by the inspector, the bar and the placeholder's text followed on the next frames"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 300
+input = [
+    "until placeholder A", "shot 01-bar", "hold 4 1", "until not made yet", "shot 02-notice", "wait 6", "shot 03-later",
+]
+script = """
+log placeholder: task 4.6 of add-ability-api, kyubu:placeholder
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.class_type 3
+wait 20
+expect cube::CreatureData.class_type value u8 == 3 [[@0x7691C8] + 0x8006C8] + 0x140
+expect - value i32 == 111 [[@0x7691C8] + 0x80080C] + 20
+log placeholder A
+wait 4
+# key 4 pressed (by gamepilot): the mode ends after 500 ms
+wait 12
+expect - value u8 == 0 [[@0x7691C8] + 0x8006C8] + 0x68
+log placeholder done
+"""

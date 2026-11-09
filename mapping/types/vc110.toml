@@ -1,0 +1,292 @@
+# The VC110 (Visual C++ 2012) standard-library layouts both builds use, x86, release (no iterator debugging, so no
+# proxy pointer, and stateless allocators take no space). Checked against live Cube.exe objects in probe
+# vc110-layouts (task 7.1). A container's element type is not part of these types: the element follows the node
+# header (std::list_node at +8, std::tree_node at +0x10, aligned to the element).
+
+[[type]]
+name = "std::string_storage"
+kind = "union"
+size = 0x10
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "the characters themselves while capacity < 16 (small-string buffer), else a pointer to them"
+
+[[type.field]]
+offset = 0x0
+name = "buf"
+type = "char[16]"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "used while capacity is 15: \"--kyubu-dev\" (size 11) sat here"
+
+[[type.field]]
+offset = 0x0
+name = "ptr"
+type = "char*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "used once capacity is 16 or more: model file names (size 21, capacity 21) on the heap"
+
+[[type]]
+name = "std::string"
+kind = "class"
+size = 0x18
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "std::basic_string<char>; the text is NUL-terminated at size; the loader's VcString is the same layout"
+
+[[type.field]]
+offset = 0x0
+name = "bx"
+type = "std::string_storage"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x10
+name = "size"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x14
+name = "capacity"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "15 for the small-string buffer"
+
+[[type]]
+name = "std::wstring_storage"
+kind = "union"
+size = 0x10
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "the UTF-16 characters themselves while capacity < 8, else a pointer to them"
+
+[[type.field]]
+offset = 0x0
+name = "buf"
+type = "wchar_t[8]"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "used while capacity is 7: map keys such as \"Aim\" and \"Beach\""
+
+[[type.field]]
+offset = 0x0
+name = "ptr"
+type = "wchar_t*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "used once capacity is 8 or more: \"Adventurer Quarter\" (size 18, capacity 23)"
+
+[[type]]
+name = "std::wstring"
+kind = "class"
+size = 0x18
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "std::basic_string<wchar_t>; the game keeps its display names in these (the UI text is UTF-16)"
+
+[[type.field]]
+offset = 0x0
+name = "bx"
+type = "std::wstring_storage"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x10
+name = "size"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "in characters"
+
+[[type.field]]
+offset = 0x14
+name = "capacity"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "in characters; 7 for the small-string buffer"
+
+[[type]]
+name = "std::vector"
+kind = "class"
+size = 0xC
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "any element type; size = (last - first) / sizeof(T); grows by half its capacity"
+
+[[type.field]]
+offset = 0x0
+name = "first"
+type = "void*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "the first element (_Myfirst)"
+
+[[type.field]]
+offset = 0x4
+name = "last"
+type = "void*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "one past the last element (_Mylast)"
+
+[[type.field]]
+offset = 0x8
+name = "end"
+type = "void*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "one past the allocated storage (_Myend)"
+
+[[type]]
+name = "std::list_node"
+kind = "struct"
+size = 0x8
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "the element follows at +8; the head node is a sentinel without one"
+
+[[type.field]]
+offset = 0x0
+name = "next"
+type = "std::list_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x4
+name = "prev"
+type = "std::list_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type]]
+name = "std::list"
+kind = "class"
+size = 0x8
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "circular: an empty list's head points at itself both ways"
+
+[[type.field]]
+offset = 0x0
+name = "head"
+type = "std::list_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x4
+name = "size"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type]]
+name = "std::tree_node"
+kind = "struct"
+size = 0x10
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "red-black tree node of std::map and std::set; the element (the key, then the value) follows at +0x10"
+
+[[type.field]]
+offset = 0x0
+name = "left"
+type = "std::tree_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "in the head: the smallest element"
+
+[[type.field]]
+offset = 0x4
+name = "parent"
+type = "std::tree_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "in the head: the root"
+
+[[type.field]]
+offset = 0x8
+name = "right"
+type = "std::tree_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "in the head: the largest element"
+
+[[type.field]]
+offset = 0xC
+name = "color"
+type = "char"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "0 red, 1 black; the head and the root are black"
+
+[[type.field]]
+offset = 0xD
+name = "isnil"
+type = "char"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "1 only in the head, which also stands for every missing child"
+
+[[type]]
+name = "std::map"
+kind = "class"
+size = 0x8
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+notes = "also std::set and the multi- variants; the comparator and allocator are stateless"
+
+[[type.field]]
+offset = 0x0
+name = "head"
+type = "std::tree_node*"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"
+
+[[type.field]]
+offset = 0x4
+name = "size"
+type = "uint32_t"
+status = "verified"
+evidence = ["probe:vc110-layouts"]
+source = "kyubu"

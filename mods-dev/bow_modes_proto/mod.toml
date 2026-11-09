@@ -1,0 +1,10 @@
+id = "bow_modes_proto"
+name = "Bow modes prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe bow-modes): logs the player's mode, mode time, charged and spent mp and the first two bar ids at the bar-built site, and for a ranger of specialization 1 copies the M1 key byte (GameController+4) onto the M2 byte (+5) so that M1 starts the bow's charge."
+
+[scripts]
+client = "scripts/client.lua"

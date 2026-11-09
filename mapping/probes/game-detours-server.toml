@@ -1,0 +1,88 @@
+# Recorded with kyubu_probe and the Kyubu loader of add-game-api (API 1.1, a MinGW build), unattended under Wine 9.0
+# (WSL on the Windows laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe in the same Wine
+# prefix that joins 127.0.0.1 with a new character and walks (client = "join"). The script runs on the server and puts
+# pass-through detours (hook_function, a handler that takes ECX and pops the given number of stack arguments, as the
+# game API's detours will) on the two functions the game API detours, through the join, a walk and a creature dying.
+# Static reading (main): `update(now - last, &local_a, &local_b)` between the World lock (0x4D3D50) and unlock, returns
+# to 0x549F33; the function ends in `ret 0xC`.
+id = "game-detours-server"
+build = "server-0x51D2CE9B"
+kyubu = "1.0.1 (API 1.1)"
+date = "2026-09-28"
+steps = [
+    "Wine replay: Server.exe with --kyubu-dev, then Cube.exe joined 127.0.0.1 with a new character (Tester, warrior)",
+    "Detoured cube::World::update (3 stack arguments) and cube::Creature::~Creature (none) while the client joined",
+    "Checked this (a cube::World), the caller and the three arguments",
+    "Ran both detours while the client walked back for 120 s",
+    "Set the top-id creature's hp to 0 on the server and ran the detours for 5 s",
+]
+observations = [
+    "Wine replay 1 passed, 16 of 16 held; the client connected (client.log: connected to 127.0.0.1:12345)",
+    "joining 140 s: 6,788 steps through the detour, all from main (ret 0x549F33) on the main thread; this the World",
+    "arguments (elapsed ms, 0x14 to 0x25; 0x31F9F8; 0x31FAA0): two of main's locals, the same every pass",
+    "walking back 125 s: 5,897 steps and 50 destructor calls through the detours, all from the deleting destructor",
+    "the top-id creature set to hp 0: one destructor call through the detour (ret 0x40763B, the deleting destructor)",
+    "every destructor call ran on the main thread, inside the World step (the removal loops 0x534123 and 0x535413)",
+]
+
+[[confirms]]
+entry = "cube::World::update"
+observed = "a 3-argument thiscall detour ran 12,927 steps: (elapsed ms, two pointers to main's locals); this the World"
+
+[[confirms]]
+entry = "cube::Creature::~Creature"
+observed = "a 0-argument thiscall detour ran 51 deletions from the deleting destructor, on the main thread"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 390
+input = [
+    "shot 01-joined",
+    "until 2.1: walk",
+    "hold s 120", "shot 02-walked",
+]
+script = """
+log game detours, server side (add-game-api 2.1): a client joins and walks; both detours run on the server
+trace detour 3 cube::World::update
+trace detour 0 cube::Creature::~Creature
+trace add @0x407630
+# phase 1, joining (the client connects about 95 s after the server is ready and loads for 30 s)
+trace start
+wait 140
+trace stop
+trace report
+expect cube::World::update calls cube::World::update > 1000
+expect cube::World::update caller cube::World::update 0x549F33
+# this is a complete cube::World (".?AVWorld@cube@@": "Worl", "d@cu"; locator offset 0)
+expect cube::World::update value u32 == 1819438935 [[[ecx(cube::World::update)] - 4] + 0xC] + 0xC
+expect cube::World::update value u32 == 1969438820 [[[ecx(cube::World::update)] - 4] + 0xC] + 0x10
+expect cube::World::update value u32 == 0 [[ecx(cube::World::update)] - 4] + 4
+# the elapsed ms, then pointers to two of main's locals
+expect cube::World::update arg cube::World::update 1 < 1000
+expect cube::World::update arg cube::World::update 2 > 65535
+expect cube::World::update arg cube::World::update 3 > 65535
+# phase 2, walking back: creatures left behind are deleted, each through the destructor's detour
+trace start
+log 2.1: walk
+wait 125
+trace stop
+trace report
+expect cube::World::update calls cube::World::update > 1000
+expect cube::World::update caller cube::World::update 0x549F33
+expect cube::Creature::~Creature calls cube::Creature::~Creature > 0
+expect cube::Creature::~Creature caller cube::Creature::~Creature 0x40763B
+# phase 3, a creature dying: the creature with the top id gets hp 0 on the server; the dead-creature loop deletes it
+inspect cube::Creature [[[ecx(cube::World::update) + 4] + 8] + 0x18]
+trace start
+inspect set data.hp 0
+log 2.1: top creature hp 0
+wait 5
+trace stop
+trace report
+expect cube::Creature::~Creature calls @0x407630 == 1
+expect cube::Creature::~Creature calls cube::Creature::~Creature == 1
+expect cube::Creature::~Creature caller cube::Creature::~Creature 0x40763B
+expect - hooks == 0
+"""

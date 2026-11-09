@@ -1,0 +1,13 @@
+id = "shockwave_demo"
+name = "EMTweaks demo"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Example and test mod for EMTweaks: the warrior's fourth ability (key 4), Shockwave, which only draws shockwaves and a burst of the game's own particles, and the console commands shockwave_demo:nova, :pulse, :gyro, :tower, :burst, :combo, :implode, :halo and :clear. It does no damage and costs no mp. The ability is learned in the skill tree like the other fourth abilities, or at rank 1 with [abilities] skill_tree = false in Kyubu's config."
+
+[dependencies]
+emtweaks = "^0.1"
+
+[scripts]
+client = "scripts/client.lua"

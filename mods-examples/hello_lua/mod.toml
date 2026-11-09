@@ -1,0 +1,14 @@
+id = "hello_lua"
+name = "Hello Lua"
+version = "1.0.0"
+kyubu = "^1.1"
+sides = ["client", "server"]
+description = "Lua example: events, overlay UI, a console command, an option, text registry and client/server channels."
+
+[dependencies]
+hello_native = { version = "^1.0", optional = true }
+
+[scripts]
+common = "scripts/common.lua"
+client = "scripts/client.lua"
+server = "scripts/server.lua"

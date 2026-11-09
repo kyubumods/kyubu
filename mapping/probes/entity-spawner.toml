@@ -1,0 +1,103 @@
+# Recorded with kyubu_probe, the entity_spawner mod (0.2.0: the window, on kyubu.game) and the Kyubu 1.1 loader in
+# development (MinGW build of task 4.3), unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering):
+# kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new world (seed 1234). Task
+# 5.1 of add-entity-spawner: the mod's console command, its window (F7, the filter, a click) and `spawner all`, all
+# spawning through kyubu.game.creature_spawn on the server side. The probe counts the inserts into the creature map.
+id = "entity-spawner"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there, then walked (W) 3 s so that body_yaw follows the camera",
+    "Detoured creature_map_slot (1 stack argument) for each phase and watched the creature count",
+    "Phase 1: `console entity_spawner:spawner GREEN_SLIME 3`; phase 2: `console entity_spawner:spawner all`; phase 3: F7 opens the window; phase 4: a click in the filter box and the keys s l i m e; phase 5: a click on the first button (Green slime), then F7 closes the window, and the game ran on for 60 s",
+]
+observations = [
+    "phase 1: `spawner GREEN_SLIME 3` gave three green slimes (level 1, the player's; hostile 1) with ids -1, -2 and -3, two blocks apart along the player's facing, in one frame; creature_map_slot ran 3 times from the loader (ret 0x77530BC8, the server side's thread) and once from the zone path (0x60E97D); the World's count went 18 -> 20 (the three, and one zone creature gone). 01-console-three.png does not show them: 4 to 8 blocks ahead they stand behind the character, as in probe creature-spawn",
+    "phase 2: `spawner all` spawned 156 creatures (ids -4 to -159), one of each type kyubu.game.enum(\"cube::EntityType\") lists, on a grid four blocks apart around the player: creature_map_slot 156 times, all from the loader, and 176 creatures in the World; 02-all.png shows them drawn around the player (a dark troll, a skeleton, a bat, a snowberry bush, an emerald deposit...), 03-all-later.png 30 s later, and the game ran on to the end",
+    "phase 3: F7 opened the window, which logged `the window lists 156 of 156 entity types`, as many as the enum has; 04-window.png shows the list in three columns with a scroll bar, under the filter box, the level slider, the hostile checkbox and the status line",
+    "phase 4: a click in the filter box and the keys s l i m e: the list followed each key (58 types for \"s\") down to 4 of 156 for \"slime\": Green, Pink, Yellow and Blue slime (05-filter.png)",
+    "phase 5: a click on Green slime (37) at (110, 187): the server side spawned one with id -160, the status line read `server side: spawned Green slime, id -160` (06-clicked.png), creature_map_slot ran once from the loader and the count went 176 -> 177; F7 closed the window",
+    "the pointer: while the window was open the mod's SetCursorPos hook left it where gamepilot put it, and both clicks reached the window. Moving it there turned the camera, because over a mod window the loader holds back only the mouse buttons, so the shots from phase 4 on look up at the sky",
+    "run 1 (the same day, with `spawner all` last) gave the same results, but its shots of `spawner all` showed only sky, and its phase 1 check `creature_map_slot == 3` failed on the zone path's call (4 calls); the record now spawns everything before the window opens and checks >= 3 and the count",
+    "no error or fault in either run; the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[[confirms]]
+entry = "creature_map_slot"
+observed = "called once for each creature kyubu.game.creature_spawn builds (this = World+4, from the loader's recipe on the server side's thread): 3, 156 and 1 calls in the three phases; the zone path calls it too (from 0x60E97D)"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the count grew with each request (18 -> 20 with a zone creature gone meanwhile, 176 after `spawner all`, 176 -> 177 after the click) and the map walked completely with 176 creatures"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1200
+mods = ["mods-examples/entity_spawner"]
+# The window opens at ImGui's default place, (60, 60): the filter box is its first row, and after the filter "slime"
+# the first button is Green slime. Moving the pointer to the window turns the camera (the game reads the mouse's
+# motion; the loader holds back only the buttons over a mod window), so the spawns to be seen come first, while the
+# camera still looks ahead.
+input = [
+    "until 5.1: walk", "hold w 3",
+    "until 5.1: console", "console entity_spawner:spawner GREEN_SLIME 3", "wait 60", "shot 01-console-three",
+    "until 5.1: all", "console entity_spawner:spawner all", "wait 50", "shot 02-all", "wait 30", "shot 03-all-later",
+    "until 5.1: open", "key F7", "wait 15", "shot 04-window",
+    "until 5.1: filter", "click 100 96", "key s", "key l", "key i", "key m", "key e", "wait 15", "shot 05-filter",
+    "until 5.1: click", "click 110 187", "wait 20", "shot 06-clicked", "key F7", "wait 10", "shot 07-closed",
+]
+script = """
+log entity spawner (task 5.1 of add-entity-spawner): the mod's command and window, spawning through the game API
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+trace args 3
+trace detour 1 creature_map_slot
+log 5.1: walk
+wait 15
+# phase 1: three green slimes from the console (the first console step runs 20 to 50 s late under Wine). The map's
+# operator[] is generic: the zone path calls it too (from 0x60E97D), so the count of the World's creatures decides
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 5.1: console
+wait 90
+trace stop
+watch
+trace report
+expect creature_map_slot calls creature_map_slot >= 3
+expect cube::World.creatures watch count increased
+watch clear
+# phase 2: one creature of every type around the player
+trace start
+log 5.1: all
+wait 110
+trace stop
+trace report
+expect creature_map_slot calls creature_map_slot >= 156
+inspect creatures
+expect cube::World.creatures creatures > 156 [@0x7691C8] + 0x2DC
+# phases 3 and 4: the window and its filter (the mod logs how many types it lists)
+log 5.1: open
+wait 30
+log 5.1: filter
+wait 40
+# phase 5: a click on Green slime spawns one
+watch count u32 [@0x7691C8] + 0x2E4
+trace start
+log 5.1: click
+wait 50
+trace stop
+watch
+trace report
+expect creature_map_slot calls creature_map_slot >= 1
+expect cube::World.creatures watch count increased
+watch clear
+# the game keeps running with them
+log 5.1: hold
+wait 60
+log 5.1: end
+wait 5
+expect - hooks == 0
+"""

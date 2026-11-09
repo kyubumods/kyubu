@@ -1,0 +1,92 @@
+# Recorded with kyubu_probe, the entity_spawner mod (prototype, spawn_raw) and the Kyubu 1.0.1 loader, unattended under
+# Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the
+# level-1 human warrior "Tester" and a new world (seed 1234). Task 3.3 of add-entity-spawner: the mod's `spawner all
+# <first> <count>` puts a batch of entity types in a grid in front of the player (five columns, rows 5 blocks apart, the
+# earlier batch is set to hp 0 first); the input takes one screenshot per batch. The static half of the task, the
+# jump table of creature_appearance_for_type (0x43FDB0, 156 cases for 0 to 155), is in mapping/atlas/creatures.md.
+id = "entity-types"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-29"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Eight batches, each `console entity_spawner:spawner all <first> <count>` (20 types, the last 16; 156 in all, values 0 to 155): the mod sets the earlier batch to hp 0 and puts the batch north of the player (+y, where the camera of a new world looks) in five columns, rows 6, 11, 16 and 21 blocks away; then a screenshot 35 s after the console step, one per batch",
+    "After the last batch the game ran on for 60 s; the World's creature count was read, and the tracer's hooks were all gone",
+    "First attempt (not kept as evidence): the grid was put along body_yaw (cos, sin) and was off screen, the camera does not follow body_yaw; the camera of a new world looks along +y (north on the compass), the rows in the screenshots fit that",
+]
+observations = [
+    "all 156 values 0 to 155 were spawned (one `spawn_raw` line each, level 1, hp 100 = max hp, ids -1 to -156 as the earlier batches were still leaving), none faulted the game, and the game ran on for 60 s after the last batch; the creature count rose from 17 to 35 with the last batch and the earlier batches left the map after their hp 0 (`left the map` lines)",
+    "every batch is drawn, and the game writes a name tag over the ones the crosshair passes: ORC, SKELETON, LIZARDMAN, HUMAN (batch 1), CAT (2), ROCKLING, INSEKTOID, SAND HORROR (3), PEACOCK, DESERT ONIONLING, MOSQUITO, ANCIENT GUARDIAN (4), MINOTAUR, VAMPIRE, OWL (5), EMBER GOLEM, SEA CRAB (6), SNOWBERRY BUSH, IRON DEPOSIT, RUBY DEPOSIT (7), LANTERN FISH, DUMMY, SEAHORSE (8); each sits over the creature the grid put at that value, so cuwo's names hold for them",
+    "no screenshot contradicts a cuwo name: humans and elves with pointed ears in the first row, goblins, dwarves, orcs, the dog and cat breeds, the four slimes in their colours, the birds, insects, golems, the beetles, crabs, plants, deposits, the scarecrow, vase and bomb, the fish, the shark and the mermaid and merman look like their names (a few big ones hide the row behind them: not every creature is seen closely in a shot)",
+    "the game's own name for type 77 (ANUBIS in cuwo) is ANCIENT GUARDIAN (the tag over the middle of the far row of batch 4); the enum keeps cuwo's name",
+    "the two values cuwo has no name for are in the game's switch and are drawn: 95 is a Santa Claus (red hat, white beard, red and white coat: the far left of batch 5's last row), 129 an orange, flower-like plant (right of the cactus 128 in batch 7, half behind a scrub: the look is not certain)",
+    "the static half (0x43FDB0's jump table): 156 entries, one case each for 0 to 155 (its own target for every value), a larger value leaves the appearance untouched",
+    "the spawned creatures have no behaviour and stand still; the player stayed put for six batches, and before batch 7 it was moved 5 blocks west and one down with body_yaw 90 (pushed by a spawned creature, most likely one of the big ones of batch 6); the grid of batches 7 and 8 is still north of it and in view, so the camera does not follow body_yaw",
+]
+
+[[confirms]]
+entry = "cube::EntityType"
+observed = "every value 0 to 155 was passed to the recipe (spawn_raw) and drawn, the name tags the game writes matched cuwo's names for the ones that showed one; 95 (a Santa Claus) and 129 (a flower-like plant) have cases in the game but no cuwo name"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the map held 35 creatures after the last batch (17 before the first): 16 spawned ones on top of the zone's own, the earlier batches having left"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1500
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 3.3: batch 1", "console entity_spawner:spawner all 0 20", "wait 35", "shot batch-1-from-0",
+    "until 3.3: batch 2", "console entity_spawner:spawner all 20 20", "wait 35", "shot batch-2-from-20",
+    "until 3.3: batch 3", "console entity_spawner:spawner all 40 20", "wait 35", "shot batch-3-from-40",
+    "until 3.3: batch 4", "console entity_spawner:spawner all 60 20", "wait 35", "shot batch-4-from-60",
+    "until 3.3: batch 5", "console entity_spawner:spawner all 80 20", "wait 35", "shot batch-5-from-80",
+    "until 3.3: batch 6", "console entity_spawner:spawner all 100 20", "wait 35", "shot batch-6-from-100",
+    "until 3.3: batch 7", "console entity_spawner:spawner all 120 20", "wait 35", "shot batch-7-from-120",
+    "until 3.3: batch 8", "console entity_spawner:spawner all 140 16", "wait 35", "shot batch-8-from-140",
+]
+script = """
+log entity types (task 3.3 of add-entity-spawner): every type of cube::EntityType spawned by the mod's grid
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+watch count u32 [@0x7691C8] + 0x2E4
+# batch 1: types 0 to 19 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 1
+wait 80
+# batch 2: types 20 to 39 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 2
+wait 80
+# batch 3: types 40 to 59 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 3
+wait 80
+# batch 4: types 60 to 79 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 4
+wait 80
+# batch 5: types 80 to 99 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 5
+wait 80
+# batch 6: types 100 to 119 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 6
+wait 80
+# batch 7: types 120 to 139 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 7
+wait 80
+# batch 8: types 140 to 155 in a grid in front of the player (the console step runs 20 to 40 s late under Wine)
+log 3.3: batch 8
+wait 80
+watch
+expect cube::World.creatures watch count increased
+inspect creatures
+# the last batch (types 140 to 155) is in the map: 16 creatures on top of the zone's own
+expect cube::World.creatures creatures > 25 [@0x7691C8] + 0x2DC
+# nothing faulted while the grid was drawn: the game runs on for 60 s
+log 3.3: hold
+wait 60
+watch clear
+log 3.3: end
+wait 5
+expect - hooks == 0
+"""

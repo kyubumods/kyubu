@@ -1,0 +1,10 @@
+id = "snare_proto"
+name = "Snare prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe snare-freeze): the console command snare_proto:run sends the newest creature (a spawned zombie) towards the player and, 1.2 s after placing it 8 blocks north and 7 east, snares it: it stands still, its stun timer is held, the stun mark is hidden and its pose is frozen by restoring a snapshot of the draw record at the join site. Replaced by the Scout ability."
+
+[scripts]
+client = "scripts/client.lua"

@@ -1,0 +1,66 @@
+# Recorded with kyubu_probe and the dev mod mods-dev/bow_model_proto (Kyubu 1.0.1 loader), unattended under Wine 9.0 (WSL on the
+# Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester"
+# and a new world. The mod adds a white bow model (a 5 x 3 x 32 voxel file) and hooks ModelLoader::itemModel so that an item it
+# marks (a bow whose minus_modifier is 0x4C49) draws that model; the probe makes the player a ranger, marks the bow and takes
+# pictures with the game's own bow and the mod's (task 8.2b of add-skills-unleashed).
+id = "bow-model"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 20 s there",
+    "Wrote class_type 2 and sub_type 6 on the right weapon slot through the inspector; picture of the game's bow",
+    "Wrote specialization 5: the mod makes the weapon a bow marked with minus_modifier 0x4C49 (a copy of the real item kept); picture",
+    "Wrote specialization 6: the mod puts the real item back; picture",
+]
+observations = [
+    "Wine replay 1 passed, 2 of 2 checks held; the model file was assets/models/su_bow_of_light.vox, 5 x 3 x 32 voxels, 68 of them, all white (evidence/skills-unleashed-sniper-2026-10-12/bow-model-1)",
+    "kyubu.model.add gave the file slot 2569 (the first mod model); the log said `adds 1 new key(s)`",
+    "ModelLoader::itemModel was called 116,377 times in the first minute after the world was up (every frame, for the items on the screen), so the hook has to be cheap; the marked bow asked for a model 142 times in the 8 s it was on",
+    "with the marked bow the held weapon was drawn as the mod's white thin bow in place of the brown game's bow (02-mod-bow.png against 01-plain-bow.png); the HUD's M1 and M2 icons stayed the bow's",
+    "the real weapon written back drew the club again (03-back.png)",
+]
+
+[[confirms]]
+entry = "ModelLoader::itemModel"
+observed = "a Lua detour (void*(__thiscall*)(void*, void*)) that returns ModelLoader::get(slot) for a marked item changed the drawn model; called about 2000 times a second"
+
+[[confirms]]
+entry = "cube::CreatureData.specialization"
+observed = "written 5 and 6 through the inspector; the mod read them in the bar hook the next frame"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 120
+mods = ["mods-dev/bow_model_proto"]
+input = [
+    "until bowmodel plain",
+    "shot 01-plain-bow",
+    "until bowmodel mod",
+    "shot 02-mod-bow",
+    "until bowmodel back",
+    "shot 03-back",
+]
+script = """
+log bow-model: task 8.2b of add-skills-unleashed
+wait world
+wait 20
+inspect player [@0x7691C8]
+inspect set data.class_type 2
+inspect cube::ItemData [[@0x7691C8] + 0x8006C8] + 0xAA8
+inspect set sub_type 6
+wait 3
+inspect player [@0x7691C8]
+log bowmodel plain
+wait 4
+inspect set data.specialization 5
+wait 3
+expect cube::CreatureData.specialization value u8 == 5 [[@0x7691C8] + 0x8006C8] + 0x141
+log bowmodel mod
+wait 5
+inspect set data.specialization 6
+wait 3
+log bowmodel back
+wait 4
+"""

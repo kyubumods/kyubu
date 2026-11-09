@@ -1,0 +1,16 @@
+# The options of a disabled mod (add-mod-manager, task 3.3): the loader parses the declaration on request,
+# it is never attached at boot. `radius` is the documented scenario, `shine` the restart = true one.
+[options.radius]
+type = "float"
+default = 8.0
+min = 1.0
+max = 32.0
+label = "Ring brightness"
+group = "Ring"
+description = "How strong the ring glows."
+
+[options.shine]
+type = "bool"
+default = false
+restart = true
+description = "Read at start only."

@@ -1,0 +1,68 @@
+# Server.exe: creatures and their spawns.
+
+[[function]]
+name = "cube::Creature::Creature"
+address = 0x405FA0
+convention = "thiscall"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "correlated:cube-0x51D2CE9C:cube::Creature::Creature", "probe:creature-server"]
+source = "kyubu"
+notes = "sizeof 7776 (operator new); callers server_accept_loop (a joining player's creature: probe:creature-server saw one construction more than the create-site passes as a client joined, and the player at id 1) and cube::World::update (the same four sites as the client)"
+
+[[function]]
+name = "cube::Creature::~Creature"
+address = 0x406E70
+convention = "thiscall"
+prototype = "void __thiscall cube::Creature::~Creature(cube::Creature* this)"
+subsystem = "creatures"
+status = "verified"
+evidence = ["rtti:cube::Creature", "manual:only caller is vtable slot 0 (the deleting destructor)", "probe:creature-server", "probe:game-detours-server"]
+source = "kyubu"
+notes = "the deleting destructor is 0x407630 (it returns to 0x40763B); the World's removal sites call it through vtable slot 0"
+
+[[function]]
+name = "cube::Spawn::Spawn"
+address = 0x4E0B80
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "correlated:cube-0x51D2CE9C:cube::Spawn::Spawn"]
+source = "kyubu"
+notes = "sizeof 4336 (operator new); one caller is 0x5183D0, the size match of cube::World::generateZone"
+
+[[function]]
+name = "cube::Spawn::~Spawn"
+address = 0x4E0D00
+convention = "thiscall"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["rtti:cube::Spawn", "manual:only caller is vtable slot 0 (the deleting destructor)"]
+source = "kyubu"
+
+# Creature levels (read statically on 2026-09-30).
+
+[[function]]
+name = "creature_level_range"
+address = 0x40EA30
+convention = "cdecl"
+prototype = "void __cdecl creature_level_range(uint32_t entity_type, int32_t* min_level, int32_t* max_level)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["xref:cube::World::generateZone", "manual:switch on the entity type, writes a fixed level range", "probe:server-level-sites"]
+source = "kyubu"
+notes = "67 types in 9 tiers plus a default (2-4), 68 entries: 3-6, 6-9, 9-14, 14-21, 21-31, 31-47, 47-81, 81-180, 180-19981 (Mosquito, Minotaur, Imp, Vampire, HellDemon, EmberGolem). Callers roll uniformly in the range: generateZone and site_generate. Same table as Cube.exe's"
+
+# Creature stats (read statically on 2026-09-30); see Cube.exe's functions/combat.toml and
+# kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+
+[[function]]
+name = "cube::Creature::maxHp"
+address = 0x40F730
+convention = "thiscall"
+prototype = "float __thiscall cube::Creature::maxHp(cube::Creature* this)"
+subsystem = "creatures"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Creature::maxHp", "xref:cube::World::applyHit"]
+source = "kyubu"
+notes = "the same length (0x240) and callees as Cube.exe's, 86% of the bytes equal; calls item_hp six times. 24 call sites"

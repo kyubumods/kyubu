@@ -1,0 +1,39 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (--kyubu-dev). Log: kyubu-mapping/evidence/probes-2026-09-27/02-dev-mode-menu.log.
+id = "menu-render-trace"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Started Cube.exe with --kyubu-dev and kyubu_probe; the script below ran once the start menu was up",
+    "Traced cube::GameController::render for 10 seconds with its first two stack arguments, then stopped the tracer",
+]
+observations = [
+    "render ran 1733 times in 10 s (about once per frame), always with the same this (ECX)",
+    "every call returned to 0x4C858F, inside Game::frame (0x4C84A0)",
+    "after the stop, kyubu_probe owned no hooks (mod_stats, the count the hooks console command lists)",
+]
+
+[[confirms]]
+entry = "cube::GameController::render"
+observed = "called about once per frame at the start menu, with one GameController as this"
+
+[[confirms]]
+entry = "Game::frame"
+observed = "every render call returned to 0x4C858F, inside Game::frame: it is render's caller"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 90
+script = """
+trace add cube::GameController::render
+trace args 2
+trace start
+wait 10
+trace stop
+trace report
+expect cube::GameController::render calls cube::GameController::render > 100
+expect Game::frame caller cube::GameController::render @0x4C858F
+expect - hooks == 0
+"""

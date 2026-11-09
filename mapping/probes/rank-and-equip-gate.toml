@@ -1,0 +1,250 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader, unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb,
+# software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 3.4 of add-level-rework (M4 and M5): the rank rule of ability_power for monsters, and the power gate of
+# can_equip_item. P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8].
+id = "rank-and-equip-gate"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-01"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Part R: traced ability_power (two stack arguments) and two instructions inside it, 0x43F643 (the monster rank rule) and 0x43F64B (where the rank is in EAX). The top-id creature (a plant) was made hostile (hostile_type 1), given a level and a power_base, put 40 blocks away, and put in mode 79 (sneak) for 6 s: World::update then calls ability_power(79, -1) for it. Five windows: R1 level 21 and power_base 3, R2 level 1 and 0, R3 level 100 and 4, R4 hostile_type 0, R5 hostile with the creature's skill slot 7 (Creature+0x1154) set to 5",
+    "Part E: the dev mod mods-dev/equip_gate_probe ran its console command (the input typed it into the game's console): it calls can_equip_item eight times, each on a zeroed stand-in creature of a chosen level (class 1) with a copy of the player's weapon (type 3, sub_type 17) at a chosen level. The detour on can_equip_item (one stack argument) and mid hooks at 0x43ECDD, 0x43ED14 and 0x43ED1C recorded the calls",
+    "Runs 1 to 3 tried to reach can_equip_item through the inventory instead (an item written to Creature+0x11EC; the pointer over the weapons list and a left press, with the player's level set to 0, 1 and 21): it was never called, see the observations",
+]
+observations = [
+    "Wine replay 8 passed: 22 of 22 expectations held; no fault, and the probe's hooks were all removed at the end (runs 6 and 7, before creature_power was added to the mod, passed too)",
+    "ability_power was called with the stack arguments 0x4F and 0xFFFFFFFF (79, -1) about 330 times per window from three sites of World::update, 0x617E8B, 0x6183DF and 0x618428, with ECX = the creature in mode 79",
+    "R1 (level 21, power_base 3): at 0x43F643 EAX = 21 and ECX = 3; at 0x43F64B EAX = 14 (21 halved to 10 by integer arithmetic, plus 3, plus 1; a float half would give 14.5). R2 (level 1, power_base 0): rank 1. R3 (level 100, power_base 4): rank 55. All 32 recorded calls of each window agreed",
+    "R4 (hostile_type 0): 0 calls of 0x43F643, rank 0: the rule is for hostile creatures only. R5 (hostile, Creature+0x1154 = 5): 0 calls of 0x43F643 and rank 5: ability 79 reads skill slot 7, and a non-zero level skips the rule",
+    "the result of ability_power was not read (a float in st0), so rank/(rank+10) is from the disassembly only",
+    "E, 8 calls in the dev mod's order: the mod's answers all matched the power rule (0 mismatches). Refused: creature level 0 against item level 1, 21 against 22, 1 against 2, 100 against 1981. Accepted: 1 against 1, 21 against 1, 21 against 21, 1981 against 1981. The weapon was a warrior's own, so the class check passed in every accepted case",
+    "E, the detour: 8 calls, ECX = the stand-in creature, one stack argument = the item (the same copy each time), no fault: can_equip_item is a __thiscall with one stack argument that returns a bool in AL. 0x43ECDD ran 8 times, 0x43ED14 (power refused) 4 times and 0x43ED1C (power passed) 4 times",
+    "E, registers: at 0x43ED14 and 0x43ED1C EAX = item_power of the item and ESI = the creature's power (EDI = the creature): refused (1, -4), (52, 51), (5, 1), (100, 84); passed (1, 1), (1, 51), (51, 51), (100, 100). The game truncates the power toward zero: level 0 gives -4",
+    "creature_power, called by the dev mod nine times on stand-in creatures (levels 0, 1, 2, 21, 22, 51, 100, 981, 1981): a detour with no stack argument saw 9 calls without a fault, ECX = the stand-in, and the results were -4, 1, 5, 51, 52, 72, 84, 99 and 100, the power of each level (0 mismatches). So it is a __fastcall with the creature in ECX that returns the power in EAX, and it truncates toward zero",
+    "runs 1 to 3: with the inventory open (key c) can_equip_item was never called: not by an item at Creature+0x11EC, not by hovering the weapons list, not by a left press on it (the item box showed Power in red at player level 0, so the box compares item_power with creature_power by its own code). The inventory panel is cut off at the left edge of the 1024x768 window under gamepilot, so the grid cells may be out of reach. The two callers 0x47C29B and 0x47D506 were not reached by any input",
+    "not tried: creature_power from the game's own callers (the character sheet, the item box), the two callers of can_equip_item from the UI, a pet item (M13), classes other than the warrior, the second copy of the rank rule at 0x447EB5 (creature_attack_speed: it needs a buff entry of type 0xC)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[[confirms]]
+entry = "ability_power"
+observed = "entered with the stack arguments 79 and -1 about 330 times per window, ECX = the creature, from 0x617E8B, 0x6183DF and 0x618428; rank 0 on a hostile creature gave the monster rank, rank 5 in skill slot 7 gave 5"
+
+[[confirms]]
+entry = "ability_track"
+observed = "ability 79 read Creature+0x1154 (slot 7): a value of 5 there made the rank 5 and skipped the monster rule; the other ids are from the disassembly only"
+
+[[confirms]]
+entry = "ability_power_rank_site"
+observed = "reached for a hostile creature with skill level 0 (EAX = level, ECX = power_base: 21 and 3, 1 and 0, 100 and 4), never with hostile_type 0 or a skill level of 5"
+
+[[confirms]]
+entry = "ability_power_rank_join"
+observed = "EAX = the rank on every path: 14 for level 21 and power_base 3, 1 for level 1 and 0, 55 for 100 and 4, 0 for hostile_type 0, 5 for a skill level of 5"
+
+[[confirms]]
+entry = "can_equip_item"
+observed = "8 calls by a dev mod on stand-in creatures and the player's weapon: ECX = the creature, one stack argument = the item, result in AL; false when item_power exceeds the creature's power (4 of 8), true otherwise with a matching class"
+
+[[confirms]]
+entry = "creature_power"
+observed = "9 calls by a dev mod through a detour with no stack argument, ECX = a stand-in creature, no fault; the results were the power of the level for 0, 1, 2, 21, 22, 51, 100, 981 and 1981 (-4, 1, 5, 51, 52, 72, 84, 99, 100)"
+
+[[confirms]]
+entry = "can_equip_item_level_site"
+observed = "reached 8 times, once per call"
+
+[[confirms]]
+entry = "can_equip_item_refused_site"
+observed = "reached 4 times, for the four calls whose item power exceeded the creature's: EAX = the item's power, ESI = the creature's"
+
+[[confirms]]
+entry = "can_equip_item_class_site"
+observed = "reached 4 times, for the four calls whose item power did not exceed the creature's, with EAX and ESI as at the refused site"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1500
+mods = ["mods-dev/equip_gate_probe"]
+input = ["until rr: E window open", "console equip_gate_probe:check"]
+script = """
+log ability rank and equip gate (task 3.4 of add-level-rework, M4 and M5): the rank of a monster's ability, and the power gate of can_equip_item
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+# part R: the top-id creature (a plant) is made hostile and put in mode 79 (sneak: World::update calls ability_power(79, -1) for it at 0x617E86)
+trace args 2
+trace add ability_power
+trace add @0x43F643
+trace add @0x43F64B
+# R1 level 21 power_base 3: rank 10 + 3 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 21
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R1 level 21 power_base 3: rank 10 + 3 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_site calls @0x43F643 >= 1
+expect ability_power_rank_join reg @0x43F64B eax == 14
+# R2 level 1 power_base 0: rank 0 + 0 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 1
+inspect set data.power_base 0
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R2 level 1 power_base 0: rank 0 + 0 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_site calls @0x43F643 >= 1
+expect ability_power_rank_join reg @0x43F64B eax == 1
+# R3 level 100 power_base 4: rank 50 + 4 + 1
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 100
+inspect set data.power_base 4
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R3 level 100 power_base 4: rank 50 + 4 + 1
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_site calls @0x43F643 >= 1
+expect ability_power_rank_join reg @0x43F64B eax == 55
+# R4 hostile_type 0 (the rule is off): rank 0
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 0
+inspect set data.show_patch_time -1
+inspect set data.level 21
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R4 hostile_type 0 (the rule is off): rank 0
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B
+expect ability_power_rank_site calls @0x43F643 == 0
+expect ability_power_rank_join reg @0x43F64B eax == 0
+# R5 skills[7] = 5 (ability 79 reads track 7): rank 5
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.show_patch_time -1
+inspect set data.level 21
+inspect set data.power_base 3
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x280000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 5
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+trace start
+log rr: R5 skills[7] = 5 (ability 79 reads track 7): rank 5
+inspect set data.current_mode 79
+inspect set data.mode_start_time 0
+wait 6
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+trace stop
+trace report
+expect ability_power from ability_power 0x617E8B this [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+expect ability_power_rank_site calls @0x43F643 == 0
+expect ability_power_rank_join reg @0x43F64B eax == 5
+inspect cube::ItemData [[[[@0x7691C8] + 0x2E0] + 8] + 0x18] + 0x1150
+inspect set modifier 0
+# part E: the dev mod equip_gate_probe calls can_equip_item eight times and creature_power nine times (the input runs its console command): stand-in creatures of
+# level 0, 1, 21, 100 and 1981 and a copy of the player's weapon at level 1, 2, 21, 22 and 1981. The detour records the calls, the three
+# sites say which way the power gate went
+trace clear
+trace args 1
+trace detour 1 can_equip_item
+trace detour 0 creature_power
+trace add @0x43ECDD
+trace add @0x43ED14
+trace add @0x43ED1C
+trace start
+log rr: E window open
+wait 90
+trace stop
+trace report
+expect can_equip_item calls can_equip_item == 8
+expect creature_power calls creature_power >= 9
+expect can_equip_item_level_site calls @0x43ECDD == 8
+expect can_equip_item_refused_site calls @0x43ED14 == 4
+expect can_equip_item_class_site calls @0x43ED1C == 4
+wait 3
+expect - hooks == 0
+"""

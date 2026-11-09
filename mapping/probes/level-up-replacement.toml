@@ -1,0 +1,216 @@
+# Re-recorded on 2026-10-04 with the current XP table (design D3).
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 4.1 of add-level-rework: the mod level_rework replaces creature_level_up (the new XP table, the cap of 100, XP 0 at the
+# cap) and creature_xp_to_next (the XP bar's divisor). P is the player's cube::Creature, [[@0x7691C8] + 0x8006C8]. The expectations
+# on creature_level_up and creature_xp_to_next are not possible (the mod's hooks own their first instruction, so the tracer cannot
+# trace them): the replacement shows in the level, XP and HP values, in the log of the mod and in the HUD screenshots.
+id = "level-up-replacement"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 15 s there",
+    "Window A: the player's HP set to 1; the input ran `config level_rework dev_commands true` and `level_rework:levels xp 1000` in the console and took a screenshot of the HUD (01-award.png)",
+    "Windows B1 and B2: the player's level and XP written directly (99 with 4,188 XP, then 100 with 0), no level-up call; the game's render calls counted after each",
+    "Window B3: a forced cyclone (mode 86, as kill-xp) killed a level-10 creature of the world next to a player edited to level 99 with 4,188 XP and 1 HP; screenshot 02-kill-to-100.png",
+    "Window C: the same kill with the player at level 100 and 50 HP",
+    "Window D: the input ran `level_rework:levels xp 5000` at level 100 and took a screenshot (03-cap.png)",
+]
+observations = [
+    "Wine replay 10 (the re-recording of 2026-10-04 with the current table; evidence `evidence/level-up-replacement-2026-10-04/`) passed; no fault, and the probe's hooks were all removed at the end. The first recording, before the table changed, had also found the freeze below",
+    "the freeze found by the first recording: creature_level_up is a __thiscall with ONE stack argument (the World, popped by `ret 4`, never read), and a replacement that took none left the caller's stack 4 bytes off at the first kill that levelled the player and the game stopped rendering, while the same level-up from the console (which pushes nothing) worked. The replacement takes (creature, edx, world)",
+    "window A: `levels xp 1000` took the level-1 player with 0 XP to level 15 with 15 XP and the log line read `awarded 1000 XP: level 1 XP 0 -> level 15 XP 15, hp 352.9 of max 352.9`: the HP of 1 was restored to the game's own max HP of the new level. The HUD (01-award.png) showed LVL 15, HP 352/352 and XP 15/139",
+    "windows B1 and B2: the player's level written to 99 with 4,188 XP and then to 100 with 0 XP kept the game rendering (44 and 45 render calls in 8 s)",
+    "window B3: the kill (kill_record_apply: 1 call) added its 3 XP to 4,188, which passes the 4,190 of level 99: the player went to level 100 with XP 0 and its HP of 1 became 2042.2. The HUD (02-kill-to-100.png) showed LVL 100, HP 2042/2042 and XP 0/1, an empty bar, not a NaN",
+    "window C: a second kill (kill_record_apply: 1 call) at level 100 with 50 HP left level 100, XP 0 and HP 50: nothing is restored at the cap",
+    "window D: `levels xp 5000` at level 100 logged `awarded 5000 XP: level 100 XP 0 -> level 100 XP 0, hp 50.0 of max 2042.2`; the HUD (03-cap.png) showed LVL 100, HP 50/2042 and XP 0/1",
+    "the cap is shown as 0/1 in the HUD's XP text (hud_xp_to_next returns 1 at level 100 so that the HUD's xp / xp_to_next is never 0/0): cosmetic, for the user",
+    "not tried: a pet (the level-up path is the same function, see creature-level-up), the type-13 item XP path (0x48FB17), a joined client, Server.exe",
+]
+
+[[confirms]]
+entry = "creature_level_up"
+observed = "replaced by level_rework: a kill and the console both took a character through its hook; the stack argument is real (a replacement without it froze the game at the first kill), see the observations"
+
+[[confirms]]
+entry = "creature_xp_to_next"
+observed = "replaced by level_rework: the HUD showed 15/139 at level 15 and 0/1 at level 100 (screenshots 01-award, 02-kill-to-100, 03-cap), so the XP bar's divisor comes from the replacement"
+
+[[confirms]]
+entry = "kill_record_apply"
+observed = "a kill at level 99 and a kill at level 100 each ran it once (the level-up inside it is the replaced function)"
+
+[[confirms]]
+entry = "cube::CreatureData.level"
+observed = "1 -> 15 (levels xp 1000), 99 -> 100 (a kill), 100 stays 100 (a kill, levels xp 5000)"
+
+[[confirms]]
+entry = "cube::CreatureData.current_xp"
+observed = "15 left after 1000 XP at level 1; 0 after the level-100 kill and the 5000 XP award"
+
+[[confirms]]
+entry = "cube::CreatureData.hp"
+observed = "352.9 (the max HP of level 15) after the award from 1 HP, 2042.2 (the max HP of level 100) after the kill to level 100, and 50 unchanged by a kill at level 100"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 900
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until lur: A ready",
+    "console config level_rework dev_commands true",
+    "console level_rework:levels xp 1000",
+    "until lur: A shot",
+    "shot 01-award",
+    "until lur: B3 shot",
+    "shot 02-kill-to-100",
+    "until lur: D ready",
+    "console level_rework:levels xp 5000",
+    "until lur: D shot",
+    "shot 03-cap",
+]
+script = """
+log level-up replacement of level_rework (task 4.1 of add-level-rework): the table, the cap and the XP bar
+wait world
+wait 15
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 1 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+trace add cube::GameController::render
+trace add kill_record_apply
+# window A, "Several levels from one award": the input turns dev_commands on and runs `levels xp 1000`. HP is set to 1 first,
+# so that the restore to the new max HP is visible. 1000 XP from level 1 is level 15 with 15 XP (the table, task 2.2)
+inspect set data.hp 1
+log lur: A ready
+wait 130
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 15 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 15 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.hp value f32 > 100 [[@0x7691C8] + 0x8006C8] + 0x16C
+log lur: A shot
+wait 4
+# the game keeps running (render calls) after each step below
+trace start
+wait 5
+trace stop
+trace report
+expect - calls cube::GameController::render > 3
+# window B1: level 99 with 4,188 XP written directly, no level-up call (level 99 needs 4,190)
+log lur: B1 level 99 written
+inspect player [@0x7691C8]
+inspect set data.level 99
+inspect set data.current_xp 4188
+inspect set data.hp 1
+inspect set data.mp 1
+trace start
+wait 8
+trace stop
+trace report
+expect - calls cube::GameController::render > 3
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 99 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 4188 [[@0x7691C8] + 0x8006C8] + 0x194
+# window B2: level 100 with 0 XP written directly, still no level-up call: does the game run at level 100?
+log lur: B2 level 100 written
+inspect player [@0x7691C8]
+inspect set data.level 100
+inspect set data.current_xp 0
+inspect set data.hp 1
+inspect set data.mp 1
+trace start
+wait 8
+trace stop
+trace report
+expect - calls cube::GameController::render > 3
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 100 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+# window B3: a kill (level 10, 3 XP) that takes a level-99 character holding 4,188 XP over the 4,190 of level 99
+log lur: B3 kill at level 99 with 4188 XP
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.level 99
+inspect set data.current_xp 4188
+inspect set data.hp 1
+inspect set data.mp 1
+trace start
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect - calls cube::GameController::render > 3
+expect kill_record_apply calls kill_record_apply >= 1
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 100 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.hp value f32 > 1000 [[@0x7691C8] + 0x8006C8] + 0x16C
+log lur: B3 shot
+wait 4
+# window C, "The cap": a level-100 character kills a monster. It stays level 100 with XP 0, and its HP is not restored (set to 50 first)
+log lur: C kill at level 100
+inspect creatures [@0x7691C8] + 0x2DC
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 0
+inspect set data.appearance.flags 0
+inspect set data.hp 1
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 60000
+inspect set data.pos.x from [[@0x7691C8] + 0x8006C8] + 0x10 plus 0x8000
+inspect set data.pos.y from [[@0x7691C8] + 0x8006C8] + 0x18
+inspect set data.pos.z from [[@0x7691C8] + 0x8006C8] + 0x20
+inspect player [@0x7691C8]
+inspect set data.hp 50
+inspect set data.mp 1
+trace start
+inspect set data.damage_multiplier 100
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 3
+inspect set data.current_mode 0
+inspect set data.mode_start_time 0
+wait 1
+inspect set data.current_mode 4
+inspect set data.mode_start_time 0
+wait 2
+trace stop
+trace report
+expect - calls cube::GameController::render > 3
+expect kill_record_apply calls kill_record_apply >= 1
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 100 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+expect cube::CreatureData.hp value f32 < 400 [[@0x7691C8] + 0x8006C8] + 0x16C
+# window D: the input runs `levels xp 5000` at the cap
+log lur: D ready
+wait 60
+inspect player [@0x7691C8]
+expect cube::CreatureData.level value i32 == 100 [[@0x7691C8] + 0x8006C8] + 0x190
+expect cube::CreatureData.current_xp value i32 == 0 [[@0x7691C8] + 0x8006C8] + 0x194
+log lur: D shot
+wait 4
+wait 5
+expect - hooks == 0
+"""

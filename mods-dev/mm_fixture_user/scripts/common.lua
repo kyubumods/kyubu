@@ -1,0 +1,1 @@
+-- Fixture for the Mods page list (add-mod-manager 6.1): does nothing.

@@ -1,0 +1,79 @@
+# Kyubu mapping workspace: the pinned toolchain, the analysis options and the supported builds.
+# kmap reads this file; changing the Ghidra pin is its own change (re-run the survey, review the diff).
+
+subsystems = ["core", "world", "creatures", "combat", "items", "ai", "ui", "rendering", "audio", "input",
+              "network", "saves", "travel", "library"]
+no_atlas_page = ["library"]   # statically linked third-party code (SQLite, STL, Ogg): no atlas page
+
+[ghidra]
+version = "12.1.4"
+archive = "ghidra_12.1.4_PUBLIC_20260921.zip"
+url = "https://github.com/NationalSecurityAgency/ghidra/releases/download/Ghidra_12.1.4_build/ghidra_12.1.4_PUBLIC_20260921.zip"
+sha256 = "ddac49f903da9d5bac833e5cc79395098b9c33cfd3279be5f31bd00387d2d4db"
+folder = "ghidra_12.1.4_PUBLIC"
+max_heap = "4G"     # the cloud workspace has about 7 GB of RAM
+jdk = 21            # minimum JDK major version
+
+[analysis]
+language = "x86:LE:32:default"
+compiler = "windows"
+
+# Ghidra analysis options set before auto-analysis (names as in Analysis > Auto Analyze). kmap init fails
+# when a name is unknown to the pinned Ghidra, so a typo cannot silently fall back to the default.
+[analysis.options]
+"Windows x86 PE RTTI Analyzer" = true
+"Decompiler Parameter ID" = true
+"Aggressive Instruction Finder" = false
+
+[cuwo]
+repository = "https://github.com/matpow2/cuwo"
+commit = "240bb61ec42abb10a73d750ce72f243e04e55509"
+
+[[build]]
+id = "cube-0x51D2CE9C"
+file = "Cube.exe"
+sha256 = "a4eeb3606ad2b82e4c9b3d0db6f9472ffa6e89a4d56084a9114ff1fb3c812699"
+text_sha256 = "8c5fbd779bf48b2c2df696da3f9bdb8ece2774e0daec1baa9caf7f92dece967b"
+timestamp = 0x51D2CE9C
+image_base = 0x400000
+image_size = 0x3BA000
+text_start = 0x401000
+text_end = 0x6FA74F
+retired = true      # 2026-10-26: Kyubu targets the 07-20 build below; this one is the record its entries came from
+
+[[build]]
+id = "server-0x51D2CE9B"
+file = "Server.exe"
+archive = "Server.zip"   # the game ships the dedicated server zipped; kmap reads it from the zip
+sha256 = "dde8e7082907246d309e07d5a3ad4f230960e7a617bd19fb17f28a55b8c2e7b9"
+text_sha256 = "8fbf34eb8141118d55e9939e62bff4b54da3454fb7af08a960734061a57cb964"
+timestamp = 0x51D2CE9B
+image_base = 0x400000
+image_size = 0x1A8000
+text_start = 0x401000
+text_end = 0x5574E5
+retired = true
+
+# The 2013-07-20 build (the one every other Alpha project targets). Kyubu targets it from 2026-10-26; the two builds
+# above stay as the record its entries were ported from (correlated:<build>:<symbol>).
+[[build]]
+id = "cube-0x51EA955E"
+file = "Cube.exe"
+sha256 = "84a7a132a84d4282338e7ea45a1940d32066d64e39cbafed8f2418d5a6dc30bf"
+text_sha256 = "95ceb4cd764615977fb9874174944bfdb2608d578dd737bc280c7adee93f632e"
+timestamp = 0x51EA955E
+image_base = 0x400000
+image_size = 0x3BC000
+text_start = 0x401000
+text_end = 0x6FBABF
+
+[[build]]
+id = "server-0x51EA94D5"
+file = "Server.exe"
+sha256 = "1ffbcbce251e1506a63c9ce18ab0009d5553fcbb9e6202be2bc3a7d870d34fb1"
+text_sha256 = "613ad48e070e3aabb17fe55161f981e2d3af22be59489a347fbe949a3a5de486"
+timestamp = 0x51EA94D5
+image_base = 0x400000
+image_size = 0x1A8000
+text_start = 0x401000
+text_end = 0x557665

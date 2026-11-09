@@ -1,0 +1,799 @@
+# The ability (mode) ids of cube::CreatureData.current_mode, from Cube.exe (task 9.2). cube::Creature::modeDuration
+# (0x43DA30) switches on every id from 0 to 105; the dispatch in cube::World::update (task 9.3) has cases up to 110,
+# so the range is 0 to 110 (106 to 110 are MODE_<id>, added with the user's approval). Names come from the game's strings:
+# the cast bar in cube::GameController::update (a switch on current_mode - 30 at 0x49340C, table 0x49D5A0, which
+# shows the spell name) and the skill tooltips (the @ placeholders that skill_description_fill fills per id).
+# Ids the game names nowhere are MODE_<id>. All 16 names cuwo gives (cuwo/strings.py) match these values.
+
+[[enum]]
+name = "cube::AbilityId"
+size = 1
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::Creature::modeDuration", "xref:cube::World::abilityDispatchSite", "probe:ability-force", "cuwo:cuwo/strings.py"]
+source = "kyubu"
+notes = "the value of cube::CreatureData.current_mode; 0 to 110 (modeDuration covers 0 to 105, the dispatch in cube::World::update up to 110), named from the cast bar and the skill tooltips; the MODE_<id> names are placeholders until the game's use of the id is known"
+
+[[enum.value]]
+name = "NONE"
+value = 0
+notes = "no mode: a creature returns to 0 when its mode ends (cube::Creature::modeDuration gives 0)"
+
+[[enum.value]]
+name = "MODE_1"
+value = 1
+
+[[enum.value]]
+name = "MODE_2"
+value = 2
+
+[[enum.value]]
+name = "MODE_3"
+value = 3
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_4"
+value = 4
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_5"
+value = 5
+
+[[enum.value]]
+name = "MODE_6"
+value = 6
+
+[[enum.value]]
+name = "MODE_7"
+value = 7
+
+[[enum.value]]
+name = "MODE_8"
+value = 8
+
+[[enum.value]]
+name = "MODE_9"
+value = 9
+
+[[enum.value]]
+name = "MODE_10"
+value = 10
+
+[[enum.value]]
+name = "MODE_11"
+value = 11
+
+[[enum.value]]
+name = "MODE_12"
+value = 12
+
+[[enum.value]]
+name = "MODE_13"
+value = 13
+
+[[enum.value]]
+name = "MODE_14"
+value = 14
+
+[[enum.value]]
+name = "MODE_15"
+value = 15
+
+[[enum.value]]
+name = "MODE_16"
+value = 16
+
+[[enum.value]]
+name = "MODE_17"
+value = 17
+
+[[enum.value]]
+name = "MODE_18"
+value = 18
+
+[[enum.value]]
+name = "MODE_19"
+value = 19
+
+[[enum.value]]
+name = "MODE_20"
+value = 20
+
+[[enum.value]]
+name = "RANGER_KICK"
+value = 21
+evidence = ["string:\"@rangerkickcooldown\""]
+
+[[enum.value]]
+name = "MODE_22"
+value = 22
+
+[[enum.value]]
+name = "MODE_23"
+value = 23
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_24"
+value = 24
+
+[[enum.value]]
+name = "MODE_25"
+value = 25
+
+[[enum.value]]
+name = "MODE_26"
+value = 26
+
+[[enum.value]]
+name = "MODE_27"
+value = 27
+
+[[enum.value]]
+name = "MODE_28"
+value = 28
+
+[[enum.value]]
+name = "MODE_29"
+value = 29
+
+[[enum.value]]
+name = "FIRE_SWIRL"
+value = 30
+evidence = ["string:\"Fire Swirl\""]
+
+[[enum.value]]
+name = "FIRE_VORTEX"
+value = 31
+evidence = ["string:\"Fire Vortex\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "WATER_SWIRL"
+value = 32
+evidence = ["string:\"Water Swirl\""]
+
+[[enum.value]]
+name = "WATER_VORTEX"
+value = 33
+evidence = ["string:\"Water Vortex\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "HEALING_STREAM"
+value = 34
+evidence = ["string:\"Healing Stream\"", "string:\"@healingstreamcost\""]
+
+[[enum.value]]
+name = "MODE_35"
+value = 35
+
+[[enum.value]]
+name = "MODE_36"
+value = 36
+
+[[enum.value]]
+name = "FIREBALL"
+value = 37
+evidence = ["string:\"Fireball\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "FIREBOLT"
+value = 38
+evidence = ["string:\"Firebolt\""]
+
+[[enum.value]]
+name = "FIREBOLT_2"
+value = 39
+evidence = ["string:\"Firebolt\""]
+notes = "the cast bar names it Firebolt too"
+
+[[enum.value]]
+name = "FIREBOLT_3"
+value = 40
+evidence = ["string:\"Firebolt\""]
+notes = "the cast bar names it Firebolt too"
+
+[[enum.value]]
+name = "WATER_DROP"
+value = 41
+evidence = ["string:\"Water drop\""]
+
+[[enum.value]]
+name = "WATER_DROP_2"
+value = 42
+evidence = ["string:\"Water drop\""]
+notes = "the cast bar names it Water drop too"
+
+[[enum.value]]
+name = "WATER_SPLASH"
+value = 43
+evidence = ["string:\"Water splash\""]
+
+[[enum.value]]
+name = "WATER_DROP_3"
+value = 44
+evidence = ["string:\"Water drop\""]
+notes = "the cast bar names it Water drop too"
+
+[[enum.value]]
+name = "WATER_SALVO"
+value = 45
+evidence = ["string:\"Water Salvo\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "FIRE_SALVO"
+value = 46
+evidence = ["string:\"Fire Salvo\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_47"
+value = 47
+
+[[enum.value]]
+name = "INTERCEPT"
+value = 48
+evidence = ["string:\"@interceptcooldown\""]
+
+[[enum.value]]
+name = "TELEPORT"
+value = 49
+evidence = ["string:\"Teleport\"", "string:\"@teleportcooldown\""]
+
+[[enum.value]]
+name = "RETREAT"
+value = 50
+evidence = ["string:\"@retreatcooldown\""]
+
+[[enum.value]]
+name = "MODE_51"
+value = 51
+
+[[enum.value]]
+name = "MODE_52"
+value = 52
+
+[[enum.value]]
+name = "MODE_53"
+value = 53
+
+[[enum.value]]
+name = "SMASH"
+value = 54
+evidence = ["string:\"@smashcooldown\""]
+
+[[enum.value]]
+name = "MODE_55"
+value = 55
+
+[[enum.value]]
+name = "MODE_56"
+value = 56
+
+[[enum.value]]
+name = "MODE_57"
+value = 57
+notes = "a new warrior's primary attack (skill-bar slot M1), from cube::Creature::nextAttackMode"
+
+[[enum.value]]
+name = "MODE_58"
+value = 58
+
+[[enum.value]]
+name = "MODE_59"
+value = 59
+notes = "a new warrior's right-button ability (skill-bar slot M2); the game follows it with 60, then 0"
+
+[[enum.value]]
+name = "MODE_60"
+value = 60
+notes = "the follow-up mode of 59, set by the game after 59 ends"
+
+[[enum.value]]
+name = "MODE_61"
+value = 61
+
+[[enum.value]]
+name = "MODE_62"
+value = 62
+
+[[enum.value]]
+name = "MODE_63"
+value = 63
+
+[[enum.value]]
+name = "MODE_64"
+value = 64
+
+[[enum.value]]
+name = "MODE_65"
+value = 65
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_66"
+value = 66
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "MODE_67"
+value = 67
+
+[[enum.value]]
+name = "MODE_68"
+value = 68
+
+[[enum.value]]
+name = "MODE_69"
+value = 69
+
+[[enum.value]]
+name = "MODE_70"
+value = 70
+
+[[enum.value]]
+name = "MODE_71"
+value = 71
+
+[[enum.value]]
+name = "MODE_72"
+value = 72
+
+[[enum.value]]
+name = "MODE_73"
+value = 73
+
+[[enum.value]]
+name = "MODE_74"
+value = 74
+
+[[enum.value]]
+name = "MODE_75"
+value = 75
+
+[[enum.value]]
+name = "MODE_76"
+value = 76
+
+[[enum.value]]
+name = "MODE_77"
+value = 77
+
+[[enum.value]]
+name = "MODE_78"
+value = 78
+
+[[enum.value]]
+name = "SNEAK"
+value = 79
+evidence = ["string:\"@sneakcooldown\""]
+
+[[enum.value]]
+name = "MODE_80"
+value = 80
+notes = "set by the Q slot (0x4A2940) when the player uses a potion"
+
+[[enum.value]]
+name = "MODE_81"
+value = 81
+
+[[enum.value]]
+name = "MODE_82"
+value = 82
+
+[[enum.value]]
+name = "MODE_83"
+value = 83
+
+[[enum.value]]
+name = "MODE_84"
+value = 84
+
+[[enum.value]]
+name = "MODE_85"
+value = 85
+
+[[enum.value]]
+name = "CYCLONE"
+value = 86
+evidence = ["string:\"@cyclonecooldown\""]
+
+[[enum.value]]
+name = "EXPLOSION"
+value = 87
+evidence = ["string:\"Explosion\""]
+
+[[enum.value]]
+name = "FIRE_EXPLOSION"
+value = 88
+evidence = ["string:\"Fire Explosion\"", "string:\"@fireexplosioncooldown\""]
+
+[[enum.value]]
+name = "LAVA"
+value = 89
+evidence = ["string:\"Lava\""]
+
+[[enum.value]]
+name = "MODE_90"
+value = 90
+
+[[enum.value]]
+name = "MODE_91"
+value = 91
+
+[[enum.value]]
+name = "SUMMON"
+value = 92
+evidence = ["string:\"Summon\""]
+
+[[enum.value]]
+name = "MODE_93"
+value = 93
+
+[[enum.value]]
+name = "FIREBEAM"
+value = 94
+evidence = ["string:\"Firebeam\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "FIRERAY"
+value = 95
+evidence = ["string:\"Fireray\""]
+notes = "started through cube::Creature::weaponAttack"
+
+[[enum.value]]
+name = "SHURIKEN"
+value = 96
+evidence = ["string:\"@shurikencooldown\""]
+
+[[enum.value]]
+name = "CAMOUFLAGE"
+value = 97
+evidence = ["string:\"@camouflagecooldown\""]
+notes = "a buff: its start (0x5940A0) sets a cooldown, not a mode"
+
+[[enum.value]]
+name = "MODE_98"
+value = 98
+
+[[enum.value]]
+name = "AIM"
+value = 99
+evidence = ["string:\"@aimcooldown\""]
+
+[[enum.value]]
+name = "SWIFTNESS"
+value = 100
+evidence = ["string:\"@swiftnesscooldown\""]
+notes = "a buff: its start (0x5940A0) sets a cooldown, not a mode"
+
+[[enum.value]]
+name = "BULWARK"
+value = 101
+evidence = ["string:\"@bulwarkcooldown\""]
+notes = "a buff: its start (0x5940A0) sets a cooldown, not a mode"
+
+[[enum.value]]
+name = "WAR_FRENZY"
+value = 102
+evidence = ["string:\"@warfrenzycooldown\""]
+notes = "a buff: its start (0x5940A0) sets a cooldown, not a mode"
+
+[[enum.value]]
+name = "MANA_SHIELD"
+value = 103
+evidence = ["string:\"@manashieldcooldown\""]
+notes = "a buff: its start (0x5940A0) sets a cooldown, not a mode"
+
+[[enum.value]]
+name = "MODE_104"
+value = 104
+
+[[enum.value]]
+name = "TELEPORT_TO_CITY"
+value = 105
+evidence = ["string:\"Teleport to City\""]
+
+[[enum.value]]
+name = "MODE_106"
+value = 106
+notes = "past modeDuration's range; the dispatch in cube::World::update sends it to the default, and the step compares the mode with it"
+
+[[enum.value]]
+name = "MODE_107"
+value = 107
+notes = "past modeDuration's range; the dispatch sends it to the default, and the step compares the mode with it"
+
+[[enum.value]]
+name = "MODE_108"
+value = 108
+notes = "past modeDuration's range; the dispatch runs it in the block of the projectile ids 37 to 46"
+
+[[enum.value]]
+name = "MODE_109"
+value = 109
+notes = "past modeDuration's range; the dispatch sends it to the default"
+
+[[enum.value]]
+name = "MODE_110"
+value = 110
+notes = "past modeDuration's range; the dispatch has a block of its own for it"
+
+# One hit (task 9.5): cuwo's hit packet (packet 7), the same 0x48 bytes the game keeps in a std::list per World step.
+
+[[type]]
+name = "cube::Hit"
+kind = "struct"
+size = 0x48
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit", "xref:cube::World::hitCreature", "manual:hitCreature fills one at ESP+0xC4, last byte written +0x46"]
+source = "cuwo"
+notes = "built by cube::World::hitCreature, applied by cube::World::applyHit; the step output's hit list holds 0x50-byte nodes (0x486760 pushes one), which a joined client sends to the server"
+
+[[type.field]]
+offset = 0x0
+name = "entity_id"
+type = "uint64_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py"]
+source = "cuwo"
+notes = "the attacker's creature id (cuwo's name)"
+
+[[type.field]]
+offset = 0x8
+name = "target_id"
+type = "uint64_t"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "probe:server-guardian-0720"]
+source = "cuwo"
+notes = "the target's creature id: cube::World::applyHit looks it up first"
+
+[[type.field]]
+offset = 0x10
+name = "damage"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit"]
+source = "cuwo"
+notes = "subtracted from the target's hp; negative heals"
+
+[[type.field]]
+offset = 0x14
+name = "critical"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x18
+name = "stun_duration"
+type = "int32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit", "manual:hitCreature stores 0 or the target max stun at Hit+0x18"]
+source = "cuwo"
+notes = "ms; the target's data.stun_time becomes at least this, and its velocity is zeroed"
+
+[[type.field]]
+offset = 0x1C
+name = "slow_duration"
+type = "int32_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit"]
+source = "cuwo"
+notes = "ms; the target's data.slowed_time becomes at least this (cuwo calls it something8)"
+
+[[type.field]]
+offset = 0x20
+name = "pos"
+type = "cube::LongVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x38
+name = "hit_dir"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit", "manual:hitCreature stores its direction argument at Hit+0x38"]
+source = "cuwo"
+notes = "the knockback: it replaces the target's data.extra_vel when longer (a tenth while stunned)"
+
+[[type.field]]
+offset = 0x44
+name = "skill_hit"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py"]
+source = "cuwo"
+
+[[type.field]]
+offset = 0x45
+name = "hit_type"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::applyHit"]
+source = "cuwo"
+notes = "1 adds 0.25 to the target's mp, 3 does nothing, 4 calls 0x43D7B0 on the target, 5 hits its shields first"
+
+[[type.field]]
+offset = 0x46
+name = "show_light"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py"]
+source = "cuwo"
+
+# One projectile (task 9.6): cuwo's shoot packet, the same 0x70 bytes the World keeps in cube::World.projectiles and
+# the step output in its shoot list. Only the fields the spawn (0x616303) and the update (0x61F31D) use are mapped.
+
+[[type]]
+name = "cube::Projectile"
+kind = "struct"
+size = 0x70
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite", "xref:cube::World::projectileUpdateSite", "probe:projectile-spawn"]
+source = "cuwo"
+notes = "cuwo's ShootPacket. The size is also the list's: 0x486670 caps it at 0x2222221 nodes of 0x78 bytes. Built on the stack by the projectile block of the dispatch and copied into both lists"
+
+[[type.field]]
+offset = 0x0
+name = "entity_id"
+type = "uint64_t"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite", "probe:projectile-spawn"]
+source = "cuwo"
+notes = "the shooter's creature id (copied from cube::Creature.id); a boomerang looks its shooter up by it"
+
+[[type.field]]
+offset = 0x18
+name = "pos"
+type = "cube::LongVector3"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite"]
+source = "cuwo"
+notes = "starts at the shooter's data.pos; the World step adds velocity * dt"
+
+[[type.field]]
+offset = 0x3C
+name = "velocity"
+type = "cube::FloatVector3"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite", "probe:projectile-spawn"]
+source = "cuwo"
+notes = "blocks per second: the shooter's data.ray_hit normalised (0x4279D0) times 50, or 100 with Creature+0xAA9 = 12"
+
+[[type.field]]
+offset = 0x48
+name = "damage"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::Creature::modeDamageFactor"]
+source = "cuwo"
+notes = "cuwo's legacy_damage: modeDamageFactor(mode) * 0x4474D0() * a random 0.75 to 1.25; for 108, 0x43E4F0() instead of 0x4474D0() and times 5"
+
+[[type.field]]
+offset = 0x50
+name = "scale"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite"]
+source = "cuwo"
+notes = "charged_mp + 0.5 for 38-42 and 44, + 1 for 45 and 46, + 1.5 for 37 and 43; 4 for 108"
+
+[[type.field]]
+offset = 0x54
+name = "mana"
+type = "float"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite"]
+source = "cuwo"
+notes = "the shooter's data.charged_mp for 38-42 and 44; 1 for 37, 43 and 108; 0.25 for 45 and 46"
+
+[[type.field]]
+offset = 0x5C
+name = "skill"
+type = "uint8_t"
+status = "candidate"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileSpawnSite"]
+source = "cuwo"
+notes = "1 for 37, 43, 45, 46 and 108; passed on to cube::World::hitCreature"
+
+[[type.field]]
+offset = 0x60
+name = "kind"
+type = "int32_t"
+status = "verified"
+evidence = ["cuwo:cuwo/packet.py", "xref:cube::World::projectileUpdateSite", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "cuwo's projectile. The spawn sets 1 for 37-46 and 4 for 108. The update: 1 flies straight, 2 returns to its shooter (a boomerang), 0, 3 and 4 fall. 0, 1 and 4 stop at the first creature they meet (with skill set, 1 and 4 then explode and hit through 0x621305); 2 and 3 go on"
+
+[[type.field]]
+offset = 0x64
+name = "heals"
+type = "uint8_t"
+status = "candidate"
+evidence = ["xref:cube::World::projectileUpdateSite"]
+source = "kyubu"
+notes = "cuwo's something26. 2: the projectile applies a hit with negated damage (a heal) to the creatures it passes, through applyHit at 0x620664; otherwise hits go through cube::World::hitCreature (0x6206DC). The spawn sets 1 or 2 only when Creature+0x140 is 3"
+
+[[type.field]]
+offset = 0x68
+name = "age"
+type = "int32_t"
+status = "verified"
+evidence = ["xref:cube::World::projectileUpdateSite", "probe:projectile-spawn"]
+source = "kyubu"
+notes = "ms since the shot (cuwo's something27): 0 at the spawn, + dt each step; past 5000 the projectile is removed"
+
+[[enum]]
+name = "cube::ClassType"
+size = 1
+subsystem = "combat"
+status = "verified"
+evidence = ["cuwo:cuwo/constants.py", "probe:ability-slot4"]
+source = "kyubu"
+
+[[enum.value]]
+name = "WARRIOR"
+value = 1
+
+[[enum.value]]
+name = "RANGER"
+value = 2
+
+[[enum.value]]
+name = "MAGE"
+value = 3
+
+[[enum.value]]
+name = "ROGUE"
+value = 4
+
+[[enum]]
+name = "cube::Specialization"
+size = 1
+subsystem = "combat"
+status = "verified"
+evidence = ["cuwo:cuwo/constants.py", "probe:ability-slot4"]
+source = "kyubu"
+notes = "values depend on the class: 0 and 1 for each"
+
+[[enum.value]]
+name = "BERSERKER"
+value = 0
+
+[[enum.value]]
+name = "GUARDIAN"
+value = 1
+
+[[enum.value]]
+name = "SNIPER"
+value = 0
+
+[[enum.value]]
+name = "SCOUT"
+value = 1
+
+[[enum.value]]
+name = "FIRE_MAGE"
+value = 0
+
+[[enum.value]]
+name = "WATER_MAGE"
+value = 1
+
+[[enum.value]]
+name = "ASSASSIN"
+value = 0
+
+[[enum.value]]
+name = "NINJA"
+value = 1

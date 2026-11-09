@@ -1,0 +1,36 @@
+# mods-dev/auto_enter 0.1.0 with an empty Save/ (every replay sandbox starts with one): the mod must find no character, log it and leave
+# the title menu alone, so that gamepilot can still make a character and a world by hand. The run is also the first half of the test of
+# auto-enter-0720: replayed with --keep, its sandbox keeps the character Tester and the world testworld (seed 1234) gamepilot made.
+id = "auto-enter-empty-0720"
+build = "cube-0x51EA955E"
+kyubu = "1.1"
+date = "2026-10-27"
+steps = [
+    "Built mods-dev/auto_enter 0.1.0 (ninja auto_enter); replayed under Wine with --keep, setup new-world",
+]
+observations = [
+    "run 4 passed under Wine 9.0 software rendering (evidence/auto-enter-2026-10-27): the mod loaded, logged 'no saved character matches (0 saved): staying at the menu' 8 s after start, and gamepilot made Tester and entered testworld 61 s later",
+    "the first entry of characters is a pointer to a creature whose name begins with Test (u32 0x74736554 at data + 0x1158)",
+    "run 2 under Wine 11 WoW64 on the GPU: the mod behaved the same, but gamepilot's world creation never reached 'world entered' in 150 s (item-adaption-0720-gpu-1 stopped the same way)",
+    "run 3 failed on the record, not the game: the expectation read characters.first as the creature, one dereference short",
+    "the Wine 11 failure of run 2 was the renderer: d3d12 on Xvfb ran so slowly that typed names arrived one letter every 2 s, so Create Character was clicked mid-name. With llvmpipe (runs llvm1, and w11 through run_replay.sh GPU=1) it passed at 13 fps",
+]
+
+[[confirms]]
+entry = "cube::GameController.characters"
+observed = "after gamepilot made the character Tester, the vector's first entry is a creature whose name (data + 0x1158) starts with Test"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 240
+mods = ["mods-dev/auto_enter"]
+input = [
+]
+script = """
+log autoenter-empty: script up
+wait world
+log autoenter-empty: world entered by gamepilot
+expect cube::GameController.characters value u32 == 0x74736554 [[[@0x76B1C8] + 0x800984]] + 0x1168
+wait 10
+"""

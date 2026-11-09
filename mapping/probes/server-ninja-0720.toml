@@ -1,0 +1,88 @@
+# Task 8.6 of add-skills-unleashed-multiplayer: the Ninja's Flash Bomb on Server.exe with a joined client (kmap probe replay,
+# client = "join"). The client, made a Ninja by su_rank, holds key 4; at its clip's `throw` marker it sends `bomb { from, view }` on
+# skills_unleashed:ability (design D13). The server checks it against its own copy of the player, flies its own bomb on its own
+# blocks, bursts it (hits within the splash), and runs true stealth on its monsters: the threat for the player below 0 on each
+# monster that holds one, the player out of the first-target scan (cube::CombatBehavior::targetScanSite of Server.exe), and at the
+# end the entries erased. It tells the clients `stealth_on` and `stealth_off` (D14). su_dummy holds a monster 3 blocks in front.
+# From run 4 (task 8.6a): a watcher, a second joined client, draws the bomb, the burst and the stealth look on the thrower from the
+# server's `bomb`, `burst`, `stealth_on` and `stealth_off` on skills_unleashed:world.
+id = "server-ninja-0720"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-09"
+steps = [
+    "native replay: Server.exe, a joined client and (from run 4) a watcher, all with emtweaks and skills_unleashed (the gate), mp_fill, su_rank and su_dummy",
+    "the client made itself a Ninja with rank 3 (su_rank options), log_effects on; the client held key 4 for 0.8 s",
+]
+observations = [
+    "run 1, 2026-11-09 (evidence/ninja-mp-2026-11-09/server-ninja-0720-run1), failed on the record: the server took the bomb 517 ms into its run, burst it on the ground, ran 6.0 s of true stealth and logged the scan skip; an `until` text was not a substring of the log line; the server refused the client's bounce restart (cooldown), so the server's def got `restarts = 1`",
+    "run 2 (run2), failed on the record (a log_expect text with the count inside it): the run restarted once (1 of 1) and went on; the bursts 0.1 blocks apart on client and server; stealth ended 29 ms apart",
+    "run 3 (run3), passed: bomb taken 505 ms into the run; restart 1 of 1; burst on the ground at 8396928.0, 8396927.6, 83.0 on both; true stealth 6.0 s (rank 3); the server's targetScanSite skipped the player 22 ms after the start; expired 5.99 s later on the server, 5.99 s on the client; 0 enemies held, 0 erased",
+    "run 4, 2026-11-09 (evidence/ninja-mp-2026-11-09/server-ninja-0720-run4), with a watcher (task 8.6a), passed: the server took the bomb 486 ms into the run and burst it on the ground at 8396928.0, 8396927.6, 83.1; the watcher drew the bomb 12 ms after the server took it and the burst at the same point 14 ms after the server's; watched stealth 6.0 s, ended `expired` 16 ms after the server's end; the screenshot watcher-02-stealth shows the burst's smoke; the caster's pale look is not judged from it (the caster is at the frame's top edge)",
+    "limits: su_dummy's monster stood 3 blocks ahead, out of the 2-block splash, and never held the player, so no hit, threat drop or erase on a real threat map is seen here (test_parity_ninja.cpp has them on a stand-in); one client, one watcher",
+]
+
+[[confirms]]
+entry = "cube::World::abilityDispatchSite"
+observed = "the dispatch site runs on the server while a joined client's Flash Bomb runs"
+
+[[confirms]]
+entry = "cube::CombatBehavior::targetScanSite"
+observed = "the server's scan site skips the stealthed player (the mod's log line from the hook)"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+watcher = true
+seconds = 480
+mods = ["mods-gameplay/emtweaks", "mods-gameplay/skills_unleashed", "mods-dev/mp_fill", "mods-dev/su_rank", "mods-dev/su_dummy"]
+input = [
+    "console config su_rank specialization ninja",
+    "console config su_rank ability skills_unleashed:ninja",
+    "console config skills_unleashed log_effects true",
+    "console watcher config skills_unleashed log_effects true",
+    "shot 01-client-joined",
+    "shot watcher 01-joined",
+    "click 820 384",
+    "hold 4 0.8",
+    "until server: ninja: bomb of player",
+    "shot 02-client-cast",
+    "until server: ninja: true stealth of player",
+    "until watcher ninja: watched stealth of player",
+    "shot watcher 02-stealth",
+    "until ninja: true stealth of player 1 ended",
+    "until enemies forgot player",
+    "until watcher ninja: watched stealth of player 1 ended",
+    "shot 03-client-after",
+]
+# The server: the bomb taken, its burst, true stealth on and off, the scan skip, the erase. The client: its own bomb and stealth.
+log_expect = { latest = [
+    "skills_unleashed: server: ninja: bomb of player",
+    "skills_unleashed: server: ninja: the bomb of player",
+    "skills_unleashed: server: ninja: true stealth of player",
+    "skills_unleashed: server: ninja: a monster's scan skipped player",
+    "enemies forgot player 1",
+], client = [
+    "su_rank: the character is class 4, specialization 1 (ninja)",
+    "skills_unleashed: ninja: the bomb burst on",
+], watcher = [
+    "skills_unleashed: ninja: watched bomb of player",
+    "skills_unleashed: ninja: watched burst of player",
+    "skills_unleashed: ninja: watched stealth of player",
+    "skills_unleashed: ninja: watched stealth of player 1 ended (expired)",
+] }
+# The server's script only waits for the dispatch site's first call (460 s is a limit); the inputs end on the server's erase line.
+# The scan site is not traced: the mod's own mid hook is on it, and its log line is the check.
+script = """
+log server-ninja-0720: task 8.6 of add-skills-unleashed-multiplayer
+trace args 3
+trace add @0x537BC4
+trace start
+wait 460 until calls @0x537BC4 >= 1
+trace stop
+trace report
+expect cube::World::abilityDispatchSite calls @0x537BC4 >= 1
+log server-ninja-0720: done
+"""

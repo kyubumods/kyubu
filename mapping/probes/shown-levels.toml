@@ -1,0 +1,51 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which creates the level-1 human warrior "Tester" and a new
+# world. Task 5.4 of add-level-rework: the mod level_rework is installed beside kyubu_probe. The player walks the starting region
+# for about five minutes while the dev command `levels creatures` surveys the live creatures every half minute (their count, the
+# lowest and highest level, and how many lie outside 1-100); screenshots show the HUD and the world map.
+id = "shown-levels"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-03"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world with the mod level_rework (mods-gameplay) installed beside kyubu_probe; waited 20 s there",
+    "the input turned dev_commands on, then ten times: `level_rework:levels creatures`, walked forward 15 s (the character is level 1, so most creatures stay out of reach)",
+    "screenshots: the world as the player sees it, then the world map (key m)",
+]
+observations = [
+    "Wine replays 3, 5 and 6 (walks of 6 to 9 minutes) and 4 (standing still) all passed, no fault. The record holds the walk. Only some of the `console` steps took effect while the character walked: of the 5 to 9 `levels creatures` commands in a walk, 3 or 4 printed (the others were lost to the game's 4 fps input, the player often stuck against scenery). Run 6: 4 surveys in 9 minutes, 16 to 19 creatures each, levels 1 to 69, 1 to 39, 1 to 36, 1 to 36, `0 outside 1-100` every time (runs 3 and 5: the same, highest 69). Creature levels seen at the start: type 104 at 61 to 69, type 88 at 30 to 33, type 151 at 36, the rest 1 to 18",
+    "Run 4 (record input changed to stand still, 8 console commands one after another, all printed): `levels areas` listed 9 regions, 432 areas, 144 dungeons, highest level 100, 0 above 100 (as in region-area-levels). `levels xp 1000000000` took the player to level 100, and the next `levels creatures` read `levels 1 to 100, 0 outside 1-100` (the 100 is the player)",
+    "run 4 also called the game's max-HP function with the player's power_base set to 0 and to 4: both gave the same value (265.01 at level 1, 2042.24 at level 100). So max HP does NOT read power_base: vanilla's 2^(p/4) must be applied to max_hp_multiplier when a monster is made, a place that is not mapped and that the mod does not touch. That test cannot show the effect, and it was dropped from the mod",
+    "not done: a screenshot of an area's information (the key m, held for 0.5 s, did not open a map: the floating map of the starting region with the name LANDS OF SELA is always on screen and shows no level); a monster inside the level-61 dungeon (no way to get the character there); the HP of a +4 monster (none lives near the start: every creature seen has +p 0)",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "0 in single-player"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 2000
+mods = ["mods-gameplay/level_rework"]
+input = [
+    "until sl: start",
+    "console config level_rework dev_commands true",
+    "wait 20", "console level_rework:levels creatures", "hold w 15", "hold d 2",
+    "wait 20", "console level_rework:levels creatures", "hold w 15", "hold a 2",
+    "wait 20", "console level_rework:levels creatures", "hold w 15", "hold d 2",
+    "wait 20", "console level_rework:levels creatures", "hold w 15", "hold a 2",
+    "wait 20", "console level_rework:levels creatures", "hold w 15", "hold d 2",
+    "wait 20", "shot 01-walk",
+    "until sl: done",
+]
+script = """
+log shown levels of level_rework (task 5.4 of add-level-rework)
+wait world
+wait 20
+inspect player [@0x7691C8]
+expect cube::World.joined value u8 == 0 [@0x7691C8] + 0x390
+log sl: start
+wait 560
+log sl: done
+"""

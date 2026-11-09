@@ -1,0 +1,254 @@
+# Superseded in part on 2026-10-04 by task 8.3: `creature_update_level_site` was at 0x415B47, the instruction after the read of +0x190, not the level (+0x180).
+# The entry now names 0x415B05; the 7362 calls this record saw at 0x415B47 are calls of creature_update_read, which both addresses share.
+# Recorded with kyubu_probe and the Kyubu 1.1 loader in development (MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop): kmap probe replay starts Server.exe, then a Kyubu-loaded Cube.exe in the same Wine prefix that joins 127.0.0.1 with a new
+# character (client = "join"). The script runs on the server. Task 8.1 of add-level-rework: the Server.exe twins of the sites that
+# level_rework hooks on Cube.exe (S1 to S8). Nothing here is hooked by a mod: the probe only traces.
+# Phase 0: from the start of the server until the client has joined (world generation, the accept loop, the update reader).
+# Phase 1: a server creature T (the top id of the creature map, as in hit-authority) hits the player (cyclone, mode 86), so the
+# server runs hitCreature and the strength functions.
+# Phase 2: the client attacks T with M1 while T has 1 hp and no armour, to make a kill on the server.
+id = "server-level-sites"
+build = "server-0x51D2CE9B"
+kyubu = "1.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: Server.exe, then a client that joins with a new warrior; the script waits 140 s for it",
+    "Phase 0: traced the region, spawn, generator and update-reader sites from the start",
+    "Phase 1: T (a server creature) raised to level 20, made hostile and sent against the player in cyclone",
+    "Phase 2: T at level 10, power_base 4, 1 hp, no armour, put at the four sides of the player in turn while the client holds M1",
+]
+observations = [
+    "Wine replay 3 (the first with the expectations; replays 1 and 2 only corrected the script) saw every site below. A mod on Server.exe made the loader hook cube::World::update (0x532260), so the probe could not trace it: the script reads the World from the cube::Server tick (0x427FF0) instead, [ecx + 4]. A traced site must not be a call or a jump: 0x50D3BA and 0x4CF9E6 were refused, so their returns (0x50D3BF, 0x4CF9EB) were tried",
+    "phase 0, from the start of the server to 140 s (the client joined at 63 s): region_generate's area-level store ran 284 times at 63.0 s, creature_level_range 100 times (64.9 s onwards), the accept loop's version compare once (63.0 s, then the join went through: the vanilla client sends 3), the reply site for a wrong version never, creature_update_read's level site 7362 times (every update packet), the maxHp level site 115979 times",
+    "phase 0: no item generator (0x52C2B0, 0x5289C0, 0x52A530), no spawn-loot return (0x50D3BF, 0x50D41B) and no gear-drop site (0x4D2D35) ran. Zone loot is not made at a join, and the kill below rolled no gear drop (1 kill in 10)",
+    "phase 1 (T raised to level 20, cyclone on the player, 8 s): hitCreature 27 times, applyHit 27, and at each the two hitCreature level sites (0x4D143E, 0x4D1458), the damage site (0x408B9D), the crit site (0x4096CF) and the armour site (0x407F0F) 27 times; the tempo site 20609 times (every tick); ability_power's rank site twice (0.3 s, 2.3 s). Not reached: the damage sites of flags 0x08 and 0x10 (0x408C59, 0x408D04), the alt damage (0x4090AF), the projectile damage (0x41149D) and the resistance site (0x410EEF)",
+    "phase 2 (T at level 10, power_base 4, 1 hp, no armour; the client held M1 at four sides): applyHit 4 times (2.4, 3.0, 4.1 and 14.6 s), the damage site 4; the kill at 14.6 s ran killXpSite once (EBX = the victim) and level_curve once with the argument 14.0 (level + power_base) from 0x4CF295, killRecordXpSite once, kill_record_apply once from 0x4CF87D (its call at 0x4CF878), and the typed-drop site (0x4D3000) once (replay 3) or three times (replay 4: a victim has up to three typed drops)",
+    "phase 2: creature_level_up (0x411EE0) never ran: the joined player's kill record does not level it on the server, as the static read of kill_record_apply said (only the killer's pet is levelled there). How the joined client gets its XP is not read yet: 8.2 has to find it",
+    "no warning or error in the server's log but the two refused sites; the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[[confirms]]
+entry = "cube::World::regionAreaLevelSite"
+observed = "ran 284 times when the server built its regions (63.0 s, as the client joined)"
+
+[[confirms]]
+entry = "creature_level_range"
+observed = "called 100 times while the world was built, from 64.9 s"
+
+[[confirms]]
+entry = "creature_update_level_site"
+observed = "passed 7362 times in 140 s, once for every update packet the joined client sent"
+
+[[confirms]]
+entry = "Net::acceptVersionSite"
+observed = "ran once, at the join (the client sent 3); a mod can hook it"
+
+[[confirms]]
+entry = "Net::acceptWrongVersionReplySite"
+observed = "not reached: a vanilla client is never refused. The refusal itself was seen from the client side in probe protocol-version"
+
+[[confirms]]
+entry = "cube::Creature::maxHpLevelSite"
+observed = "reached 115979 times from the start (max hp is read every tick)"
+
+[[confirms]]
+entry = "cube::World::hitAttackerLevelSite"
+observed = "27 passes in the 8 s of the creature's cyclone, once per hitCreature"
+
+[[confirms]]
+entry = "cube::World::hitTargetLevelSite"
+observed = "27 passes, as the attacker site"
+
+[[confirms]]
+entry = "creature_damage_level_site"
+observed = "27 passes, once per hit of the creature on the player (the base term)"
+
+[[confirms]]
+entry = "creature_crit_level_site"
+observed = "27 passes, once per hit"
+
+[[confirms]]
+entry = "cube::Creature::armorLevelSite"
+observed = "27 passes: the target's armour is read for each hit"
+
+[[confirms]]
+entry = "creature_tempo_level_site"
+observed = "reached every tick (20609 passes in the 8 s)"
+
+[[confirms]]
+entry = "ability_power_rank_site"
+observed = "two passes (0.3 s and 2.3 s), for the creature's cyclone: the monster rule runs on the server"
+
+[[confirms]]
+entry = "ability_power_rank_join"
+observed = "the same two passes"
+
+[[confirms]]
+entry = "cube::World::hitCreature"
+observed = "27 calls: the creature's cyclone, forwarded to the client"
+
+[[confirms]]
+entry = "cube::World::killXpSite"
+observed = "once, at the kill of T (EBX = T)"
+
+[[confirms]]
+entry = "cube::World::killRecordXpSite"
+observed = "once, at the same kill: the kill record of the joined player is made here"
+
+[[confirms]]
+entry = "kill_record_apply"
+observed = "once, from 0x4CF87D (the call at 0x4CF878 in applyHit); the first argument is the record"
+
+[[confirms]]
+entry = "level_curve"
+observed = "once during the kill, with the float 14.0 (level 10 + power_base 4) from 0x4CF295: the kill XP is f(level + power_base), as on Cube.exe"
+
+[[confirms]]
+entry = "creature_level_up"
+observed = "not called by the kill: the joined player is not levelled on the server"
+
+[[confirms]]
+entry = "kill_drop_typed_item_site"
+observed = "once in replay 3 and three times in replay 4, at the kill (ESI = 1): the typed drops of a kill"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+seconds = 420
+input = [
+    "shot 01-joined",
+    "until 8.1: kill 1", "wait 1", "hold mouse1 2",
+    "until 8.1: kill 2", "wait 1", "hold mouse1 2",
+    "until 8.1: kill 3", "wait 1", "hold mouse1 2",
+    "until 8.1: kill 4", "wait 1", "hold mouse1 2", "shot 02-attacked",
+]
+script = """
+log server sites of the level rework (task 8.1 of add-level-rework): S1 to S8
+trace args 3
+trace add @0x427FF0
+trace add @0x50E841
+trace add @0x40EA30
+trace add @0x50D3BF
+trace add @0x50D41B
+trace add @0x52C2B0
+trace add @0x5289C0
+trace add @0x52A530
+trace add @0x4D2D35
+trace add @0x415B47
+trace add @0x42554E
+trace add @0x42555F
+trace add @0x40F74F
+trace start
+wait 140
+trace stop
+trace report
+expect cube::World::regionAreaLevelSite calls @0x50E841 >= 1
+expect creature_level_range calls @0x40EA30 >= 1
+expect creature_update_level_site calls @0x415B47 >= 1
+expect Net::acceptVersionSite calls @0x42554E == 1
+expect Net::acceptWrongVersionReplySite calls @0x42555F == 0
+expect cube::Creature::maxHpLevelSite calls @0x40F74F >= 1
+log 8.1: phase 1
+trace add @0x4D143E
+trace add @0x4D1458
+trace add @0x408B9D
+trace add @0x408C59
+trace add @0x408D04
+trace add @0x4090AF
+trace add @0x4096CF
+trace add @0x41149D
+trace add @0x411CAF
+trace add @0x407F0F
+trace add @0x410EEF
+trace add @0x409A13
+trace add @0x409A1B
+trace add @0x4CFCC0
+trace add @0x4CE9F0
+inspect creatures [ecx(@0x427FF0) + 4]
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 20
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 1000
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+trace start
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 2
+inspect set data.current_mode 86
+inspect set data.mode_start_time 0
+wait 6
+trace stop
+trace report
+expect cube::World::hitAttackerLevelSite calls @0x4D143E >= 1
+expect cube::World::hitTargetLevelSite calls @0x4D1458 >= 1
+expect creature_damage_level_site calls @0x408B9D >= 1
+expect creature_crit_level_site calls @0x4096CF >= 1
+expect cube::Creature::armorLevelSite calls @0x407F0F >= 1
+expect creature_tempo_level_site calls @0x411CAF >= 1
+expect ability_power_rank_site calls @0x409A13 >= 1
+expect ability_power_rank_join calls @0x409A1B >= 1
+expect cube::World::hitCreature calls @0x4CFCC0 >= 1
+log 8.1: phase 2
+trace add @0x4CF31D
+trace add @0x4CF824
+trace add @0x4D5E80
+trace add @0x411EE0
+trace add @0x407960
+trace add @0x4D2D35
+trace add @0x4D3000
+trace add @0x4CF9EB
+trace add @0x4CE9F0
+trace add @0x4CEF7E
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+inspect set data.hostile_type 1
+inspect set data.level 10
+inspect set data.power_base 4
+inspect set data.appearance.flags 0
+inspect set data.max_hp_multiplier 100
+inspect set data.armor_multiplier 0
+inspect set data.stun_time 120000
+inspect set data.hp 1
+trace start
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: kill 1
+wait 12
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18 plus 0x8000
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: kill 2
+wait 12
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10 plus 0x8000
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: kill 3
+wait 12
+inspect set data.pos.x from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x10
+inspect set data.pos.y from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x18 plus 0x8000
+inspect set data.pos.z from [[[[ecx(@0x427FF0) + 4] + 4]] + 0x18] + 0x20
+inspect set data.hp 1
+log 8.1: kill 4
+wait 12
+trace stop
+trace report
+expect cube::World::killXpSite calls @0x4CF31D >= 1
+expect cube::World::killRecordXpSite calls @0x4CF824 >= 1
+expect kill_record_apply calls @0x4D5E80 >= 1
+expect kill_record_apply caller @0x4D5E80 0x4CF87D
+expect level_curve calls @0x407960 >= 1
+expect level_curve arg @0x407960 1 == 1096810496
+expect creature_level_up calls @0x411EE0 == 0
+expect kill_drop_typed_item_site calls @0x4D3000 >= 1
+inspect cube::Creature [[[[ecx(@0x427FF0) + 4] + 4] + 8] + 0x18]
+wait 5
+expect - hooks == 0
+"""

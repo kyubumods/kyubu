@@ -1,0 +1,26 @@
+duration = 800
+end = "hold"
+blend_in = 40
+blend_out = 100
+
+# The body dips when the spring is let go at 25 % of the clip, overshoots a little and settles.
+[[track]]
+part = "body"
+channel = "pos"
+spring = { to = [0, 0, -2], at = 0.25, freq = 3, damping = 0.35 }
+
+# The head shakes and dies down.
+[[track]]
+part = "head"
+channel = "rot"
+osc = { amp = [4, 0, 6], freq = 6, decay = 5 }
+
+# The weapon hand lifts with the charge the creature holds, and rolls once over the clip.
+[[track]]
+part = "weapon_r"
+channel = "rot"
+expr = ["charge * 60", "0", "sin(u * 360) * 8"]
+
+[[marker]]
+t = 0.25
+name = "hit"

@@ -1,0 +1,9 @@
+id = "anim_catalogue_proto"
+name = "Animation catalogue prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probe anim-catalogue): forces the local player into each vanilla mode id in turn (the ability-force technique) with the mode time pinned at three values, and a mid hook at the join site of draw_creature (0x41F135) logs the pose id, the record time and the smoothed hand vectors the draw reads. A screenshot line per mode lets gamepilot take one picture."
+[scripts]
+client = "scripts/client.lua"

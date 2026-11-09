@@ -1,0 +1,51 @@
+# Task 5.2 of add-ability-animation (a part the creature lacks): mods-dev/anim_tracks_proto defines a seventh mod ability (118) whose clip moves
+# hand B and the tail. The human warrior has no tail (its model slot at the record's +0xD4 is 0), so the tail track is skipped and logged once per
+# mode; the hand track still applies. The mod runs the clip four times, once per class (the class byte at Creature + 0x140 written each phase:
+# 1 warrior, 2 mage, 3 ranger, 4 rogue), with a screenshot and a line per phase. The mod numbers and the eight phases of probe anim-tracks run first.
+id = "anim-lacking"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-07"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 80 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; twelve phases of 6 s (idle, mod 112 to 117, idle again, then t1 to t4 for mod 118 with classes 1 to 4), a screenshot 3 s into each",
+]
+observations = [
+    "Wine replay 2 passed (evidence/ability-animation-2026-10-07/anim-lacking-run2/: twelve screenshots, latest.log, report.md; script finished, the expect held). Replay 1 used a 420 s budget: all twelve phases ran, but the budget ended before the script's last wait, so the probe runs 700 s",
+    "the log has one WARN, 'animation: mode 118 animates tail, which this creature does not draw: the track is skipped', at the first draw of mode 118 (t1_warrior); no line for classes 2 to 4 (the key is the mode, so it is logged once), and no ERROR",
+    "at the join site of every t phase the tail's model slot (record +0xD4) reads 0x0 for the player, for classes 1 (warrior), 2 (mage), 3 (ranger) and 4 (rogue); the outfit is the same, so the four phases test one slot, not four looks",
+    "the hand track is written at the join (hand_r rot 60 on x in each t phase) and the game's values are back after the draw (rot 0 at frame.end): the rest of the clip applies",
+    "the screenshots show the warrior with the arms forward and no club in view in the t phases; the club is not a result of this probe (5.1 showed it in hand B)",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "at the join site 0x41F135 a clip's tracks are written into the draw record only for the parts the record has a model for: the tail's track is skipped for a creature whose tail model slot is 0, and the hand's track is drawn in the same frame"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 700
+mods = ["mods-dev/anim_tracks_proto"]
+input = [
+    "until animtracks: first draw", "wheel down 3",
+    "until animtracks: shot01 idle", "shot 01-idle",
+    "until animtracks: shot02 a_plain", "shot 02-a_plain",
+    "until animtracks: shot03 b_rot30", "shot 03-b_rot30",
+    "until animtracks: shot04 c_arm", "shot 04-c_arm",
+    "until animtracks: shot05 d_head", "shot 05-d_head",
+    "until animtracks: shot06 e_borrow", "shot 06-e_borrow",
+    "until animtracks: shot07 f_both", "shot 07-f_both",
+    "until animtracks: shot08 idle_after", "shot 08-idle_after",
+    "until animtracks: shot09 t1_warrior", "shot 09-t1_warrior",
+    "until animtracks: shot10 t2_mage", "shot 10-t2_mage",
+    "until animtracks: shot11 t3_ranger", "shot 11-t3_ranger",
+    "until animtracks: shot12 t4_rogue", "shot 12-t4_rogue"
+]
+script = """
+log anim-lacking: task 5.2 of add-ability-animation, a part the creature lacks
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

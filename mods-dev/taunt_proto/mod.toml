@@ -1,0 +1,10 @@
+id = "taunt_proto"
+name = "Taunt prototype"
+version = "0.1.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probes taunt-target, hit-damage-scale, creature-tint and overhead-indicator): the console command taunt_proto:taunt makes the hostile creatures near the player target the player from any distance, cut their hits on it, tint them and draw a mark over their heads. Replaced by the Guardian ability."
+
+[scripts]
+client = "scripts/client.lua"

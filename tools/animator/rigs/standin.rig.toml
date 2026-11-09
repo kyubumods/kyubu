@@ -1,0 +1,67 @@
+# The stand-in rig of the Animator (openspec add-ability-animation, design D12, task 6.2).
+# A box figure with the parts of a clip: root, body, head, two hands (the weapon follows hand B), tail.
+# EVERY NUMBER HERE IS MADE UP. They are not the game's sizes or offsets. The frame and the order of angles are the ones that
+# docs/animations.md states ("Frame and order"); the numbers only block out timing and direction. The game's own rig is private.
+#
+# A node's steps run outermost first: rest offset, then the three angles, then the pose's position (so a `pos` is turned by the
+# part's `rot`, as the game's code reads for the head). A hand's `pos` goes before its angles: the game does not turn it (measured,
+# docs/animations.md "Frame and order"). The game draws no tail position and no z of the root's position, so no step reads them.
+# Angle order, from the docs: root, body and the hands z, y, x; head and tail x, y, z.
+
+name = "stand-in rig"
+
+[[node]]
+name  = "root"
+part  = "root"
+steps = [["rot_z", "root.rot.z"], ["rot_y", "root.rot.y"], ["rot_x", "root.rot.x"],
+         ["translate", "root.pos.x", "root.pos.y", 0]]
+
+[[node]]
+name   = "body"
+parent = "root"
+part   = "body"
+model  = "box 10 6 14"
+steps  = [["translate", 0, 0, 18],
+          ["rot_z", "body.rot.z"], ["rot_y", "body.rot.y"], ["rot_x", "body.rot.x"],
+          ["translate", "body.pos"]]
+
+[[node]]
+name   = "head"
+parent = "body"
+part   = "head"
+model  = "box 8 8 8"
+steps  = [["translate", 0, 0, 11],
+          ["rot_x", "head.rot.x"], ["rot_y", "head.rot.y"], ["rot_z", "head.rot.z"],
+          ["translate", "head.pos"]]
+
+[[node]]
+name   = "hand_r"
+parent = "body"
+part   = "hand_r"
+model  = "box 4 4 4"
+steps  = [["translate", 8, 1, -2], ["translate", "hand_r.pos"],
+          ["rot_z", "hand_r.rot.z"], ["rot_y", "hand_r.rot.y"], ["rot_x", "hand_r.rot.x"]]
+
+[[node]]
+name   = "hand_l"
+parent = "body"
+part   = "hand_l"
+model  = "box 4 4 4"
+steps  = [["translate", -8, 1, -2], ["translate", "hand_l.pos"],
+          ["rot_z", "hand_l.rot.z"], ["rot_y", "hand_l.rot.y"], ["rot_x", "hand_l.rot.x"]]
+
+# The weapon has no vector of its own: it hangs from its hand and answers to the same clip part.
+[[node]]
+name   = "weapon_r"
+parent = "hand_r"
+part   = "weapon_r"
+model  = "box 2 2 14"
+steps  = [["translate", 0, 0, 7]]
+
+[[node]]
+name   = "tail"
+parent = "body"
+part   = "tail"
+model  = "box 2 2 10"
+steps  = [["translate", 0, -4, -6],
+          ["rot_x", "tail.rot.x"], ["rot_y", "tail.rot.y"], ["rot_z", "tail.rot.z"]]

@@ -1,0 +1,1 @@
+anim capture anim_preview_proto:arm 0,500 front

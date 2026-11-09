@@ -1,0 +1,486 @@
+# Server.exe: abilities and their stats.
+
+[[function]]
+name = "ability_cooldown"
+address = 0x409370
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:ability_cooldown", "manual:returns the cooldown in ms of ability id N, per the skill tooltips"]
+source = "kyubu"
+
+[[function]]
+name = "ability_power"
+address = 0x4099D0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:ability_power", "manual:returns the strength of ability id N (bulwark, war frenzy, mana shield)"]
+source = "kyubu"
+
+[[function]]
+name = "ability_duration"
+address = 0x4116F0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:ability_duration", "manual:returns the duration in ms of ability id N (cyclone, 86)"]
+source = "kyubu"
+
+[[function]]
+name = "ability_cost"
+address = 0x40F4B0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:ability_cost", "manual:returns the cost of ability id N (healing stream, 34)"]
+source = "kyubu"
+
+# The per-frame ability dispatch (task 9.3): the same switch as Cube.exe's in cube::World::update, with the same 18
+# case groups (index table 0x5488D8, targets 0x548890).
+
+[[function]]
+name = "cube::World::abilityDispatchSite"
+address = 0x537B05
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::World::abilityDispatchSite", "xref:cube::World::update", "manual:the same switch on current_mode - 1 and case groups as Cube.exe"]
+source = "kyubu"
+notes = "EAX is the creature, EDI the World. The case for 59 is 0x53B87C, the melee case 0x538063, the default 0x53BB89"
+
+# Hits and damage (task 9.5): the twins of Cube.exe's functions, by the same code (not in the survey's correlation).
+# The server's World has no local player (World+0xB8 = 0): it applies the hits on monsters and forwards the hits on
+# players to their clients.
+
+[[function]]
+name = "cube::World::applyHit"
+address = 0x4CE9F0
+convention = "thiscall"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the same code as Cube.exe's cube::World::applyHit (0x5942B0)", "probe:hit-authority"]
+source = "kyubu"
+notes = "called per hit received from the clients at 0x532AEB (returns to 0x532AF0) and by cube::World::hitCreature"
+
+[[function]]
+name = "cube::World::hitCreature"
+address = 0x4CFCC0
+convention = "thiscall"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the same code as Cube.exe's cube::World::hitCreature (0x595580)", "probe:hit-authority", "probe:server-level-sites"]
+source = "kyubu"
+notes = "the hits of the modes the server runs: the monsters' and NPCs' (the dispatch guard skips the players)"
+
+[[function]]
+name = "cube::World::canHit"
+address = 0x4D1830
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:the same 143 bytes of code as Cube.exe's cube::World::canHit"]
+source = "kyubu"
+
+[[function]]
+name = "cube::World::hitDamageSite"
+address = 0x4CEF7E
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "manual:target hp -= hit.damage"]
+source = "kyubu"
+notes = "ESI is the target, EBX the cube::Hit"
+
+[[function]]
+name = "cube::World::hitForwardSite"
+address = 0x4CEA9C
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::applyHit", "manual:a player target: the hit is queued for the player's client", "probe:hit-authority"]
+source = "kyubu"
+notes = "EBX is the cube::Hit; the server never changes a player's hp itself"
+
+[[function]]
+name = "cube::World::receivedHitSite"
+address = 0x532AD0
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "verified"
+evidence = ["xref:cube::World::update", "manual:the loop over the step's received hits (third argument), each to applyHit", "probe:hit-authority"]
+source = "kyubu"
+notes = "EDI is the World; one pass per hit a client sent, applied by cube::World::applyHit (returns to 0x532AF0). Cube.exe has the same loop at 0x60B710, but the game controller passes no received hits, so it never runs there"
+
+# Projectiles (task 9.6): the same code as Cube.exe's, at Cube.exe - 0xD8C40 (as cube::World::update itself).
+
+[[function]]
+name = "cube::World::projectileSpawnSite"
+address = 0x53DDE6
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::abilityDispatchSite", "manual:the same code as Cube.exe's projectileSpawnSite (0x616A26)"]
+source = "kyubu"
+notes = "the monsters' and NPCs' shots (the dispatch guard skips the players, whose clients send theirs)"
+
+[[function]]
+name = "cube::World::projectileUpdateSite"
+address = 0x5466DD
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:the same code as Cube.exe's projectileUpdateSite (0x61F31D)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::World::projectileRemoveSite"
+address = 0x546978
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::update", "manual:the same code as Cube.exe's projectileRemoveSite (0x61F5B8)"]
+source = "kyubu"
+
+# Creature stats (read statically on 2026-09-30). Each is Cube.exe's function with the same length and the same
+# callees (Server.exe's item getters and pow); see kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+
+[[function]]
+name = "cube::Creature::armor"
+address = 0x407EF0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Creature::armor", "xref:cube::World::hitCreature"]
+source = "kyubu"
+notes = "the same length (0x1B0) and callees as Cube.exe's, 90% of the bytes equal; calls item_armor four times. Its only caller is cube::World::hitCreature"
+
+[[function]]
+name = "cube::Creature::resistance"
+address = 0x410ED0
+convention = "thiscall"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:cube::Creature::resistance", "xref:cube::World::hitCreature"]
+source = "kyubu"
+notes = "the same length (0x1B0) and callees as Cube.exe's, 90% of the bytes equal; calls item_resistance four times. Its only caller is cube::World::hitCreature"
+
+[[function]]
+name = "creature_damage"
+address = 0x408B60
+convention = "fastcall"
+prototype = "float __fastcall creature_damage(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_damage", "xref:cube::World::update"]
+source = "kyubu"
+notes = "the same length (0x300) and callees as Cube.exe's, 83% of the bytes equal; calls item_damage. Six call sites, all in cube::World::update"
+
+# Added 2026-10-01 (kyubu-mapping/evidence/item-formulas-2026-10-01/): the Server.exe twins of five creature functions that
+# the 2026-09-30 match did not reach, found by byte shape (prologue, epilogue offset, level load), and their level terms.
+
+[[function]]
+name = "creature_damage_alt"
+address = 0x409090
+convention = "fastcall"
+prototype = "float __fastcall creature_damage_alt(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_damage_alt", "xref:item_damage"]
+source = "kyubu"
+notes = "the twin of Cube.exe's: the same prologue, the level load at +0x14 and the epilogue at +0x124; calls item_damage. CubicExpansion's Server.exe \"projectile damage\" hook (07-20: 0x4094A6) is on this function, not on the projectile one"
+
+[[function]]
+name = "creature_projectile_damage"
+address = 0x411460
+convention = "fastcall"
+prototype = "float __fastcall creature_projectile_damage(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_projectile_damage", "xref:item_damage"]
+source = "kyubu"
+notes = "the twin of Cube.exe's: the same SEH prologue, epilogue at +0x28B, level sites at +0x2A, +0xE7 and +0x18F; calls item_damage. CubicExpansion never hooks it on the server"
+
+[[function]]
+name = "creature_crit"
+address = 0x4096B0
+convention = "fastcall"
+prototype = "float __fastcall creature_crit(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_crit", "xref:item_crit"]
+source = "kyubu"
+notes = "the twin of Cube.exe's: the same shape (level load at +0x14, epilogue at +0x246); calls item_crit (0x413460)"
+
+[[function]]
+name = "creature_tempo"
+address = 0x411C90
+convention = "fastcall"
+prototype = "float __fastcall creature_tempo(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_tempo", "xref:item_tempo"]
+source = "kyubu"
+notes = "the twin of Cube.exe's: the same shape (level load at +0x14, epilogue at +0x246); calls item_tempo (0x413CF0)"
+
+[[function]]
+name = "cube::Creature::armorLevelSite"
+address = 0x407F0F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::armor", "correlated:cube-0x51D2CE9C:cube::Creature::armorLevelSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In cube::Creature::armor: movd xmm2,[esi+0x190] (0x407F04) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Term 2^(3f). Twin of Cube.exe's cube::Creature::armorLevelSite"
+
+[[function]]
+name = "cube::Creature::maxHpLevelSite"
+address = 0x40F74F
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::maxHp", "correlated:cube-0x51D2CE9C:cube::Creature::maxHpLevelSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In cube::Creature::maxHp: movd xmm2,[esi+0x190] (0x40F744) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Term 2^(3f). Twin of Cube.exe's cube::Creature::maxHpLevelSite"
+
+[[function]]
+name = "cube::Creature::resistanceLevelSite"
+address = 0x410EEF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::Creature::resistance", "correlated:cube-0x51D2CE9C:cube::Creature::resistanceLevelSite"]
+source = "kyubu"
+notes = "In cube::Creature::resistance: movd xmm2,[esi+0x190] (0x410EE4) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Term 2^(3f). Twin of Cube.exe's cube::Creature::resistanceLevelSite"
+
+[[function]]
+name = "creature_damage_level_site"
+address = 0x408B9D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "correlated:cube-0x51D2CE9C:creature_damage_level_site", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x408B8A) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Base term. Twin of Cube.exe's creature_damage_level_site"
+
+[[function]]
+name = "creature_damage_level_site_flag8"
+address = 0x408C59
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "correlated:cube-0x51D2CE9C:creature_damage_level_site_flag8", "probe:server-level-sites-items"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x408C46) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Taken with +0x7E bit 0x08. Twin of Cube.exe's creature_damage_level_site_flag8"
+
+[[function]]
+name = "creature_damage_level_site_flag10"
+address = 0x408D04
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage", "correlated:cube-0x51D2CE9C:creature_damage_level_site_flag10", "probe:server-level-sites-items"]
+source = "kyubu"
+notes = "In creature_damage: movd xmm2,[ebx+0x190] (0x408CF1) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Taken with +0x7E bit 0x10. Twin of Cube.exe's creature_damage_level_site_flag10"
+
+[[function]]
+name = "creature_damage_alt_level_site"
+address = 0x4090AF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_damage_alt", "correlated:cube-0x51D2CE9C:creature_damage_alt_level_site"]
+source = "kyubu"
+notes = "In creature_damage_alt: movd xmm2,[esi+0x190] (0x4090A4) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Twin of Cube.exe's creature_damage_alt_level_site"
+
+[[function]]
+name = "creature_crit_level_site"
+address = 0x4096CF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_crit", "correlated:cube-0x51D2CE9C:creature_crit_level_site", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In creature_crit: movd xmm2,[esi+0x190] (0x4096C4) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Twin of Cube.exe's creature_crit_level_site"
+
+[[function]]
+name = "creature_projectile_damage_level_site"
+address = 0x41149D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "correlated:cube-0x51D2CE9C:creature_projectile_damage_level_site"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x41148A) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Base term. Twin of Cube.exe's creature_projectile_damage_level_site"
+
+[[function]]
+name = "creature_projectile_damage_level_site_flag8"
+address = 0x41155A
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "correlated:cube-0x51D2CE9C:creature_projectile_damage_level_site_flag8"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x411547) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Flag branch 0x08. Twin of Cube.exe's creature_projectile_damage_level_site_flag8"
+
+[[function]]
+name = "creature_projectile_damage_level_site_flag10"
+address = 0x411602
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_projectile_damage", "correlated:cube-0x51D2CE9C:creature_projectile_damage_level_site_flag10"]
+source = "kyubu"
+notes = "In creature_projectile_damage: movd xmm2,[esi+0x190] (0x4115EF) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Flag branch 0x10. Twin of Cube.exe's creature_projectile_damage_level_site_flag10"
+
+[[function]]
+name = "creature_tempo_level_site"
+address = 0x411CAF
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:creature_tempo", "correlated:cube-0x51D2CE9C:creature_tempo_level_site", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In creature_tempo: movd xmm2,[esi+0x190] (0x411CA4) loads the level, cvtdq2ps converts it. This site is the next instruction: XMM2 = the level as a float. A mid hook writes old_float(N) there. Twin of Cube.exe's creature_tempo_level_site"
+
+[[function]]
+name = "cube::World::hitAttackerLevelSite"
+address = 0x4D143E
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "correlated:cube-0x51D2CE9C:cube::World::hitAttackerLevelSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In hitCreature: movd xmm0,[eax+0x190] (0x4D1433) loads the attacker's level, cvtdq2ps converts it, and the next instruction stores XMM0 as the argument of a level_curve call. A mid hook at this site writes old_float(N) there, with no call to hook. Twin of Cube.exe's"
+
+[[function]]
+name = "cube::World::hitTargetLevelSite"
+address = 0x4D1458
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::hitCreature", "correlated:cube-0x51D2CE9C:cube::World::hitTargetLevelSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "In hitCreature: movd xmm0,[edi+0x190] (0x4D144D) loads the target's level, cvtdq2ps converts it, and the next instruction stores XMM0 as the argument of a level_curve call. A mid hook at this site writes old_float(N) there, with no call to hook. Twin of Cube.exe's"
+
+# Server twins of the progression sites of add-level-rework (task 8.1), found by shifting inside one block of code and checked instruction by instruction.
+
+[[function]]
+name = "level_curve"
+address = 0x407960
+convention = "cdecl"
+prototype = "float __cdecl level_curve(float level)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:level_curve", "manual:the same 0x34 bytes as Cube.exe's", "probe:server-level-sites"]
+source = "kyubu"
+notes = "the saturating level curve f, the twin of Cube.exe's level_curve (0x43D2F0): 1 - 1/(0.05*(level-1) + 1). applyHit calls it for the kill XP (0x4CF290)."
+
+[[function]]
+name = "creature_level_up"
+address = 0x411EE0
+convention = "thiscall"
+prototype = "void __thiscall creature_level_up(cube::Creature* this, cube::World* world)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_level_up", "manual:the same loop as Cube.exe's", "probe:server-level-sites"]
+source = "kyubu"
+notes = "level-up loop, twin of Cube.exe's (0x448150): while xp >= int(1000 f + 50), level += 1, hp = max hp. ECX = creature, one stack argument (the World), `ret 4` at 0x411FFD. Called only for the killer's pet (kill_record_apply 0x4D5FD1)."
+
+[[function]]
+name = "kill_record_apply"
+address = 0x4D5E80
+convention = "thiscall"
+prototype = "void __thiscall kill_record_apply(cube::World* this, void* record)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:kill_record_apply", "manual:the same code as Cube.exe's 0x59F4E0", "probe:server-level-sites"]
+source = "kyubu"
+notes = "twin of Cube.exe's. On the server local_player and joined are both 0: the local player's XP add (0x4D5F6F) is skipped, the killer's pet gains the XP (0x4D5FC9) and levels up (0x4D5FD1). A joined player's XP is not added here (unconfirmed)."
+
+[[function]]
+name = "cube::World::killXpSite"
+address = 0x4CF31D
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "correlated:cube-0x51D2CE9C:cube::World::killXpSite", "probe:server-level-sites", "probe:server-kill-drop-sites"]
+source = "kyubu"
+notes = "in applyHit's death branch, after the kill XP is computed: EBX is the victim, the XP is the float at [EBP-0x2F8]. A mod writes its own value there. Twin of Cube.exe's killXpSite (0x594BDD); nothing jumps into it."
+
+[[function]]
+name = "cube::World::killRecordXpSite"
+address = 0x4CF824
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:cube::World::applyHit", "correlated:cube-0x51D2CE9C:cube::World::killRecordXpSite", "probe:server-level-sites"]
+source = "kyubu"
+notes = "in applyHit's threat-map loop: cvttss2si truncates the XP into the kill record (+0x14), which goes to the list at World+0x48 and to kill_record_apply (call 0x4CF878). Twin of Cube.exe's (0x5950E4). 8 bytes."
+
+[[function]]
+name = "ability_power_rank_site"
+address = 0x409A13
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:ability_power", "correlated:cube-0x51D2CE9C:ability_power_rank_site", "probe:server-level-sites"]
+source = "kyubu"
+notes = "the monster rule of ability_power (0x4099D0, ret 8): EAX = level, ECX = power_base; the 8 bytes after it halve it and add power_base + 1 (to 0x409A1B). Twin of Cube.exe's ability_power_rank_site (0x43F643)."
+
+[[function]]
+name = "ability_power_rank_join"
+address = 0x409A1B
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["xref:ability_power", "correlated:cube-0x51D2CE9C:ability_power_rank_join", "probe:server-level-sites"]
+source = "kyubu"
+notes = "where the player's rank and the monster's rank meet: EAX is the rank on every path. An observation point. Twin of Cube.exe's ability_power_rank_join (0x43F64B)."
+
+[[function]]
+name = "is_giant_creature"
+address = 0x40EFE0
+convention = "fastcall"
+prototype = "bool __fastcall is_giant_creature(cube::Creature* creature)"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:is_giant_creature", "xref:cube::World::applyHit", "manual:same ten type compares as the Cube.exe twin; called at 0x4CF2CD"]
+source = "kyubu"
+notes = "twin of Cube.exe's is_giant_creature (0x444BC0), found by instruction match on 2026-10-04 (task 8.2 of add-level-rework). The kill XP block of applyHit calls it at 0x4CF2CD, the twin of 0x594B8D. Not traced in a replay"
+
+[[function]]
+name = "creature_attack_speed_rank_site"
+address = 0x411C45
+convention = "cdecl"
+kind = "site"
+subsystem = "combat"
+status = "candidate"
+evidence = ["correlated:cube-0x51D2CE9C:creature_attack_speed_rank_site", "manual:14 instructions from here match Cube.exe 0x447EB5 one for one"]
+source = "kyubu"
+notes = "the monster rule of the attack-speed function, twin of Cube.exe's (0x447EB5): EAX = level, ECX = power_base; the 8 bytes halve the level and add power_base + 1. Found by instruction match, task 8.2 of add-level-rework. Static only: no replay reached it, nor Cube.exe's"

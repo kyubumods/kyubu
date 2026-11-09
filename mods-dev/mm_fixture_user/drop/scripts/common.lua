@@ -1,0 +1,1 @@
+-- Fixture for the rescan (add-mod-manager 6.5): does nothing.

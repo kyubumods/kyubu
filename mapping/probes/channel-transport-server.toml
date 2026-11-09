@@ -1,0 +1,68 @@
+# Task 10.4 of add-skills-unleashed-multiplayer (design D10): kyubu.channel between Server.exe and a joined Cube.exe, as one Kyubu
+# packet on the game's connection (kmap probe replay, client = "join"). The dev mod mods-dev/channel_proto is a gate mod on both
+# games (same id and version, so the join passes). The joined client sends pings 1, 2, 3 and a 60,000-byte message; the server
+# answers each ping to that connection, echoes the large one and sends one message to every client; the client acknowledges.
+id = "channel-transport-server"
+build = "server-0x51EA94D5"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "native replay: Server.exe and a joined client, both with channel_proto (gate = true)",
+    "the client sends pings 1 2 3 and 60,000 bytes on channel_proto:echo once it is joined",
+    "the server answers each to the connection it came from, echoes the large one, and sends hello to all clients",
+    "the client checks the order and the bytes and acknowledges; the server logs done",
+]
+observations = [
+    "fast_join run, 2026-11-08 (evidence/fast-join-2026-11-08/all-run1/channel-transport-server), passed in 15 s: the clients joined by auto_enter with the seed save's character, no menu clicks",
+    "native run 1, 2026-11-08 (evidence/channel-transport-2026-11-08/channel-transport-server-run1), passed: 'channel transport: installed' at both sites on both games; join gate 0xDE2F4D0F on both",
+    "the joined client's first send after the join went through; the server got pings 1, 2, 3 and the 60,000 bytes from connection 2 (the player's creature id 1 + 1), in order, in one tick",
+    "the client got pong 1, the hello to all clients, pongs 2 and 3, and the large echo equal byte for byte, 26 ms after its send; the client acknowledged and the server logged done",
+    "the game's own traffic went on: the join, the world and the creature updates, no disconnect",
+    "not covered: two joined clients (KY_CONN_ALL_CLIENTS fan-out to more than one; the user's), a malformed packet, a send with the gate off (unit tests)",
+]
+
+[[confirms]]
+entry = "Net::connectionReceiveNextSite"
+observed = "the server read four Kyubu packets there, whole and in order, and its receive loop went on with the game's packets"
+
+[[confirms]]
+entry = "connection_send_pass_site"
+observed = "the server's replies, queued in a tick, were written there between two game packets and reached the client"
+
+[[confirms]]
+entry = "cube::Connection.socket"
+observed = "the replies written to it at the send pass reached the joined client"
+
+[[confirms]]
+entry = "cube::Connection.creature_id"
+observed = "read 1 for the only joined player: its messages came from connection 2"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+fast_join = true
+seconds = 300
+mods = ["mods-dev/channel_proto"]
+input = [
+    "until channel_proto: server: done",
+    "shot 01-client",
+]
+log_expect = { latest = [
+    "channel transport: installed at Net::connectionReceiveNextSite and connection_send_pass_site",
+    "channel_proto: server: got ping 1 from connection ",
+    "channel_proto: server: got ping 3 from connection ",
+    "channel_proto: server: got 60000 bytes from connection ",
+    "channel_proto: server: done: pings 1 2 3 in order, the client saw pongs 1 2 3",
+], client = [
+    "channel transport: installed at Net::clientReceiveNextSite and Net::clientSendPassSite",
+    "channel_proto: client: sent pings 1 2 3 and 60000 bytes: true",
+    "channel_proto: client: got pong 1 from connection 0",
+    "channel_proto: client: got the large echo: 60000 bytes, equal",
+    "channel_proto: client: got hello to all clients: server",
+    "channel_proto: client: done: pongs 1 2 3, large echo ok, hello ok",
+] }
+script = """
+log channel-transport-server: task 10.4 of add-skills-unleashed-multiplayer
+expect - hooks == 0
+"""

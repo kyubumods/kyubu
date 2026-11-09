@@ -1,0 +1,61 @@
+# cube-0x51EA955E: global variables
+
+[[global]]
+name = "cube::game_controller"
+address = 0x76B1C8
+type = "cube::GameController*"
+subsystem = "core"
+status = "verified"
+evidence = ["xref:WinMain", "correlated:cube-0x51D2CE9C:cube::game_controller"]
+source = "kyubu"
+notes = "WinMain stores the new controller here before the message loop; Game::frame, window_proc and reset_device read it. The World is embedded at +0x2E4 (getBlock's this, probe world-ground-height; an older note said +0x2DC)"
+
+[[global]]
+name = "d3d9"
+address = 0x76B1B8
+type = "void*"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:render_init", "correlated:cube-0x51D2CE9C:d3d9"]
+source = "kyubu"
+notes = "the IDirect3D9* that render_init got from Direct3DCreate9; null when it failed"
+
+[[global]]
+name = "d3d9_device"
+address = 0x76B1B4
+type = "void*"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:render_init", "correlated:cube-0x51D2CE9C:d3d9_device"]
+source = "kyubu"
+notes = "the game's one IDirect3DDevice9*, from CreateDevice: windowed, 4 samples, D24S8, immediate presentation. Also plasma::D3D9Engine.device"
+
+[[global]]
+name = "game_window"
+address = 0x76B1C0
+type = "void*"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:render_init", "correlated:cube-0x51D2CE9C:game_window"]
+source = "kyubu"
+notes = "the game's window, an HWND, that render_init creates the device for"
+
+[[global]]
+name = "cube::cube_shader"
+address = 0x76B1BC
+type = "void*"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:render_init", "correlated:cube-0x51D2CE9C:cube::cube_shader"]
+source = "kyubu"
+notes = "the one cube::CubeShader, the voxel world's shaders; made by render_init after the engine"
+
+[[global]]
+name = "plasma::d3d9_engine"
+address = 0x76B1CC
+type = "plasma::D3D9Engine*"
+subsystem = "rendering"
+status = "verified"
+evidence = ["xref:render_init", "correlated:cube-0x51D2CE9C:plasma::d3d9_engine"]
+source = "kyubu"
+notes = "the one plasma::D3D9Engine, made by render_init and also kept at cube::GameController.engine"

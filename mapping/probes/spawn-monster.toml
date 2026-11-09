@@ -1,0 +1,232 @@
+# Recorded with kyubu_probe, the entity_spawner mod (its `fights` option) and the Kyubu 1.1 loader in development,
+# unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay with gamepilot, which
+# creates the level-1 human warrior "Tester" and a new world (seed 1234). Task 6.2 of add-entity-spawner: creature_spawn
+# with the monster behaviour, from the mod's console command and its `fights` option.
+id = "spawn-monster"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; waited 15 s there",
+    "Phase 1, the control: `console config entity_spawner fights false`, then `console entity_spawner:spawner GREEN_SLIME` (the mod's default: a hostile level-1 green slime four blocks south of the player); 4 samples of the lowest id's low word, hp, x and y and of the player's hp, x and y, 8 s apart; the player's hp watched",
+    "Phase 2, the monster: `console config entity_spawner fights true`, then the same spawn; 14 samples 8 s apart (the console steps land 20 to 60 s late under Wine); the player's hp watched; the lowest id's `behavior` (+0x13E4) read",
+]
+observations = [
+    "the mod logged `spawned Green slime (type 37, hostile 1, level 1, behavior still), id -1` for phase 1 and `... behavior monster), id -2` for phase 2: the spawner sent behavior = \"still\" or \"monster\" from its `fights` option to kyubu.game.creature_spawn on the server side, which built the creature with the loader's recipe",
+    "phase 1, the control: the creature with the lowest id (low word 0xFFFFFFFF, hp 100) had behavior 0 at +0x13E4, stood at the same x and y in all 8 samples over about 100 s (four blocks south of the player: y 544482138 against 544744282, in world units) and the player's hp stayed 265 (the php watch: 10,033 samples, 0 changes)",
+    "phase 2, the monster: the lowest id was now 0xFFFFFFFE (hp 100) with a non-zero behavior pointer (656585232, a cube::SequentialBehavior block from operator_new) and it was next to the player at the first sample after the spawn (2.5 blocks), then 1.7, 1.4, 1.9 and 0.1 blocks in the next four, following the player as the hits pushed it about 16 blocks north in 8 s each time; the player's hp fell 265 to 225.6, 158.7, 106.7, 50.3 and 0 in five samples (the php watch: 118 changes, first 265, last 0). Before the creature landed the four samples of phase 2 showed hp 265 and the control at rest",
+    "the first replay (the monster spawned first, run 1) showed the same: 01-spawned.png (run1-01-spawned.png) has the player at 181/265 with red damage numbers over its head 30 s after the console step, and run1-02-approach.png the player at 0/265 with `[R] REVIVE`. Its slime had hp 100 all along (nothing hurt it), and was gone at the end, as the game removes creatures away from a dead player",
+    "01-control.png (265/265, the console closed) and 02-monster.png and 03-monster-later.png (the console still open: gamepilot types a line in a second or two, so the shots were taken while the console steps ran) do not show the slime; the numbers above are the evidence",
+    "no error or fault in any of the three runs; the probe's hooks were all removed at the end (hooks == 0); run 2 failed only on its own control check (the spawn had not landed when the script read it), so phase 1 was made the control first and the waits longer",
+]
+
+[[confirms]]
+entry = "cube::Creature.behavior"
+observed = "the creature spawned with behavior = \"monster\" held a non-zero sequence pointer at +0x13E4, the one spawned with \"still\" held 0; the World step drove the first (it came to the player and hit it, hp 265 to 0 in about 40 s under Wine) and left the second where it stood"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "the count grew with each spawn (17 to 18, then 19; a zone creature may come in as well)"
+
+[[confirms]]
+entry = "cube::CombatBehavior::CombatBehavior"
+observed = "the loader's recipe called it (through the game's function, with 20.0f) for the monster: the player's hp watch fell from 265 to 0 with the monster next to the player, and stayed at 265 for the control that had no behaviour"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 1200
+mods = ["mods-examples/entity_spawner"]
+input = [
+    "until 6.2: control", "console config entity_spawner fights false", "console entity_spawner:spawner GREEN_SLIME", "wait 45", "shot 01-control",
+    "until 6.2: monster", "console config entity_spawner fights true", "console entity_spawner:spawner GREEN_SLIME", "wait 15", "shot 02-monster", "wait 15", "shot 03-monster-later",
+]
+script = """
+log spawn monster (task 6.2 of add-entity-spawner): a hostile slime spawned with the monster behaviour attacks
+wait world
+wait 15
+inspect creatures [@0x7691C8] + 0x2DC
+watch count u32 [@0x7691C8] + 0x2E4
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+# phase 1, the control: the option fights off (the console step lands 20 to 60 s late under Wine)
+log 6.2: control
+wait 70
+wait 8
+log 6.2: sample 0
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 1
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 2
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 3
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+inspect creatures
+expect cube::Creature.behavior value u32 == 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x13E4
+expect cube::World.creatures watch count increased
+expect cube::CombatBehavior::CombatBehavior watch php unchanged
+watch clear
+# phase 2: the option on; every 8 s: the lowest id (low word), its hp and x, y (low words, world units), then the
+# player's hp and x, y
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log 6.2: monster
+wait 8
+log 6.2: sample 0
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 1
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 2
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 3
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 4
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 5
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 6
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 7
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 8
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 9
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 11
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 12
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+wait 8
+log 6.2: sample 13
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x8
+expect cube::Creature.behavior value f32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x18
+expect cube::Creature.behavior value f32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x16C
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x10
+expect cube::Creature.behavior value u32 >= 0 [[@0x7691C8] + 0x8006C8] + 0x18
+inspect creatures
+inspect cube::Creature [[[[@0x7691C8] + 0x2E0] + 0] + 0x18]
+expect cube::Creature.behavior value u32 != 0 [[[[@0x7691C8] + 0x2E0] + 0] + 0x18] + 0x13E4
+expect cube::CombatBehavior::CombatBehavior watch php decreased
+log 6.2: end
+wait 10
+expect - hooks == 0
+"""

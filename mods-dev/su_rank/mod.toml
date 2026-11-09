@@ -1,0 +1,10 @@
+id = "su_rank"
+name = "SkillsUnleashed rank (dev)"
+version = "0.2.0"
+kyubu = "^1.1"
+sides = ["client"]
+trust = "full"
+description = "Development only (probes server-berserker-0720, server-fire-mage-0720): sets the played character's rank in one skills_unleashed ability to 3 (option ability, default the Berserker's), because the replay cannot type the console command, and can make the character another class and specialization (option specialization). Not on the server, so the join gate is not changed."
+
+[scripts]
+client = "scripts/client.lua"

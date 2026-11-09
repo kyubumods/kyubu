@@ -1,0 +1,10 @@
+id = "spells_lib"
+name = "Spells library"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+trust = "restricted"
+description = "Registry example: owns the spells_lib:spells registry that other mods add spells to."
+
+[scripts]
+common = "scripts/common.lua"

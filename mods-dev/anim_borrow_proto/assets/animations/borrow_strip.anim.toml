@@ -1,0 +1,11 @@
+# Task 4.3: the clip's fraction follows the ability's duration (800 ms here). Pose 2 is worn at the mode's own pace; the hair is hidden from 0.3 to 0.7
+# of the ability, so a strip at 0, 50 and 100 % shows the hair, no hair, the hair.
+duration = "ability"
+
+[borrow]
+mode = 2
+
+[[hide]]
+from = 0.3
+to = 0.7
+parts = ["hair"]

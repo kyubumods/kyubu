@@ -1,0 +1,9 @@
+id = "fx_net"
+name = "Fixture: raw network events"
+version = "1.0.0"
+kyubu = "^1.0"
+sides = ["client", "server"]
+trust = "restricted"
+description = "Counts net.connect / net.recv_raw / net.send_raw and logs a summary every 10 s (game-events/Inspecting packets)."
+[scripts]
+common = "scripts/common.lua"

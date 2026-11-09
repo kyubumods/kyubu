@@ -1,0 +1,86 @@
+# Recorded 2026-10-12 for task 7.2 of add-skills-unleashed (the Guardian's taunt), unattended under Wine (WSL, Xvfb): replay 5 passed.
+# One run covers the proposed probes taunt-target, hit-observe, hit-damage-scale and the counters of creature-tint and overhead-indicator
+# (their shots are the record taunt-visual): the dev mod mods-dev/taunt_proto writes the threat map each World step, scales a taunted
+# creature's damage on its taunter at hitDamageSite, multiplies draw_creature's colour argument and draws a mark over the head. The
+# five slimes (`spawner GREEN_SLIME 5 monster`, ids -1 to -5, the zone's combat behaviour) fight the player, are then put 26 to 42
+# blocks north with their threat maps emptied (a creature that once fought the player keeps chasing it from any distance: the entry
+# stays), left alone for 15 s, and taunted. Runs 1 to 4 failed on script mistakes: a format bug of the mod, the spawner's `hostile`
+# verb makes `still` creatures, console input steps are slow (15 s each, so the timeline runs inside the game), and the control
+# slimes had fought the player. The slimes' damage to the player is small (level 1), which is enough: the site sees it.
+id = "taunt-target"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-12"
+steps = [
+    "Wine replay: gamepilot makes the character Tester (human male warrior) and a new world; waits 15 s there",
+    "the player gets max hp x1000 and hp 2000; `spawner GREEN_SLIME 5 monster` puts five slimes with the zone's combat behaviour in front; `taunt_proto:place 26` lines them up 26 to 42 blocks north",
+    "S (the farthest slime, the lowest id) is made level 50 with max hp x10000 and hp 1000 (it hits through the player's armour)",
+    "`taunt_proto:run` is one console step: it places the slimes, logs a 15 s control (each slime's distance and top threat id every second), taunts them by the player, then turns the damage scale, the tint and the mark off and on in turn (timeline lines in the log)",
+    "shots every 10 s or so while it runs",
+]
+observations = [
+    "replay 5, report passed: 1 expectation held (hitDamageSite: the player's hp fell), the rest read from the mod's log lines (evidence/guardian-taunt-2026-10-12/run5)",
+    "all seven hooks installed (the step hook, hitDamageSite, three draw sites, the mark's gate and model sites): no 'FAILED' line",
+    "control: the five slimes, threat maps emptied and 25 to 42 blocks away, had top threat id 0 (no target) for the 15 s",
+    "taunt (the player's id written with 1e7 every World step): at +0 s the slimes were 27.5 to 49.4 blocks away, 4 s later 2.7 to 18.4, 8 s later 1.9 to 3.3; the top id read 1 and the value 1e7 all the time; after the taunt a slime's threat entry was never lost",
+    "damage scale: hits of a taunted slime on the player: 335 hits, logged damage 788.09, hp fell 512.25 = 0.65 x 788.09; with `scale 0` 64 hits, 196.28 logged, hp fell 196.26; untaunted hits fell exactly as logged",
+    "hit hook: 1292 hits seen in 130 s, attacker id at +0, victim id at +8, damage at +0x10; the same Hit is read by the site afterwards (the write took effect)",
+    "tint hook (draw_a, 0x4B5D8C) applied 949 times and the mark hooks 979 times; draw_b and draw_c (0x4BA8D8, 0x4BA97F) were never reached (no creature had Creature+0x1190 above 0)",
+]
+
+[[confirms]]
+entry = "cube::Creature::topThreat"
+observed = "the mod's Lua copy of the walk read id 1 (value 1e7) on every taunted slime, 0 on the control; the AI went to that id"
+
+[[confirms]]
+entry = "cube::Creature.threat"
+observed = "a value written for the player's id through creature_map_slot (key node+0x10, value node+0x18) takes a slime 27 to 49 blocks away to the player in 4 to 8 s and keeps it there"
+
+[[confirms]]
+entry = "cube::CombatBehavior::update"
+observed = "taunted slimes 27 to 49 blocks away walk to the player and stay; a slime with an entry for the player (even 0.01) chases from 42 blocks with no taunt"
+
+[[confirms]]
+entry = "cube::World::hitDamageSite"
+observed = "EBX is the Hit (attacker +0, victim +8, damage +0x10), ESI the victim; a damage written at EBX+0x10 is the damage subtracted: hp fell by 0.65 of the logged damage"
+
+[[confirms]]
+entry = "creature_draw_site"
+observed = "the hook ran 949 times; the colour change is seen in the shots of taunt-visual"
+
+[[confirms]]
+entry = "stun_mark_gate_site"
+observed = "979 passes; the mark shows on a creature that is not stunned (taunt-visual)"
+
+[[confirms]]
+entry = "stun_mark_model_site"
+observed = "979 passes; the Model* of slot 0x9F8 put in EAX is drawn over the head (taunt-visual)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 420
+mods = ["mods-dev/taunt_proto", "mods-examples/entity_spawner"]
+input = [
+    "until tt: A", "console entity_spawner:spawner GREEN_SLIME 5 monster", "wait 5",
+    "until tt: B", "console taunt_proto:run",
+    "wait 6", "shot 02-placed", "wait 10", "shot 03-control", "wait 12", "shot 04-pulled", "wait 12", "shot 05-near",
+    "wait 12", "shot 06-scale-off", "wait 12", "shot 07-tint-off", "wait 8", "shot 08-mark-off", "wait 8", "shot 09-all",
+]
+script = """
+log taunt-target: taunt_proto, the Guardian's taunt (threat map, damage scale, tint, mark)
+wait world
+wait 15
+inspect player [@0x7691C8]
+inspect set data.max_hp_multiplier 10000
+inspect set data.hp 20000
+inspect set data.body_yaw 0
+log tt: A
+wait 40
+inspect creatures [@0x7691C8] + 0x2DC
+watch php f32 [[@0x7691C8] + 0x8006C8] + 0x16C
+log tt: B
+wait 110
+expect cube::World::hitDamageSite watch php decreased
+log tt: done
+"""

@@ -1,0 +1,1 @@
+{"ok":false,"errors":[{"source":"bad.anim.toml","line":8,"path":"track[0].keys[1].t","code":"out_of_range","message":"`t` is 1.5; it must be from 0 to 1","hint":"Give `t` as a fraction of the clip's duration: 0 is the start, 1 is the end."}]}

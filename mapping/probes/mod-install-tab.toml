@@ -1,0 +1,48 @@
+# Task 7.2 of add-mod-manager. The Install tab lists the signed test catalog (name, author, version, size, GET), the details show the versions,
+# the Actions menu of a catalog mod has its two rows, and a tampered catalog shows "The catalog could not be verified." with no list.
+id = "mod-install-tab"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1 (API 1.2)"
+date = "2026-10-24"
+steps = [
+    "Added src/browse.h (the Install list, the marks, the updates, the details) and drew it from main.cpp beside the My mods tab",
+    "Replayed at the start menu under Wine at 1024 x 768: open the Mods page, fetch the good test catalog, open INSTALL, select a mod, open its Actions menu; then fetch the tampered catalog",
+]
+observations = [
+    "run 6 passed (evidence/mod-install-tab-2026-10-24/run6; runs 2 to 5 were lost to another session sharing the Wine distro): the good test catalog logs catalog online with 3 mods and the Install tab lists cat_alpha, cat_beta and cat_lib as GET with version and size; the header reads CATALOG: ONLINE",
+    "selecting cat_alpha shows its versions (1.1.0 and 1.0.0) with size, date and needs, and the Actions menu has Download 1.1.0 (grey for now, tip Not available yet.) and Show in My mods; the tampered copy logs catalog rejected and the tab shows The catalog could not be verified. with no rows, the header CATALOG: NOT VERIFIED, and menu_rows 2",
+    "the three installed mods read Unverified (Not from the catalog) because none is in the test catalog; Verified and updates are unit-tested only",
+]
+
+[[confirms]]
+entry = "cube::GameController::startMenuShownSite"
+observed = "ModManager's mid hook draws the Install tab from the catalog it fetched"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 700
+mods = ["mods-gameplay/mod_manager", "mods-dev/mm_fixture_catalog"]
+input = [
+    "until modinst open",
+    "move 512 559", "wait 2", "click 512 559", "wait 8",
+    "console mod_manager:catalog mods:mm_fixture_catalog/good", "until catalog online", "wait 4",
+    "console mod_manager:state",
+    "shot 01-my-mods",
+    "click 269 142", "wait 4", "shot 02-install", "console mod_manager:state",
+    "click 300 330", "wait 3", "shot 03-selected",
+    "click 731 228", "wait 3", "shot 04-menu", "move 700 290", "wait 3", "shot 05-menu-hover", "click 731 228", "wait 3",
+    "console mod_manager:catalog mods:mm_fixture_catalog/bad", "until catalog rejected", "wait 4",
+    "click 107 142", "wait 2", "click 269 142", "wait 4", "shot 06-rejected", "console mod_manager:state",
+    "until modinst done",
+]
+script = """
+log modinst: task 7.2 of add-mod-manager
+wait 15
+log modinst open
+wait 150
+log modinst done
+wait 5
+expect - value u8 == 0 [@0x7691C8] + 0x198
+wait 5
+"""

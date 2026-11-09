@@ -1,0 +1,75 @@
+# Recorded with kyubu_probe, the entity_spawner mod (0.2.0) and the Kyubu 1.1 loader in development (MinGW build of
+# task 4.3), unattended under Wine 9.0 (WSL on the Windows laptop, Xvfb, software rendering): kmap probe replay starts
+# the probed Cube.exe, then a plain Kyubu-loaded Server.exe beside it (server = "local"); the Cube.exe joins 127.0.0.1
+# with a new character. Only the Cube.exe has the mod (mods_on). Task 5.2 of add-entity-spawner: the mod on a joined
+# client whose server lacks it. The scenario is the mod's status line (its log and the shots); the probe checks what
+# the mod reads on the client before it sends: the player, and the creature map it would have grown.
+id = "entity-spawner-join"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-30"
+steps = [
+    "Wine replay: Cube.exe with --kyubu-dev and the entity_spawner mod beside a plain Kyubu-loaded Server.exe without it; joined 127.0.0.1 with a new character",
+    "`console entity_spawner:spawner where`, then inspect player and inspect creatures",
+    "`console entity_spawner:spawner GREEN_SLIME`; F7 opens the window; a click in the filter box and the keys s l i m e; a click on the first button (Green slime); F7 closes the window; inspect creatures again",
+]
+observations = [
+    "Wine replay 1 passed, 3 of 3 held. The Server.exe sandbox had no mods (its log: `boot complete: 0 mod(s) active`), the Cube.exe had entity_spawner and kyubu_probe; the Cube.exe joined 127.0.0.1:12345 as the level-1 warrior Tester",
+    "the player: 30 s after the join the pointer at GameController+0x8006C8 was set; the mod's `spawner where` (creature_player on the joined client) logged id 1, type 2, level 1, hp 265 at 550300961716 550301002068 5510390, yaw 122.57, and inspect player 71 s later showed the same x, y and yaw (z 5510476)",
+    "`spawner GREEN_SLIME` from the console: the mod logged `The server does not run the entity spawner: nothing was spawned.` (the channel send failed with \"remote does not support channels\"); 02-console.png shows no slime",
+    "F7 opened the window, which listed 156 of 156 types (spawn is available on Cube.exe; only the send fails); the filter \"slime\" left 4 (04-filter.png); the click on Green slime (37) at (110, 187) set the status line to the same message (05-clicked.png, with the game's CONNECTED. note); F7 closed it",
+    "nothing was spawned: inspect creatures before the console command and after the click listed the same 18 creatures at the same addresses: the player (id 1) and 17 of the server's, whose ids are large and positive (550301081347 to 550317858821); none has a negative id, which the loader's spawns get (the id rule)",
+    "no warning or error in either log; the probe's hooks were all removed at the end (hooks == 0)",
+]
+
+[[confirms]]
+entry = "cube::World.local_player"
+observed = "set on a joined Cube.exe 30 s after the join; creature_player read the player through it (id 1, the same x, y and yaw as inspect player)"
+
+[[confirms]]
+entry = "cube::World.creatures"
+observed = "on a joined Cube.exe the map walked completely (18 creatures: the player, id 1, and the server's, with large positive ids); a click and a console spawn on the client left it unchanged"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+server = "local"
+seconds = 900
+mods = ["mods-examples/entity_spawner"]
+mods_on = ["Cube.exe"]
+# The window opens at ImGui's default place, (60, 60), as in probe entity-spawner: the filter box is its first row,
+# and after the filter "slime" the first button is Green slime.
+input = [
+    "shot 01-joined",
+    "until 5.2: where", "console entity_spawner:spawner where",
+    "until 5.2: console", "console entity_spawner:spawner GREEN_SLIME", "wait 30", "shot 02-console",
+    "until 5.2: open", "key F7", "wait 15", "shot 03-window",
+    "until 5.2: filter", "click 100 96", "key s", "key l", "key i", "key m", "key e", "wait 15", "shot 04-filter",
+    "until 5.2: click", "click 110 187", "wait 20", "shot 05-clicked", "key F7", "wait 10", "shot 06-closed",
+]
+script = """
+log entity spawner on a joined client whose server lacks it (task 5.2 of add-entity-spawner)
+wait world
+wait 30
+# the player the mod's creature_player reads (its `spawner where` logs the same place)
+expect cube::World.local_player value u32 != 0 [@0x7691C8] + 0x8006C8
+log 5.2: where
+wait 90
+inspect player [@0x7691C8]
+inspect creatures [@0x7691C8] + 0x2DC
+# the console command and the window: each send fails on a joined client, and the mod says so
+log 5.2: console
+wait 60
+log 5.2: open
+wait 30
+log 5.2: filter
+wait 40
+log 5.2: click
+wait 50
+# nothing spawned: the loader's spawns have negative ids (the id rule), the server's creatures do not
+inspect creatures [@0x7691C8] + 0x2DC
+expect cube::World.creatures creatures >= 1 [@0x7691C8] + 0x2DC
+log 5.2: end
+wait 5
+expect - hooks == 0
+"""

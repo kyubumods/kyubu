@@ -1,0 +1,472 @@
+# Cube.exe: items (names, materials, the item info box, the item-received message).
+# Server.exe has none of these strings; of its item code, only the stat getters are found (its functions/items.toml).
+
+[[function]]
+name = "item_name"
+address = 0x5972A0
+convention = "thiscall"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"item:shabby\"", "manual:builds an item's display name from its ItemData"]
+source = "kyubu"
+notes = "args (out string, item); reads type +0, sub_type +1, modifier +4, material +0xD and upgrade_count +0x114 (the cuwo ItemData layout); the quality word is an item:<word> key, formulas get Formula: and recurse, pets Pet:"
+
+[[function]]
+name = "material_name"
+address = 0x59E850
+convention = "cdecl"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"MaterialIron\"", "manual:switch on the material id, returns the Material<Name> key"]
+source = "kyubu"
+notes = "args (out string, material id); 1 iron, 2 wood, 5 obsidian, 7 bone, 10 copper, 11 gold, 12 silver ...; unknown ids give Material"
+
+[[function]]
+name = "item_tooltip"
+address = 0x4A2A80
+convention = "thiscall"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\" (adapted)\"", "manual:the item info box: LVL, DMG, ARMOR, RESI, TEMPO, CRIT, REG"]
+source = "kyubu"
+notes = "first arg the item; calls item_name; also Already known, Ridable, the class line. Callers: the draw slots of the adaption and enchant widgets, 0x4D3DF0. +N and Power line: item_power (0x4A2C86, 0x4A304D). 0x4A39B1 is the pet XP line (type 0x13), not a power"
+
+[[function]]
+name = "item_received_message"
+address = 0x481470
+convention = "thiscall"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"You receive \"", "manual:compares its creature arg with GameController+0x8006C8"]
+source = "kyubu"
+notes = "thiscall on the game controller, args (item, creature); You receive for the player, <name> receives otherwise; coins (type 12) name the material; callers 0x470C00, 0x47BB30 and cube::GameController::update"
+
+# Task 8.4: which model an item is drawn with.
+
+[[function]]
+name = "ModelLoader::itemModel"
+address = 0x4EB290
+convention = "thiscall"
+prototype = "Model* __thiscall ModelLoader::itemModel(ModelLoader* this, const cube::ItemData* item)"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:ModelLoader::get", "manual:switch on ItemData type, sub_type, material; returns a model table slot", "probe:model-slots"]
+source = "kyubu"
+notes = "a slot from the item type, sub_type, modifier, rarity and material: weapons through weapon_model_slot, armour as a base by type and material + (modifier % 5) * 5 + min(rarity, 4), fixed slots otherwise (details: the items atlas page); ret 4"
+
+[[function]]
+name = "weapon_model_slot"
+address = 0x51ACE0
+convention = "cdecl"
+prototype = "int32_t __cdecl weapon_model_slot(int32_t sub_type, int32_t modifier, int32_t rarity, int32_t material)"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:ModelLoader::itemModel", "manual:jump table on sub_type (0-20), then material; returns a slot number", "probe:model-slots"]
+source = "kyubu"
+notes = "most weapons: base + (modifier % 11) * 5 + min(rarity, 4), the base by sub_type and material; some materials a fixed slot; only caller ModelLoader::itemModel (returns to 0x4EB302)"
+
+
+# Item power and the equip gate (read statically on 2026-09-30).
+
+[[function]]
+name = "item_power"
+address = 0x4C75D0
+convention = "fastcall"
+prototype = "int32_t __fastcall item_power(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:int(level_curve(item.level) * 100 + 1)", "xref:item_tooltip"]
+source = "kyubu"
+notes = "the \"+N\" of item names and the Power line of the info box: 1 at level 1, 51 at 21, 84 at 100, 99 at 981, 100 at 1981. Callers: item_tooltip, item_received_message, can_equip_item, the inventory draw slot, the voxel widget, GameController::update. level_rework: stored 2000 + N gives N"
+
+[[function]]
+name = "can_equip_item"
+address = 0x43ECC0
+convention = "thiscall"
+prototype = "bool __thiscall can_equip_item(cube::Creature* this, cube::ItemData* item)"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:item_power", "manual:false when item_power > the creature's power, else the class check", "manual:ret 4, the result in AL; ECX = the creature, one stack argument, the item", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "the power gate (the creature's power from its level, curve inlined), then item_usable_by_class 0x4C6E50 with Creature+0x140. Only two callers: 0x47C29B (the input handler 0x47BB30: probably the item held at Creature+0x11EC, inferred; error sound 0x32 when refused) and 0x47D506 (an inventory entry)"
+
+[[function]]
+name = "can_equip_item_level_site"
+address = 0x43ECDD
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:can_equip_item", "manual:inline curve after the level load: movd xmm1,[edi+0x190] then cvtdq2ps", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "the instruction after cvtdq2ps (0x43ECDA) in can_equip_item; XMM1 = the level as a float. Writing old(N) here hits the float32 truncation (D2a): task 6.2 uses a whole-number gate in a hook instead, so this site is unused. Probe: reached 8 times"
+
+[[function]]
+name = "can_equip_item_refused_site"
+address = 0x43ED14
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:can_equip_item", "manual:reached when the power gate says no", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "the power gate said no: pop edi, xor al,al, pop esi, pop ebp, ret 4. An observation point for probes (the engine cannot hook the jle before it). EAX = the item's power, ESI = the creature's, EDI = the creature"
+
+[[function]]
+name = "can_equip_item_class_site"
+address = 0x43ED1C
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:can_equip_item", "manual:reached when the power gate says yes, before item_usable_by_class", "probe:rank-and-equip-gate"]
+source = "kyubu"
+notes = "the power gate said yes (the jle target): movzx eax,[edi+0x140], then item_usable_by_class decides. An observation point for probes. EAX = the item's power, ESI = the creature's, EDI = the creature"
+
+[[function]]
+name = "level_up_teach_formulas"
+address = 0x47FFA0
+convention = "thiscall"
+prototype = "void __thiscall level_up_teach_formulas(cube::GameController* this, uint32_t level)"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:cube::GameController::update", "manual:adds known formulas chosen by level mod 3, 4 and 5 and by class"]
+source = "kyubu"
+notes = "called on LEVEL UP! with the new level. Adds ItemData records (type, sub_type) to the known-formula list of the player style (Creature+0x1D28, list at +0x14) unless known: potions and food by level mod 4 and 5, starter items at level 1, class armour or weapons by level mod 3"
+
+# The item stats (read statically on 2026-09-30). item_tooltip calls each getter right before it prints the getter's
+# label, and the creature stat functions call the same getters for the worn items. The getters were first located in
+# the 07-20 build by ToufouMaster's CubicExpansion mod; the match to this build and the method are in
+# kyubu-mapping/evidence/toufoumaster-crossmatch-2026-09-30/.
+
+[[function]]
+name = "stat_scale"
+address = 0x446560
+convention = "cdecl"
+prototype = "float __cdecl stat_scale(float level, int32_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:2^(3*level_curve(level)) * 2^(rarity/4), two calls to pow", "xref:item_hp"]
+source = "kyubu"
+notes = "the item stat multiplier, 2^(3*curve(level)) * 2^(rarity/4): 1.0 at level 1, 5.64 at 100, 7.84 at 1981; rarity step x1.19. 29 callers: 14 item getters, 6 sheet item ratings (0x438AF7 to 0x4394BD), 6 sheet partners, 3 creature sites (0x4DEAFB, 0x4DEB7A, 0x59A504). level_rework splits by caller"
+
+[[function]]
+name = "item_armor"
+address = 0x4C69D0
+convention = "fastcall"
+prototype = "float __fastcall item_armor(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"ARMOR\"", "xref:cube::Creature::armor", "xref:item_tooltip", "manual:formula read from the code, 2026-10-01"]
+source = "kyubu"
+notes = "the ARMOR line of the info box, in st0; 0 outside types 4-7. cube::Creature::armor calls it four times. S*(chest 1.0, else 0.5)*f, S = stat_scale(level + 0.1*upgrades, rarity), f by material: 18 0.8; 19, 26, 27 0.85; 23, 25 0.75; else 1"
+
+[[function]]
+name = "item_crit"
+address = 0x4C6AE0
+convention = "fastcall"
+prototype = "float __fastcall item_crit(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"CRIT\"", "xref:item_tooltip", "xref:creature_crit"]
+source = "kyubu"
+notes = "the CRIT line of the info box, in st0. creature_crit calls it nine times, once per worn item"
+
+[[function]]
+name = "item_heal"
+address = 0x4C6D50
+convention = "fastcall"
+prototype = "float __fastcall item_heal(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"HP +\"", "xref:item_tooltip", "xref:cube::World::update"]
+source = "kyubu"
+notes = "the \"HP +\" line of a consumable (type 1): the hp it restores, in st0; 0 for other types. cube::World::update also calls it, probably when one is used"
+
+[[function]]
+name = "item_usable_by_class"
+address = 0x4C6E50
+convention = "thiscall"
+prototype = "bool __thiscall item_usable_by_class(cube::ItemData* this, int32_t class_type)"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:can_equip_item", "manual:item_tooltip asks it for classes 1 to 4, then prints Warrior ... Rogue"]
+source = "kyubu"
+notes = "the class check (ret 4): whether a class may use the item. can_equip_item runs it after the power gate with the creature's class (Creature+0x140); item_tooltip lists the classes it accepts"
+
+[[function]]
+name = "item_hp"
+address = 0x4C6FE0
+convention = "fastcall"
+prototype = "float __fastcall item_hp(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"HP\"", "xref:cube::Creature::maxHp", "xref:item_tooltip", "manual:formula read from the code, 2026-10-01"]
+source = "kyubu"
+notes = "the HP line of the info box, in st0. cube::Creature::maxHp calls it six times. Types 3-7: S*5*(chest 1.0, else 0.5)*(2 - r/20 + b), S = stat_scale(level + 0.1*upgrades, rarity), r = (modifier*8) mod 21, b = +1.0 material 1, +0.5 for 26, +0.75 for 27 (atlas: items)"
+
+[[function]]
+name = "item_value"
+address = 0x4C7610
+convention = "fastcall"
+prototype = "int32_t __fastcall item_value(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "manual:CubicExpansion hooks it; formula read 2026-10-01"]
+source = "kyubu"
+notes = "an item's price in coins: max(1, int(stat_scale(level, rarity)*10*f)), f by type: 3, 4 2; 5, 6 1; 7, 8 1.5; 9 1; 10-22 0.2; 23 100; weapon sub_types 5-8, 10, 11, 15-18 double it. Callers: onMouseDown (six), the draw slots 0x4C1F80 and 0x44F0C0"
+
+[[function]]
+name = "item_regeneration"
+address = 0x4C7760
+convention = "fastcall"
+prototype = "float __fastcall item_regeneration(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"REG\"", "xref:item_tooltip", "xref:creature_regeneration", "manual:formula read from the code, 2026-10-01"]
+source = "kyubu"
+notes = "the REG line of the info box, in st0; 0 outside types 3-7. creature_regeneration calls it once per worn item. S*(chest 0.2, else 0.1)*(r/20 + b), S = stat_scale(level + 0.1*upgrades, rarity), r = (modifier*8) mod 21, b = +0.5 material 26, +1.0 for 27"
+
+[[function]]
+name = "item_resistance"
+address = 0x4C7990
+convention = "fastcall"
+prototype = "float __fastcall item_resistance(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"RESI\"", "xref:cube::Creature::resistance", "xref:item_tooltip", "manual:formula read from the code, 2026-10-01"]
+source = "kyubu"
+notes = "the RESI line of the info box, in st0; 0 outside types 4-7. cube::Creature::resistance calls it four times. S*(chest 1.0, else 0.5)*f, S = stat_scale(level + 0.1*upgrades, rarity), f by material: 1 and 19 0.85; 26 and 27 0.75; else 1"
+
+[[function]]
+name = "item_tempo"
+address = 0x4C7AA0
+convention = "fastcall"
+prototype = "float __fastcall item_tempo(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"TEMPO\"", "xref:item_tooltip", "xref:creature_tempo"]
+source = "kyubu"
+notes = "the TEMPO line of the info box, in st0. creature_tempo calls it nine times, once per worn item"
+
+[[function]]
+name = "item_damage"
+address = 0x4C7E00
+convention = "fastcall"
+prototype = "float __fastcall item_damage(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["string:\"DMG\"", "xref:item_tooltip", "xref:creature_damage", "manual:formula read from the code, 2026-10-01"]
+source = "kyubu"
+notes = "the DMG line of the info box, in st0: weapons only (type 3). creature_damage and creature_projectile_damage add it for the held weapons. S*k, S = stat_scale(level + 0.1*upgrades, rarity), k by sub_type: 2 for 3, 4, 13; 8 for 6-8, 10, 11, 15-18; else 4"
+
+# Where an item's level comes from (task 6.1 of add-level-rework, M8), read statically on 2026-10-03.
+# Every generated item gets its level word (+0x10) from one of the two twin generators, called with (out, level, rarity,
+# category). A kill's gear drop, the loot a spawn carries and the zone-completion bonus item pass a creature level, a mod
+# level after 5.2, straight in: level_rework stores item_stored_level(N) = 2000 + N there (6.6). The store (0x5C8570) builds its stock from
+# level_from_power_fraction(i/30) and is already item scale. The call at 0x47CFA9 (onMouseDown) reads a stored level.
+
+[[function]]
+name = "item_generate"
+address = 0x5F74E0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate(void* this, cube::ItemData* out, int16_t level, uint8_t rarity, int32_t category)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:four stack arguments, level stored at ItemData+0x10", "xref:item_generate_alt"]
+source = "kyubu"
+notes = "makes one random item of the category (-1: any; callers also pass the creature's class byte). The level (2nd stack argument): level_rework stores 2000 + N. Twin of item_generate_alt: callers pick one by a coin flip. Callers 0x47CFA9, 0x5952A6, 0x599CF9, 0x5C88AB, 0x5D827A, 0x5F57F0"
+
+[[function]]
+name = "item_generate_alt"
+address = 0x5F3BF0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_alt(void* this, cube::ItemData* out, int16_t level, uint8_t rarity, int32_t category)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 0x10, same arguments as item_generate", "xref:item_generate"]
+source = "kyubu"
+notes = "the twin of item_generate, another template list, same arguments. Callers 0x47CFB7, 0x5952AD, 0x599D14, 0x5C88B9, 0x5D82D6, 0x5F57F7 (item_generate_any)"
+
+[[function]]
+name = "item_generate_any"
+address = 0x5F5760
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_any(void* this, cube::ItemData* out, int16_t level, uint8_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 0xC; picks a generator by coin flip, category -1", "probe:item-level-sites-dungeon"]
+source = "kyubu"
+notes = "front end of the generator pair, any category; the level is the 2nd stack argument. Makes an inventory-style entry (type byte 2). Callers 0x59A4CA (kill drop, victim level), 0x5D1E8F and 0x5F6EBE (area level); 6.2 converts all three"
+
+[[function]]
+name = "item_roll_rarity"
+address = 0x5F6F40
+convention = "thiscall"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 8; random below arg 1 plus 1, then four rare bonuses"]
+source = "kyubu"
+notes = "rarity of a generated item, at most 4: random up to the first argument, plus 1 for each of four rolls of 1 in 100, 1000 and 10000. The kill drop passes the victim's power_base. Callers 0x599CE5, 0x599D00, 0x599E06, 0x59A4B5, 0x5D2654 and six near 0x5EBE53"
+
+[[function]]
+name = "item_level_reroll"
+address = 0x4C7D20
+convention = "thiscall"
+prototype = "void __thiscall item_level_reroll(cube::ItemData* this, float window, bool upper)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 8, ECX is the item, args float window and bool upper", "xref:level_curve"]
+source = "kyubu"
+notes = "re-rolls a stored level in the power domain: random between the inverse of (curve - window) and, if upper, (curve + window); returns below level 2. level_rework replaces it for mod items. Window 0.05, 20 callers: kill drop 0x599D29, 0x599E2F (upper); 18 worn-item calls from 0x5EC12B and 0x60E701"
+
+[[function]]
+name = "kill_drop_level_site"
+address = 0x599CB5
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:after the load of the victim's level at 0x599CAF", "probe:item-level-sites"]
+source = "kyubu"
+notes = "in the drop function 0x5999D0 (one caller, applyHit 0x594A7E; hostile victims and entity 143, the chest, take it). The gear drop, 1 kill in 10, has ESI = the victim's level here, then ESI = level - 1 + a coin flip, min 1, goes to the generators. level_rework sets ESI = 2000 + N here"
+
+[[function]]
+name = "kill_drop_typed_item_site"
+address = 0x599F80
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:SI stored as the level word of each typed drop", "probe:item-level-sites"]
+source = "kyubu"
+notes = "the 1 to 3 other drops of a kill (a switch on the victim's entity type) get ESI as their level word. ESI is 1 when the gear branch did not run. Whether it is ever a creature level was not read"
+
+[[function]]
+name = "spawn_loot_site"
+address = 0x5D827A
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:item_generate call in the spawn builder 0x5D7EB0"]
+source = "kyubu"
+notes = "the spawn builder (callers 0x5D8C29, 0x5EC794) rolls two items into each new Spawn's list at +0xF6C (chests too): this call and item_generate_alt at 0x5D82D6. Level is the Spawn's +0x34, a mod level. Not reached on a dungeon visit. Convert in a generator detour (returns 0x5D827F, 0x5D82DB)"
+
+[[function]]
+name = "spawn_elite_item_site"
+address = 0x5EBDBB
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:Spawn +0x34 stored as an item's level word", "probe:item-level-sites-dungeon"]
+source = "kyubu"
+notes = "in the creature set-up: an elite (flag 0x200) gets an extra type 0x0B item whose level word is the Spawn's +0x34, with no generator call. Whether the level matters for that item was not read"
+
+[[function]]
+name = "bonus_item_site"
+address = 0x5952A6
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "guess"
+evidence = ["manual:item_generate call in applyHit's zone-completion block"]
+source = "kyubu"
+notes = "applyHit's zone-completion block makes an item through the generator pair (0x5952A6 item_generate, 0x5952AD alt): level = the mission zone's, rarity = its +p. level_rework converts both returns (0x5952AB, 0x5952B2) to item_stored_level(N) (item_level(N) before the scale is installed; 4.6, 6.6)"
+
+[[function]]
+name = "item_generate_level_one"
+address = 0x5F63F0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall item_generate_level_one(void* this, cube::ItemData* out, int16_t level, uint8_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 0xC, level word always 1", "xref:kill_drop_level_site"]
+source = "kyubu"
+notes = "the third generator of a kill drop (1 kill in 5, called at 0x599E1A with the victim's level in ESI): it makes a type 0x14 item whose level word is always 1, so the level rework needs no hook on it. Only call seen: 0x599E1A"
+
+# Adding an item to a creature's bags (task: the game API's creature_give_item). Read statically on 2026-10-04 from the loot paths
+# (0x470F6B, 0x47CFDD) and 0x46EEE0 itself.
+
+[[function]]
+name = "inventory_add"
+address = 0x46EEE0
+convention = "thiscall"
+prototype = "void __thiscall inventory_add(cube::Inventory* this, cube::ItemData* item, int32_t tab)"
+subsystem = "items"
+status = "verified"
+evidence = ["xref:cube::GameController::onMouseDown", "manual:ret 8; coins add to a counter, others fill a slot", "probe:inventory-add"]
+source = "kyubu"
+notes = "adds an item to the bags of ECX = Creature+0x11DC. tab -1 picks the bag by item_tab. Types 0x0C coins and 0x0D go to a counter; stackable types (0, 0x14, 0x17, 0x18, 0x19) take their level word as the quantity and store level 1. The loot paths follow it with the bag widget refresh"
+
+[[function]]
+name = "item_tab"
+address = 0x47FEF0
+convention = "stdcall"
+prototype = "int32_t __stdcall item_tab(cube::ItemData* item)"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:inventory_add", "manual:ret 4; a jump table on the type byte; the result is 0 to 3"]
+source = "kyubu"
+notes = "the bag of an item type: 0 equipment, 1 the default, 2 and 3 other kinds (read from the jump table, not checked in the game). inventory_add calls it when its tab is -1"
+
+# The equipment slot under the mouse (task 8.10 of add-skills-unleashed: a weapon the player cannot take out). Read statically
+# on 2026-10-17 from its body and its three callers.
+
+[[function]]
+name = "cube::GameController::equipmentSlotUnderCursor"
+address = 0x47B6E0
+convention = "thiscall"
+prototype = "cube::ItemData* __thiscall cube::GameController::equipmentSlotUnderCursor(cube::GameController* this)"
+subsystem = "items"
+status = "candidate"
+evidence = ["xref:cube::GameController::onMouseDown", "xref:cube::GameController::update", "manual:plain ret; null unless the character window is open", "manual:returns player + 0x300 + n * 0x118, the slot under the mouse"]
+source = "kyubu"
+notes = "where every click that moves an equipped item starts: a right click sends it to the bags, a left click swaps it with the cursor's item (Creature+0x11EC), a left click on the left hand bags a two-handed right weapon. Null makes them do nothing. update asks it for the hover info box"
+
+# Found by the item-level mapping pass, task 6.5 of add-level-rework (read statically on 2026-10-04).
+
+[[function]]
+name = "stat_scale_eighth"
+address = 0x4465F0
+convention = "cdecl"
+prototype = "float __cdecl stat_scale_eighth(float level, int32_t rarity)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:body of stat_scale, divided by 8 at the end", "xref:item_crit", "xref:item_tempo"]
+source = "kyubu"
+notes = "stat_scale(level, rarity) / 8, same arguments, result in st0. Three callers that read the item level raw: item_crit 0x4C6BC7, item_tempo 0x4C7B7C, the getter at 0x4C7930 (0x4C7963). It does not call stat_scale. level_rework hooks it, routed by return address"
+
+[[function]]
+name = "adaption_price"
+address = 0x40F6E0
+convention = "thiscall"
+prototype = "int32_t __thiscall adaption_price(void* this)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ECX is the adaption widget; 0x40F760 gives the item in its slot", "xref:cube::AdaptionWidget::AdaptionWidget"]
+source = "kyubu"
+notes = "platinum price of adapting the slot item to the player's level (Creature+0x190): 0 if the item level is at least that, else the gap times 2 * 2^((rarity - 1 + item level) / 4). Draw 0x40FAE0 repeats it. Click 0x47BB30 pays, stores the level (0x47CCFE). Mod hooks 0x40F701, 0x410D95"
+
+[[function]]
+name = "adaption_commit_level_site"
+address = 0x47CCFE
+convention = "cdecl"
+kind = "site"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:store of ESI = Creature+0x190 into the slot item"]
+source = "kyubu"
+notes = "in the input handler 0x47BB30: after payment the adaption writes Creature+0x190 (the player's level, 1 to 100 in the mod) over the item's stored level. level_rework stores 2000 + N when the item's level is below N, else the same word (a price of 0 stops the click at 0x47CCC5)"
+
+[[function]]
+name = "spawn_equipment"
+address = 0x5C6170
+convention = "thiscall"
+prototype = "void __thiscall spawn_equipment(void* this, void* spawn, int32_t flag)"
+subsystem = "items"
+status = "candidate"
+evidence = ["manual:ret 8, level word of nine worn items", "probe:worn-gear"]
+source = "kyubu"
+notes = "fills a Spawn's nine worn ItemData slots (Spawn +0x238 to +0xAF8) and gives each the Spawn's +0x34, a mod level, as its level word. Callers 0x5D6419, 0x5D844D, 0x5DD74E, 0x5EBD7F, 0x60E6C6. level_rework rewrites the words to 2000 + N after it runs (task 6.9)"

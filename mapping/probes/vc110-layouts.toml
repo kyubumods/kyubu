@@ -1,0 +1,169 @@
+# Recorded with kyubu_probe on the Windows laptop (Windows 10, real Cube.exe), in a copy of the game with the Kyubu 1.0.1
+# release installed and dev mode on (kmap probe replay, setup "menu"). While the game sat at the start menu, a read-only
+# scan (ReadProcessMemory) walked the game controller (0x1001010 bytes from the pointer at 0x7691C8) and the heap for
+# container-shaped memory. Evidence: kyubu-mapping/evidence/vc110-layouts-2026-09-27/.
+id = "vc110-layouts"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-09-27"
+steps = [
+    "Started Cube.exe with --kyubu-dev and kyubu_probe through kmap probe replay, and waited at the start menu",
+    "Scanned cube::GameController and the private heap for std::string, std::wstring, std::list and std::map shapes",
+    "Decoded the model table (ModelLoader at GameController+0x2F8, from lea ecx at 0x45AB55) and three maps' nodes",
+    "Wrote the checks below as the script and replayed it",
+]
+observations = [
+    "models vector at GameController+0x2FC: (last - first) / 4 = 2570, (end - first) / 4 = 3853, elements non-null",
+    "2570 = 2569 + the loader's placeholder (the log's Model slots line); 3853 = 2569 + 2569 / 2, VC110 growth",
+    "std::string at GameController+0x800590: \"--kyubu-dev\", size 11 at +0x10, capacity 15 at +0x14, NUL at +11",
+    "heap std::strings: \"dwarf-body-female.cub\" size 21 capacity 21, pointer at +0; no SSO string above 15",
+    "21 std::map shapes: head color and isnil (+0xC, +0xD) are 1 1 in every head, 1 0 in every root",
+    "map GameController+0x310 (444 nodes) has std::wstring keys at node+0x10, in order: Aim, Alpaca, Amulet",
+    "map GameController+0x318 (23 nodes): Adventurer Quarter (heap, size 18, capacity 23), Beach, Canyon (SSO, 7)",
+    "35 std::list shapes: every next/prev pair consistent, walking size nodes returns to the head",
+    "no std::wstring lies directly in the game controller: the game's wide strings sit in containers",
+    "replay (evidence replay/report.md): 28 of 28 expectations held; the one-element list's head.next == head.prev",
+]
+
+[[confirms]]
+entry = "std::vector"
+observed = "the model table holds 2570 Model pointers with 3853 allocated"
+
+[[confirms]]
+entry = "std::vector.first"
+observed = "points at model slot 0; slot 2569 (the loader's placeholder) is at first + 0x2824"
+
+[[confirms]]
+entry = "std::vector.last"
+observed = "last - 4 holds the placeholder model: 2570 elements"
+
+[[confirms]]
+entry = "std::vector.end"
+observed = "end - first = 3853 elements, the VC110 growth of 2569 by half"
+
+[[confirms]]
+entry = "std::string"
+observed = "the command-line string in the game controller, and model file names on the heap"
+
+[[confirms]]
+entry = "std::string.size"
+observed = "11 for \"--kyubu-dev\", 21 for \"dwarf-body-female.cub\""
+
+[[confirms]]
+entry = "std::string.capacity"
+observed = "15 with the text inline, 21 with it on the heap"
+
+[[confirms]]
+entry = "std::string_storage.buf"
+observed = "held \"--kyubu-dev\" and its NUL inline"
+
+[[confirms]]
+entry = "std::string_storage.ptr"
+observed = "pointed at \"dwarf-body-female.cub\" when the capacity was 21"
+
+[[confirms]]
+entry = "std::wstring"
+observed = "the keys of the game controller's name maps"
+
+[[confirms]]
+entry = "std::wstring.size"
+observed = "3 for Aim, 18 for Adventurer Quarter"
+
+[[confirms]]
+entry = "std::wstring.capacity"
+observed = "7 with the text inline, 23 with it on the heap"
+
+[[confirms]]
+entry = "std::wstring_storage.buf"
+observed = "held Aim inline as UTF-16"
+
+[[confirms]]
+entry = "std::wstring_storage.ptr"
+observed = "pointed at Adventurer Quarter"
+
+[[confirms]]
+entry = "std::map"
+observed = "21 maps in the game controller, e.g. 444 and 23 names"
+
+[[confirms]]
+entry = "std::map.size"
+observed = "matched the number of nodes an in-order walk visits"
+
+[[confirms]]
+entry = "std::tree_node.left"
+observed = "the head's left is the smallest key (Aim, Adventurer Quarter)"
+
+[[confirms]]
+entry = "std::tree_node.parent"
+observed = "the head's parent is the root, whose parent is the head"
+
+[[confirms]]
+entry = "std::tree_node.right"
+observed = "the head's right is the largest node, whose right is the head"
+
+[[confirms]]
+entry = "std::tree_node.color"
+observed = "1 (black) in every head and root"
+
+[[confirms]]
+entry = "std::tree_node.isnil"
+observed = "1 in every head, 0 in every element node"
+
+[[confirms]]
+entry = "std::list"
+observed = "35 lists in the game controller, one with an element"
+
+[[confirms]]
+entry = "std::list.size"
+observed = "equalled the nodes walked from the head back to it"
+
+[[confirms]]
+entry = "std::list_node.next"
+observed = "the next chain returned to the head after size nodes"
+
+[[confirms]]
+entry = "std::list_node.prev"
+observed = "each node's next pointed back to it through prev"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+seconds = 120
+script = """
+log vc110 layouts: containers of the game controller at the start menu
+wait 5
+# std::vector: the model table (ModelLoader at GameController+0x2F8, its vector at +4)
+expect std::vector.first value u32 != 0 [[@0x7691C8]+0x2FC]
+expect std::vector.first value u32 != 0 [[@0x7691C8]+0x2FC] + 0x2824
+expect std::vector.last value u32 != 0 [[@0x7691C8]+0x300] - 4
+expect std::vector.end value u32 >= 0 [[@0x7691C8]+0x304] - 4
+# std::string: the command line, "--kyubu-dev"
+expect std::string.size value u32 == 11 [@0x7691C8]+0x8005A0
+expect std::string.capacity value u32 == 15 [@0x7691C8]+0x8005A4
+expect std::string_storage.buf value u8 == 45 [@0x7691C8]+0x800590
+expect std::string_storage.buf value u8 == 0 [@0x7691C8]+0x80059B
+# std::map and std::tree_node: 23 names at GameController+0x318
+expect std::map.size value u32 == 23 [@0x7691C8]+0x31C
+expect std::tree_node.isnil value u8 == 1 [[@0x7691C8]+0x318]+0xD
+expect std::tree_node.color value u8 == 1 [[@0x7691C8]+0x318]+0xC
+expect std::tree_node.parent value u8 == 0 [[[@0x7691C8]+0x318]+4]+0xD
+expect std::tree_node.left value u8 == 0 [[[@0x7691C8]+0x318]]+0xD
+expect std::tree_node.right value u8 == 0 [[[@0x7691C8]+0x318]+8]+0xD
+# std::wstring: the smallest key, Adventurer Quarter on the heap
+expect std::wstring.size value u32 == 18 [[[@0x7691C8]+0x318]]+0x20
+expect std::wstring.capacity value u32 == 23 [[[@0x7691C8]+0x318]]+0x24
+expect std::wstring_storage.ptr value u16 == 65 [[[[@0x7691C8]+0x318]]+0x10]
+expect std::wstring_storage.ptr value u16 == 100 [[[[@0x7691C8]+0x318]]+0x10] + 2
+# ... and Aim inline, the smallest of the 444 names at GameController+0x310
+expect std::map.size value u32 == 444 [@0x7691C8]+0x314
+expect std::wstring.size value u32 == 3 [[[@0x7691C8]+0x310]]+0x20
+expect std::wstring.capacity value u32 == 7 [[[@0x7691C8]+0x310]]+0x24
+expect std::wstring_storage.buf value u16 == 65 [[[@0x7691C8]+0x310]]+0x10
+expect std::wstring_storage.buf value u16 == 109 [[[@0x7691C8]+0x310]]+0x14
+# std::list: one element at GameController+0x2BC, empty at +0x138
+expect std::list.size value u32 == 1 [@0x7691C8]+0x2C0
+expect std::list.size value u32 == 0 [@0x7691C8]+0x13C
+expect std::list_node.next value u32 != 0 [[[@0x7691C8]+0x2BC]]
+expect std::list_node.prev value u32 != 0 [[[@0x7691C8]+0x2BC]+4]
+expect - hooks == 0
+"""

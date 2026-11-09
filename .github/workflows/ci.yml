@@ -1,0 +1,50 @@
+# Builds Kyubu with MinGW-w64, runs the unit/hook tests under Wine and the static checks, and packages
+# the release. Tests that need the game itself (install round trip, in-game checks) are skipped here:
+# the game cannot be redistributed. See tests/README.md.
+name: ci
+on: [push, pull_request]
+jobs:
+  mapping:
+    # Every mapping/ check that needs no game files: schema, rules, names, evidence, the exported-names
+    # lock, atlas references, and the staleness of every file generated from mapping/ (symbol maps with
+    # their committed signatures, headers, Lua files, docs/game/, Ghidra mappings, survey summary).
+    # No game files, no secrets, no packages to install. The full check, which also regenerates the
+    # signatures from Cube.exe and Server.exe, runs in the private contract level (add-feature-testing).
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mapping check (kmap check --offline)
+        run: python3 tools/kmap check --offline
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install toolchain
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build mingw-w64 g++-multilib clang wine32:i386 wine xvfb python3-pip
+          pip install --break-system-packages pefile pillow pytest
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-i686.cmake -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build
+      - name: Unit and hook tests (Wine)
+        run: |
+          export WINEARCH=win32 WINEPREFIX=$HOME/.wine32 WINEDEBUG=-all
+          xvfb-run -a wineboot -i
+          cd build/tests && xvfb-run -a wine kyubu_tests.exe
+      - name: SDK header checks
+        run: tests/sdk/check_headers.sh
+      - name: Public-file check (no Ghidra projects, decompiler dumps or game files)
+        run: python3 tools/check_public_files.py
+      - name: Docs checks
+        run: python3 tools/check_docs.py
+      - name: Tool tests
+        run: python3 -m pytest -q tests/tools
+      - name: Package
+        run: python3 scripts/package.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kyubu
+          path: dist/*.zip

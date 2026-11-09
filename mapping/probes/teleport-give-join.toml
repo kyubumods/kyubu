@@ -1,0 +1,75 @@
+# Recorded with kyubu_probe and the Kyubu 1.0.1 loader (this checkout, MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop, Xvfb, software rendering): kmap probe replay starts the probed Cube.exe, then a Kyubu-loaded Server.exe beside it
+# (server = "local"); the Cube.exe joins 127.0.0.1 with a new character. Both developer mods (teleport, give_item) are in both games:
+# the client side runs them, and the server must skip them (they declare the client side only).
+id = "teleport-give-join"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: Cube.exe with --kyubu-dev and the mods teleport and give_item joined a Kyubu-loaded Server.exe that has the same two mods; new character",
+    "give_item gave a weapon, 500 gold coins and a random item through creature_give_item; the inventory screen was opened",
+    "teleport:tp listed the dungeons, hopped 3,000 blocks east and 1,000 north (it hovers there), and landed; inspect creatures before and after the hop",
+]
+observations = [
+    "Wine replay 2 passed, no fault (replay 1 only failed its coin check, which ran before the console commands had finished: each console command takes about 20 s on a joined client; the wait is now 150 s). The Cube.exe joined 127.0.0.1:12345 (`connected to 127.0.0.1:12345 (multiplayer: client side only)`), World.joined was 1, and both mods loaded and ran on the client",
+    "the Server.exe (Kyubu 1.0.1, same two mods in its mods folder) logged `Discovered 2 mod package(s)` and `Load order: (no mods)`, `boot complete: 0 mod(s) active`: the client-only mods are skipped, with no warning but the five `not mapped for Server.exe yet` lines every Server.exe boot has",
+    "give_item through the API on the joined client: a weapon (type 3, sub_type 17, level 21, rarity 2) in bag 0 slot 3 and again in slot 5, a random item of stored level 30 in slot 4, and 500 gold coins moved the coin counter from 0 to 5,000,000 (the probe read 5000000 at Creature+0x1304)",
+    "teleport on the joined client: `teleport:tp` read the start x 8396928, y 8396928, z 84.1; `teleport:tp dungeons` listed 24 of 142 built dungeons (the region grid is filled on a joined client); `teleport:tp rel 3000 1000` hovered at x 8399928, y 8397928, z 250 (249.1 after 70 s, the hover holds it); `teleport:tp land` put the player on the ground at z 205.1; the game showed no disconnect or Connection error",
+    "the server followed the move (client-authoritative position): the 18 creatures of the start (the player, id 1, and 17 of the server's with ids from 550301081347) were replaced by 31 at the hover place; the only id in both lists is the player's",
+]
+
+[[confirms]]
+entry = "cube::World.joined"
+observed = "1 on a Cube.exe joined to a Server.exe"
+
+[[confirms]]
+entry = "cube::Inventory.coins"
+observed = "0 before, 5,000,000 after 500 gold coins given through creature_give_item on a joined client"
+
+[replay]
+host = "Cube.exe"
+setup = "menu"
+server = "local"
+seconds = 900
+mods = ["mods-dev/teleport", "mods-dev/give_item"]
+input = [
+    "shot 01-joined",
+    "until tpj: items",
+    "console teleport:tp",
+    "console give_item:give 3 17 21 2", "wait 3",
+    "console give_item:give coins 500 gold", "wait 3",
+    "console give_item:give random 30 1", "wait 3",
+    "console give_item:give 3 17 21 2", "wait 3",
+    "key i", "wait 8", "shot 02-inventory", "key i", "wait 3",
+    "until tpj: hop",
+    "console teleport:tp dungeons", "wait 3",
+    "console teleport:tp rel 3000 1000", "wait 60", "shot 03-hover",
+    "until tpj: land",
+    "console teleport:tp", "console teleport:tp land", "wait 40", "shot 04-landed",
+    "console teleport:tp",
+    "until tpj: done",
+]
+script = """
+log teleport and give_item on a joined client
+wait world
+wait 30
+expect cube::World.joined value u8 == 1 [@0x7691C8] + 0x390
+inspect player [@0x7691C8]
+inspect creatures [@0x7691C8] + 0x2DC
+log tpj: items
+wait 150
+inspect cube::Creature [[@0x7691C8] + 0x8006C8]
+expect cube::Inventory.coins value u32 >= 5000000 [[@0x7691C8] + 0x8006C8] + 0x1304
+log tpj: hop
+wait 90
+inspect player [@0x7691C8]
+inspect creatures [@0x7691C8] + 0x2DC
+log tpj: land
+wait 70
+inspect player [@0x7691C8]
+inspect creatures [@0x7691C8] + 0x2DC
+log tpj: done
+wait 5
+expect - hooks == 0
+"""

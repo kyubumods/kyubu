@@ -1,0 +1,27 @@
+# Task 10.4 of add-skills-unleashed-multiplayer (design D10): the Cube.exe half of channel-transport-server, the same run seen from
+# the joined client. Its replay is that record's (client = "join"); this record holds the client entries it confirms.
+id = "channel-transport-client"
+build = "cube-0x51EA955E"
+kyubu = "1.4"
+date = "2026-11-08"
+steps = [
+    "the joined Cube.exe of probe channel-transport-server, with channel_proto",
+    "its pings and large message are written at the send pass; the server's answers are read at the receive loop's next-packet site",
+]
+observations = [
+    "native run 1, 2026-11-08 (evidence/channel-transport-2026-11-08/channel-transport-server-run1, client.log), passed: 'channel transport: installed at Net::clientReceiveNextSite and Net::clientSendPassSite'",
+    "the four sends left at the client's send pass and reached the server whole and in order",
+    "the five answers were read at the next-packet site, whole and in order (60,000 bytes equal); the game's packets went on, no disconnect",
+]
+
+[[confirms]]
+entry = "Net::clientReceiveNextSite"
+observed = "five Kyubu packets read there whole and in order; the receive loop went on with the game's packets"
+
+[[confirms]]
+entry = "Net::clientSendPassSite"
+observed = "four Kyubu packets written there between two game packets reached the server"
+
+[[confirms]]
+entry = "cube::GameController.socket"
+observed = "the packets written to it at the send pass reached the server, and reads from it got the answers"

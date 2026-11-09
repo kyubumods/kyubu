@@ -1,0 +1,9 @@
+id = "creature_flags_proto"
+name = "Creature flags prototype"
+version = "0.1.0"
+kyubu = "^1.3"
+sides = ["client", "server"]
+description = "Development only (probe creature-flags): flags the first of two slimes with creature_set_flags (config flags, default 3 = unstoppable + invulnerable; the second is a control), parks it in front of the player, forces a stun and a push on every hit at hitListSite, and logs its state after each hit."
+
+[native]
+common = "bin/creature_flags_proto.dll"

@@ -1,0 +1,46 @@
+# entity_spawner's options (docs/config.md). Change them in kyubu/config/entity_spawner.toml, or with the
+# console: config entity_spawner distance 6
+[options.toggle_key]
+type = "string"
+default = "F7"
+description = "The key that opens and closes the window: F1 to F24, a letter or a digit."
+
+[options.distance]
+type = "float"
+default = 4.0
+min = 1.0
+max = 64.0
+description = "How many blocks in front of the player a creature appears."
+
+[options.hostile]
+type = "bool"
+default = true
+description = "Spawned creatures attack you. When off they are on your side (friendly ones and companions always are)."
+
+[options.named]
+type = "bool"
+default = false
+description = "On: friendly creatures have a name and can be talked to, like villagers. Off: they are nameless."
+
+[options.behavior]
+type = "string"
+default = "default"
+choices = ["default", "still", "monster", "friendly", "companion", "guard"]
+description = "How spawned creatures act: default, still, monster, friendly, companion (follows you) or guard (patrols)."
+
+[options.trace]
+type = "bool"
+default = false
+description = "Writes where each spawned creature is, and how far from you, to the log every 5 seconds. For testing."
+
+[options.fights]
+type = "bool"
+default = true
+description = "Old option kept so old settings still work. Use Behavior instead."
+
+[options.level]
+type = "int"
+default = 0
+min = 0
+max = 500
+description = "The spawned creature's level; 0 is the player's level. The window's slider starts from it."

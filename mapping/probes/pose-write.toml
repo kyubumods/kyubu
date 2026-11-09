@@ -1,0 +1,56 @@
+# Task 2.5 of add-ability-animation (A5, the composition order). mods-dev/pose_write_proto writes vectors of the local player's draw record at the join
+# site 0x41F135 (found by task 2.4; EDI is the record, a write goes through a float*) on every draw, in phases of 8 s, and logs a "posewrite: shotNN"
+# line 4 s into each phase, where the input takes a screenshot (the camera zoomed out by 3 wheel ticks first). Phases alternate a baseline (no write)
+# with one write to hand B (the club's hand): position x, y, z of 20, euler x, y, z of 90, then position x 20 with euler z 90 (a rotation about z moves a
+# point on the x axis only if the rotation is applied outside the translation, so this pair shows the order).
+id = "pose-write"
+build = "cube-0x51D2CE9C"
+kyubu = "1.0.1"
+date = "2026-10-06"
+steps = [
+    "Wine replay: gamepilot made the character Tester (human male warrior) and a new world; the mod waited 40 s after the first draw of the player",
+    "camera zoomed out with 3 wheel ticks; fifteen phases of 8 s, a screenshot 4 s into each (see the header)",
+]
+observations = [
+    "Wine replay 8 passed (evidence/ability-animation-2026-10-06/pose-write-run8/: 15 screenshots, sheet.png, fist-measure.txt). Runs 1 to 7 are not the evidence: a stall skipped the shot lines (1), a camera too close (2), the input step was refused (3), a yaw write at a wrong offset moved the player (4 to 6), no baselines between the writes (7); see the README, 2.5",
+    "the baseline phases that follow the first one drew the screen-left fist (hand B) identically: 414 skin pixels, a 33 x 26 box at (142, 118) of the crop, six times; the first phase was still easing from the world's first seconds",
+    "a write of 90 degrees on x, y or z of hand B's euler at the join changed the fist's outline (box 32 x 38, 27 x 33, 40 x 26); a position write of 20 on z took the fist out of the measured region (up); on y it changed nothing; on x alone the reading is contaminated by the easing of the first phase",
+    "a position write of 20 on x together with 90 degrees on z moved the fist 126 px to the side at the same height, while 90 degrees on z alone left its centre in place: the position goes through the rotation (the rotation is the outer call, the translate the inner). One pair; the axes of the hand's own frame are not settled",
+    "the warrior's club stayed on its back, in the same place, in all 15 screenshots, while hand B moved: at idle it does not follow the hands (it may when drawn, not tested)",
+    "the hook runs on every draw of the local player and writes through ctx.edi as a float*; the other creatures are skipped",
+]
+
+[[confirms]]
+entry = "draw_creature"
+observed = "a write of one vector of the record at 0x41F135 is drawn: the hand's picture changes with the vector written (screenshots per phase, measured in fist-measure.txt)"
+
+[replay]
+host = "Cube.exe"
+setup = "new-world"
+seconds = 720
+mods = ["mods-dev/pose_write_proto"]
+input = [
+    "until posewrite: first draw", "wheel down 3",
+    "until shot01", "shot 01-baseline1",
+    "until shot02", "shot 02-handB_pos_x_20",
+    "until shot03", "shot 03-baseline2",
+    "until shot04", "shot 04-handB_pos_y_20",
+    "until shot05", "shot 05-baseline3",
+    "until shot06", "shot 06-handB_pos_z_20",
+    "until shot07", "shot 07-baseline4",
+    "until shot08", "shot 08-handB_euler_x_90",
+    "until shot09", "shot 09-baseline5",
+    "until shot10", "shot 10-handB_euler_y_90",
+    "until shot11", "shot 11-baseline6",
+    "until shot12", "shot 12-handB_euler_z_90",
+    "until shot13", "shot 13-baseline7",
+    "until shot14", "shot 14-handB_pos_x_20_euler_z_90",
+    "until shot15", "shot 15-baseline8"
+]
+script = """
+log pose-write: task 2.5, one vector written at the join site 0x41F135
+wait world
+wait 20
+wait 400
+expect draw_creature value u32 != 0 [[@0x7691C8] + 0x8006C8] + 0x1498
+"""

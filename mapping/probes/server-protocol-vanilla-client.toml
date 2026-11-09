@@ -1,0 +1,59 @@
+# Recorded with kyubu_probe and the Kyubu 1.1 loader in development (MinGW build), unattended under Wine 9.0 (WSL on the Windows
+# laptop): kmap probe replay starts Server.exe WITH the level_rework mod (mods_on), then a Kyubu-loaded Cube.exe WITHOUT the mod that
+# tries to join 127.0.0.1 with a new character (client = "join"). Task 8.3 of add-level-rework, "Vanilla client, modded server": the
+# vanilla client sends version 3, the mod's hook on the server's compare turns it into a value that is not 3, and the game's own
+# refusal answers (a bare 3 and a closed socket). The join branch (Net::acceptJoinSite) and the refusal branch are traced; the client's
+# screen is the evidence of what the player sees.
+id = "server-protocol-vanilla-client"
+build = "server-0x51D2CE9B"
+kyubu = "1.1"
+date = "2026-10-04"
+steps = [
+    "Wine replay: Server.exe with level_rework, then a client without a mod that tries to join with a new warrior; the script waits 110 s for the attempt",
+    "traced the join branch and the wrong-version reply of server_accept_loop",
+    "a screenshot of the client after the attempt",
+]
+observations = [
+    "Wine replay 2 (passed, 3 of 3 expectations held, with reply 17 on; replay 1, before it, showed CONNECTION ERROR; evidence in kyubu-mapping/evidence/server-protocol-compat-2026-10-04/, files vanilla-*): the client without the mod sent version 3; the server's log says `client version 0x00000003: refused (not the mod's version)`",
+    "the join branch (0x4255AC) ran 0 times and the refusal's send (traced at 0x42556E, since the mod patches the reply's immediate at 0x425565) once: the game's own refusal path with the reply 17 and the server's version (8 bytes); the client log has `connected to 127.0.0.1:12345` and `disconnected from server` in the same millisecond",
+    "01-refused.png: the client's connect screen shows ERROR: SERVER HAS DIFFERENT VERSION (1.26327E+007) THAN CLIENT (0.03): the game's own text, from the reply 17 that the modded server now sends (the user's decision on D7's open point). The client prints versions as floats: 3 shows as 0.03 and the mod's 1263271937 as 1.26327E+007",
+]
+
+[[confirms]]
+entry = "Net::acceptJoinSite"
+observed = "0 calls: a client without the mod does not get past the version compare of a modded server"
+
+[[confirms]]
+entry = "Net::acceptWrongVersionReplySite"
+observed = "1 call: the refusal of the vanilla client (the compare saw 0 in place of vanilla's 3)"
+
+[[confirms]]
+entry = "Net::acceptVersionSite"
+observed = "hooked by the mod, so not traced: the mod's log line shows the version it read and what it did"
+
+[replay]
+host = "Server.exe"
+setup = "menu"
+client = "join"
+mods = ["mods-gameplay/level_rework"]
+mods_on = ["Server.exe"]
+seconds = 300
+input = [
+    "until 8.3: vanilla client done",
+    "wait 5",
+    "shot 01-refused",
+]
+script = """
+log level_rework on Server.exe: a vanilla client is refused (task 8.3 of add-level-rework)
+trace add @0x4255AC
+trace add @0x42556E
+trace start
+wait 120
+trace stop
+trace report
+expect Net::acceptJoinSite calls @0x4255AC == 0
+expect Net::acceptWrongVersionReplySite calls @0x42556E >= 1
+log 8.3: vanilla client done
+wait 10
+expect - hooks == 0
+"""

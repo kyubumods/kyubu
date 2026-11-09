@@ -1,0 +1,145 @@
+# Server.exe: creature behaviours (cube::Behavior and its subclasses).
+
+[[function]]
+name = "cube::CombatBehavior::CombatBehavior"
+address = 0x402640
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::CombatBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CombatBehavior::update"
+address = 0x402AA0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CombatBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CompanionBehavior::CompanionBehavior"
+address = 0x405170
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::CompanionBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::CompanionBehavior::update"
+address = 0x405320
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::CompanionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::LookAtPlayerBehavior"
+address = 0x4140C0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::LookAtPlayerBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::LookAtPlayerBehavior::update"
+address = 0x4140D0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::LookAtPlayerBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::RandomInteractionBehavior"
+address = 0x41B340
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::RandomInteractionBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomInteractionBehavior::update"
+address = 0x41B540
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomInteractionBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::RandomWalkBehavior"
+address = 0x41C530
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::RandomWalkBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::RandomWalkBehavior::update"
+address = 0x41C550
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::RandomWalkBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SequentialBehavior::SequentialBehavior"
+address = 0x41C960
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::SequentialBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SequentialBehavior::update"
+address = 0x41CA20
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SequentialBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::SpawnLocationBehavior"
+address = 0x428690
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::SpawnLocationBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::SpawnLocationBehavior::update"
+address = 0x4286B0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::SpawnLocationBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
+
+[[function]]
+name = "cube::WalkPathBehavior::WalkPathBehavior"
+address = 0x4C6140
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["rtti:cube::WalkPathBehavior", "manual:stores the vtable; called directly, not from a slot"]
+source = "kyubu"
+
+[[function]]
+name = "cube::WalkPathBehavior::update"
+address = 0x4C61F0
+convention = "thiscall"
+subsystem = "ai"
+status = "candidate"
+evidence = ["vtable:cube::WalkPathBehavior:0", "manual:the behaviour tick; slot 1 is clone (operator new)"]
+source = "kyubu"
